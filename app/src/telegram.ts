@@ -59,3 +59,7 @@ export function displayName(): string {
 export function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   tg?.HapticFeedback?.impactOccurred(style);
 }
+
+export function notify(type: 'success' | 'error' | 'warning') {
+  tg?.HapticFeedback?.notificationOccurred(type);
+}

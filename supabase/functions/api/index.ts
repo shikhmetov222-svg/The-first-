@@ -31,19 +31,71 @@ class ApiError extends Error {
   }
 }
 
+type Body = Record<string, unknown>;
+
+// Ошибки игровых правил приходят из базы с кодом P0001 — их текст показываем игроку.
+async function rpc<T>(fn: string, args: Body): Promise<T> {
+  const { data, error } = await db.rpc(fn, args);
+  if (error) {
+    if (error.code === 'P0001') throw new ApiError(400, error.message);
+    throw error;
+  }
+  return data as T;
+}
+
+function str(body: Body, key: string): string {
+  const v = body[key];
+  if (typeof v !== 'string') throw new ApiError(400, `Нет параметра ${key}`);
+  return v;
+}
+
+function int(body: Body, key: string): number {
+  const v = body[key];
+  if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw new ApiError(400, `Нет параметра ${key}`);
+  return v;
+}
+
+async function playerId(user: TelegramUser): Promise<string> {
+  const { data, error } = await db.from('players').select('id').eq('telegram_id', user.id).single();
+  if (error || !data) throw new ApiError(401, 'Игрок не найден, перезапусти игру');
+  return data.id;
+}
+
+const state = (id: string) => rpc<Body>('get_state', { p_player_id: id });
+
 async function login(user: TelegramUser) {
-  const { data, error } = await db.rpc('login_player', {
+  const player = await rpc<Body>('login_player', {
     p_telegram_id: user.id,
     p_first_name: user.first_name ?? '',
     p_username: user.username ?? null,
     p_language_code: user.language_code ?? null,
   });
-  if (error) throw error;
-  return { player: data };
+  const id = player.id as string;
+  const summary = !player.is_new && player.prev_seen_at
+    ? await rpc<Body>('away_summary', { p_player_id: id, p_since: player.prev_seen_at })
+    : null;
+  return { ...(await state(id)), is_new: player.is_new, summary };
 }
 
-const actions: Record<string, (user: TelegramUser, body: Record<string, unknown>) => Promise<unknown>> = {
+// Действие игрока → новое состояние экрана.
+function action(run: (id: string, body: Body) => Promise<unknown>) {
+  return async (user: TelegramUser, body: Body) => {
+    const id = await playerId(user);
+    const result = await run(id, body);
+    return { ...(await state(id)), result };
+  };
+}
+
+const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknown>> = {
   login,
+  state: action(async () => null),
+  open_business: action((id, b) => rpc('open_business', { p_player_id: id, p_type: str(b, 'type') })),
+  restock: action((id, b) =>
+    rpc('restock', { p_player_id: id, p_type: str(b, 'type'), p_qty: int(b, 'qty') })),
+  transfer_bread: action((id, b) => rpc('transfer_bread', { p_player_id: id, p_qty: int(b, 'qty') })),
+  set_price: action((id, b) =>
+    rpc('set_price', { p_player_id: id, p_type: str(b, 'type'), p_price: int(b, 'price') })),
+  collect: action((id) => rpc('collect_revenue', { p_player_id: id })),
 };
 
 Deno.serve(async (req) => {
@@ -58,7 +110,7 @@ Deno.serve(async (req) => {
     if (!user) throw new ApiError(401, 'Не удалось подтвердить вход через Telegram');
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const handler = actions[String(body.action)];
+    const handler = Object.hasOwn(actions, String(body.action)) ? actions[String(body.action)] : undefined;
     if (!handler) throw new ApiError(400, 'Неизвестное действие');
 
     return json(await handler(user, body));

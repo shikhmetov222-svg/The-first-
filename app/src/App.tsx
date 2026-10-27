@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { api, type Player } from './api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api, type BusinessType, type GameState, type LoginResult } from './api';
+import { BusinessCard } from './components/BusinessCard';
+import { ActionSheet, type SheetKind } from './components/ActionSheet';
+import { AwaySummary } from './components/AwaySummary';
+import { TickTimer } from './components/TickTimer';
 import { money } from './format';
-import { haptic, isInTelegram } from './telegram';
+import { isInTelegram, notify } from './telegram';
 
-type State =
-  | { kind: 'loading' }
-  | { kind: 'error'; message: string }
-  | { kind: 'ready'; player: Player };
+const POLL_MS = 60_000;
 
 export function App() {
   if (!isInTelegram) return <NotInTelegram />;
@@ -14,15 +15,29 @@ export function App() {
 }
 
 function Game() {
-  const [state, setState] = useState<State>({ kind: 'loading' });
+  const [game, setGame] = useState<GameState | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<LoginResult['summary']>(null);
+  const [sheet, setSheet] = useState<SheetKind | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+  const toastTimer = useRef<number>();
+
+  const showToast = useCallback((text: string, error = false) => {
+    setToast({ text, error });
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }, []);
 
   const login = useCallback(async () => {
-    setState({ kind: 'loading' });
+    setLoginError(null);
     try {
-      const { player } = await api.login();
-      setState({ kind: 'ready', player });
+      const res = await api.login();
+      setGame(res);
+      const hasNews = res.summary?.items.some((i) => i.sold > 0 || i.produced > 0);
+      if (hasNews) setSummary(res.summary);
     } catch (e) {
-      setState({ kind: 'error', message: (e as Error).message });
+      setLoginError((e as Error).message);
     }
   }, []);
 
@@ -30,68 +45,161 @@ function Game() {
     login();
   }, [login]);
 
-  return (
-    <main className="screen">
-      <header className="hero">
-        <div className="logo">CAPITAL</div>
-        <p className="subtitle">Бизнес-симулятор</p>
-      </header>
+  // Пока игра открыта, раз в минуту подтягиваем свежие продажи.
+  useEffect(() => {
+    if (!game) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') api.state().then(setGame).catch(() => {});
+    }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [game !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      {state.kind === 'loading' && <p className="center hint">Входим в игру…</p>}
+  /** Выполнить действие на сервере и показать новое состояние. */
+  const run = useCallback(
+    async <R,>(fn: () => Promise<GameState & { result: R }>, success?: (r: R) => string) => {
+      if (busy) return false;
+      setBusy(true);
+      try {
+        const res = await fn();
+        setGame(res);
+        notify('success');
+        if (success) showToast(success(res.result));
+        return true;
+      } catch (e) {
+        notify('error');
+        showToast((e as Error).message, true);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, showToast],
+  );
 
-      {state.kind === 'error' && (
+  if (loginError) {
+    return (
+      <Shell>
         <section className="card">
           <h2>Не получилось войти</h2>
-          <p className="hint">{state.message}</p>
+          <p className="hint">{loginError}</p>
           <button className="button" onClick={login}>
             Попробовать снова
           </button>
         </section>
+      </Shell>
+    );
+  }
+
+  if (!game) {
+    return (
+      <Shell>
+        <p className="center hint">Входим в игру…</p>
+      </Shell>
+    );
+  }
+
+  const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
+  const owned = new Set(game.businesses.map((b) => b.type));
+
+  return (
+    <Shell compact>
+      <section className="card capital">
+        <div className="capital-row">
+          <div>
+            <div className="stat-label">Капитал</div>
+            <div className="capital-value">{money(game.player.cash)}</div>
+          </div>
+          <div className="right">
+            <div className="stat-label">В кассах</div>
+            <div className="pending-value">{money(pending)}</div>
+          </div>
+        </div>
+        <button
+          className="button"
+          disabled={pending === 0 || busy}
+          onClick={() => run(api.collect, (sum) => `+${money(sum)} в капитал`)}
+        >
+          {pending > 0 ? `Забрать выручку ${money(pending)}` : 'Касса пуста'}
+        </button>
+        <TickTimer serverTime={game.server_time} />
+      </section>
+
+      {game.catalog.map((item) => (
+        <BusinessCard
+          key={item.type}
+          item={item}
+          business={game.businesses.find((b) => b.type === item.type)}
+          cash={game.player.cash}
+          hasBakery={owned.has('bakery')}
+          hasShop={owned.has('shop')}
+          busy={busy}
+          onOpen={() => setSheet({ kind: 'open', type: item.type })}
+          onAction={(kind) => setSheet({ kind, type: item.type } as SheetKind)}
+        />
+      ))}
+
+      {sheet && (
+        <ActionSheet
+          sheet={sheet}
+          game={game}
+          busy={busy}
+          onClose={() => setSheet(null)}
+          onOpenBusiness={async (type: BusinessType) => {
+            const name = game.catalog.find((c) => c.type === type)?.name;
+            if (await run(() => api.openBusiness(type), () => `${name} открыта!`)) setSheet(null);
+          }}
+          onRestock={async (type, qty) => {
+            if (await run(() => api.restock(type, qty), () => 'Склад пополнен')) setSheet(null);
+          }}
+          onTransfer={async (qty) => {
+            if (await run(() => api.transferBread(qty), () => 'Хлеб доставлен в магазин')) setSheet(null);
+          }}
+          onSetPrice={async (type, price) => {
+            if (await run(() => api.setPrice(type, price), () => 'Цена изменена')) setSheet(null);
+          }}
+        />
       )}
 
-      {state.kind === 'ready' && <Welcome player={state.player} />}
-    </main>
+      {summary && (
+        <AwaySummary
+          summary={summary}
+          catalog={game.catalog}
+          pending={pending}
+          busy={busy}
+          onCollect={async () => {
+            if (await run(api.collect, (sum) => `+${money(sum)} в капитал`)) setSummary(null);
+          }}
+          onClose={() => setSummary(null)}
+        />
+      )}
+
+      {toast && <div className={`toast ${toast.error ? 'toast-error' : ''}`}>{toast.text}</div>}
+    </Shell>
   );
 }
 
-function Welcome({ player }: { player: Player }) {
+function Shell({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
   return (
-    <>
-      <section className="card">
-        <h2>
-          {player.is_new ? 'Добро пожаловать' : 'С возвращением'}, {player.first_name || 'игрок'}!
-        </h2>
-        <p className="hint">
-          {player.is_new
-            ? 'Ты получил стартовый капитал. Скоро здесь можно будет открыть первый бизнес.'
-            : 'Твой капитал на месте. Бизнесы появятся совсем скоро.'}
-        </p>
-        <div className="stat">
-          <span className="stat-label">Капитал</span>
-          <span className="stat-value">{money(player.cash)}</span>
-        </div>
-      </section>
-      <button className="button" onClick={() => haptic('medium')}>
-        Скоро открытие
-      </button>
-    </>
+    <main className="screen">
+      <header className={`hero ${compact ? 'hero-compact' : ''}`}>
+        <div className="logo">CAPITAL</div>
+        {!compact && <p className="subtitle">Бизнес-симулятор</p>}
+      </header>
+      {children}
+    </main>
   );
 }
 
 function NotInTelegram() {
   return (
-    <main className="screen">
-      <header className="hero">
-        <div className="logo">CAPITAL</div>
-        <p className="subtitle">Бизнес-симулятор</p>
-      </header>
+    <Shell>
       <section className="card">
         <h2>Открой игру в Telegram</h2>
         <p className="hint">
-          CAPITAL работает только внутри Telegram: так мы узнаём, кто ты, без паролей.
-          Открой бота и нажми кнопку «Играть».
+          CAPITAL работает только внутри Telegram: так мы узнаём, кто ты, без паролей. Открой бота
+          и нажми кнопку «Играть».
         </p>
       </section>
-    </main>
+    </Shell>
   );
 }

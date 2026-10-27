@@ -4,15 +4,55 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './config';
 import { tg } from './telegram';
 
+export type BusinessType = 'coffee' | 'shop' | 'bakery';
+
 export interface Player {
   id: string;
-  telegram_id: number;
   first_name: string;
-  username: string | null;
-  cash: number; // в копейках
+  cash: number; // все деньги — в копейках
   created_at: string;
-  last_seen_at: string;
+}
+
+export interface CatalogItem {
+  type: BusinessType;
+  name: string;
+  product: string;
+  open_cost: number;
+  unit_cost: number;
+  ref_price: number | null;
+  capacity: number;
+  raw_capacity: number;
+  production_rate: number;
+}
+
+export interface Business {
+  id: string;
+  type: BusinessType;
+  price: number | null;
+  stock: number;
+  raw_stock: number;
+  pending_revenue: number;
+}
+
+export interface SummaryItem {
+  type: BusinessType;
+  sold: number;
+  revenue: number;
+  produced: number;
+  stock: number;
+  raw_stock: number;
+}
+
+export interface GameState {
+  server_time: string;
+  player: Player;
+  catalog: CatalogItem[];
+  businesses: Business[];
+}
+
+export interface LoginResult extends GameState {
   is_new: boolean;
+  summary: { since: string; items: SummaryItem[] } | null;
 }
 
 export class ApiError extends Error {}
@@ -37,6 +77,14 @@ async function call<T>(action: string, params: Record<string, unknown> = {}): Pr
   return data as T;
 }
 
+type WithResult<R> = GameState & { result: R };
+
 export const api = {
-  login: () => call<{ player: Player }>('login'),
+  login: () => call<LoginResult>('login'),
+  state: () => call<WithResult<null>>('state'),
+  openBusiness: (type: BusinessType) => call<WithResult<null>>('open_business', { type }),
+  restock: (type: BusinessType, qty: number) => call<WithResult<null>>('restock', { type, qty }),
+  transferBread: (qty: number) => call<WithResult<null>>('transfer_bread', { qty }),
+  setPrice: (type: BusinessType, price: number) => call<WithResult<null>>('set_price', { type, price }),
+  collect: () => call<WithResult<number>>('collect'),
 };
