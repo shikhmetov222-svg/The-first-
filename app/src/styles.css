@@ -1672,3 +1672,193 @@ h2.section-title {
   font-size: 12px;
   white-space: nowrap;
 }
+
+/* ---------- Редизайн, этап 3: решение дня и бизнесы ---------- */
+
+.decision {
+  gap: 8px;
+  padding: 16px;
+  border-color: rgba(212, 167, 58, 0.6);
+  background:
+    linear-gradient(180deg, rgba(212, 167, 58, 0.07), transparent 70%),
+    var(--card);
+}
+
+.decision-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.decision-body.expanded {
+  white-space: normal;
+}
+
+.decision-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.decision-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.decision-option .button {
+  white-space: normal;
+  line-height: 1.15;
+  padding: 6px 10px;
+}
+
+.decision-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.decision-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  color: var(--up);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.decision-result.bad {
+  color: var(--down);
+}
+
+.decision-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.biz {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.biz h3 {
+  margin: 0 0 2px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.biz-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.price-badge {
+  flex: none;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.price-badge.up {
+  background: rgba(95, 211, 154, 0.12);
+  color: var(--up);
+}
+
+.price-badge.warn {
+  background: rgba(242, 166, 90, 0.12);
+  color: var(--warn);
+}
+
+.price-line {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.price-line b {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.biz-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.meter .bar-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.segments {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+  height: 6px;
+}
+
+.segments span {
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.segments span.on {
+  background: var(--up);
+}
+
+.segments span.on.low {
+  background: var(--warn);
+}
+
+.biz.locked {
+  border: 1.5px dashed var(--border);
+  background: transparent;
+}
+
+.lock-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.biz.locked .stat-label {
+  line-height: 1.35;
+}
+
+.biz.locked > p.stat-label {
+  margin: 0;
+  text-align: center;
+}
+
+.decision-result-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.decision-result-text svg {
+  flex: none;
+  margin-top: 1px;
+}

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { CalendarClock, CircleCheck, CircleX } from 'lucide-react';
 import type { Decision } from '../api';
 
 interface Props {
@@ -6,28 +8,46 @@ interface Props {
   onChoose: (option: number) => void;
 }
 
-/** «Решение дня»: одна карточка-событие в сутки. Последствия считает сервер. */
+/** «Решение дня»: компактная карточка. Последствия считает сервер. */
 export function DecisionCard({ decision, busy, onChoose }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const decided = decision.choice !== null;
 
   return (
     <section className={`card decision ${decided ? 'decided' : ''}`}>
       <div className="decision-tag">Решение дня</div>
       <h3>{decision.title}</h3>
-      <p className="hint">{decision.body}</p>
+      <p
+        className={`decision-body ${expanded ? 'expanded' : ''}`}
+        onClick={() => setExpanded(!expanded)}
+        title={decision.body}
+      >
+        {decision.body}
+      </p>
 
       {decided ? (
-        <p className={`decision-result ${decision.success === false ? 'bad' : ''}`}>
-          {decision.options[decision.choice!]?.label}: {decision.result}
-          <span className="hint small"> Новое решение — завтра.</span>
-        </p>
+        <div className={`decision-result ${decision.success === false ? 'bad' : ''}`}>
+          <span className="decision-result-text">
+            {decision.success === false ? <CircleX size={18} /> : <CircleCheck size={18} />}
+            <span>{decision.result}</span>
+          </span>
+          <span className="decision-next">
+            <CalendarClock size={14} /> Новое решение — завтра
+          </span>
+        </div>
       ) : (
         <div className="decision-options">
-          {decision.options.map((o, i) => (
-            <button key={i} className="option" disabled={busy} onClick={() => onChoose(i)}>
-              <b>{o.label}</b>
-              <span className="hint small">{o.hint}</span>
-            </button>
+          {decision.options.slice(0, 2).map((o, i) => (
+            <div key={i} className="decision-option">
+              <button
+                className={`button small ${i === 0 ? '' : 'secondary'}`}
+                disabled={busy}
+                onClick={() => onChoose(i)}
+              >
+                {o.label}
+              </button>
+              <span className="decision-hint">{o.hint}</span>
+            </div>
           ))}
         </div>
       )}

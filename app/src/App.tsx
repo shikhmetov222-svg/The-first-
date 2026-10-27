@@ -89,7 +89,8 @@ function Game() {
         const res = await fn();
         setGame(res);
         notify('success');
-        if (success) showToast(success(res.result));
+        const text = success?.(res.result);
+        if (text) showToast(text);
         return true;
       } catch (e) {
         notify('error');
@@ -224,7 +225,16 @@ function Game() {
         />
       )}
 
-      {game.catalog.map((item) => (
+      <h2 className="section-title">
+        <span>Мои бизнесы</span>
+        <span className="stat-label">
+          {game.businesses.length} из {game.catalog.length}
+        </span>
+      </h2>
+
+      {[...game.catalog]
+        .sort((x, y) => Number(owned.has(y.type)) - Number(owned.has(x.type)))
+        .map((item) => (
         <BusinessCard
           key={item.type}
           item={item}
