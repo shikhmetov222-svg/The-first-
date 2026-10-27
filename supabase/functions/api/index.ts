@@ -117,7 +117,8 @@ async function login(user: TelegramUser) {
   });
   const id = player.id as string;
   // Флаг администратора в базе всегда отражает текущий секрет сервера.
-  await rpc('set_admin_flag', { p_player_id: id, p_is_admin: isAdmin(user) });
+  // Не мешает входу, даже если что-то пошло не так.
+  await rpc('set_admin_flag', { p_player_id: id, p_is_admin: isAdmin(user) }).catch((e) => console.error('admin flag', e));
   // Новичок пришёл по ссылке друга: t.me/<бот>?startapp=ref_<код>.
   const ref = user.start_param?.match(/^ref_([a-f0-9]{8})$/)?.[1];
   if (player.is_new && ref) {
