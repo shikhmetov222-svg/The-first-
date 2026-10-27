@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, type LeaderKind, type Leaderboard as Board, type Season } from '../api';
 import { duration, money } from '../format';
-import { Medal } from 'lucide-react';
+import { ChevronRight, Medal } from 'lucide-react';
+import type { LeaderRow } from '../api';
+import { CompanyLogo } from './CompanyLogo';
+import { CompanySheet } from './CompanySheet';
 
 const PODIUM = ['gold', 'silver', 'bronze'];
 
@@ -9,6 +12,7 @@ export function Leaderboard({ season, serverOffset }: { season: Season | null; s
   const [kind, setKind] = useState<LeaderKind>('capital');
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -60,34 +64,48 @@ export function Leaderboard({ season, serverOffset }: { season: Season | null; s
             </p>
             <ol>
               {board.top.map((r) => (
-                <Row key={r.place} row={r} kind={kind} />
+                <Row key={r.id ?? r.place} row={r} kind={kind} onOpen={setOpenId} />
               ))}
             </ol>
             {board.me && !meInTop && (
               <ol className="me-row">
-                <Row
-                  row={{ ...board.me, name: 'Ты', me: true }}
-                  kind={kind}
-                />
+                <Row row={{ ...board.me, me: true }} kind={kind} onOpen={setOpenId} />
               </ol>
             )}
             <p className="hint small center">Игроков в сезоне: {board.total}</p>
           </>
         )}
       </section>
+
+      {openId && <CompanySheet id={openId} onClose={() => setOpenId(null)} />}
     </>
   );
 }
 
-function Row({ row, kind }: { row: { place: number; name: string; capital: number; growth: number; me: boolean }; kind: LeaderKind }) {
-  const growth = `${row.growth > 0 ? '+' : ''}${String(row.growth).replace('.', ',')}%`;
+function Row({ row, kind, onOpen }: { row: LeaderRow; kind: LeaderKind; onOpen: (id: string) => void }) {
+  const growth = `${row.growth > 0 ? '▲ +' : row.growth < 0 ? '▼ ' : ''}${String(row.growth).replace('.', ',')}%`;
   return (
     <li className={row.me ? 'me' : ''}>
-      <span className={`place ${PODIUM[row.place - 1] ?? ''}`}>
-        {row.place <= 3 ? <Medal size={20} aria-label={`${row.place} место`} /> : row.place}
-      </span>
-      <span className="name">{row.name || 'Игрок'}</span>
-      <span className="value">{kind === 'capital' ? money(row.capital) : growth}</span>
+      <button className="leader-row" disabled={!row.id} onClick={() => row.id && onOpen(row.id)}>
+        <span className={`place ${PODIUM[row.place - 1] ?? ''}`}>
+          {row.place <= 3 ? <Medal size={20} aria-label={`${row.place} место`} /> : row.place}
+        </span>
+        {row.icon ? (
+          <CompanyLogo icon={row.icon} color={row.color ?? 'gold'} size={36} />
+        ) : (
+          <span className="logo-fallback">{row.name.slice(0, 1).toUpperCase()}</span>
+        )}
+        <span className="name">
+          {row.name || 'Игрок'}
+          {row.me && <span className="you"> · ты</span>}
+        </span>
+        <span
+          className={`value ${kind === 'growth' ? (row.growth > 0 ? 'up' : row.growth < 0 ? 'down' : '') : ''}`}
+        >
+          {kind === 'capital' ? money(row.capital) : growth}
+        </span>
+        <ChevronRight size={16} className="chevron" />
+      </button>
     </li>
   );
 }

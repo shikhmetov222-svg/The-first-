@@ -141,8 +141,11 @@ export interface SeasonResult {
 }
 
 export interface LeaderRow {
+  id: string;
   place: number;
   name: string;
+  icon: string | null;
+  color: string | null;
   capital: number;
   growth: number;
   me: boolean;
@@ -154,7 +157,7 @@ export interface Leaderboard {
   kind: LeaderKind;
   total: number;
   top: LeaderRow[];
-  me: { place: number; capital: number; growth: number } | null;
+  me: LeaderRow | null;
 }
 
 export interface GameState {
@@ -215,5 +218,6 @@ export const api = {
   tutorial: (step: number) => call<WithResult<null>>('tutorial', { step }),
   profile: () => call<{ profile: MyProfile; bot_username: string | null }>('profile'),
   settings: (s: { notify?: boolean; haptics?: boolean }) => call<WithResult<null>>('settings', s),
+  company: (id: string) => call<{ company: PublicProfile }>('company', { id }),
   leaderboard: (kind: LeaderKind) => call<{ leaderboard: Leaderboard }>('leaderboard', { kind }),
 };

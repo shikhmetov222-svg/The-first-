@@ -145,6 +145,12 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
   },
   settings: action((id, b) =>
     rpc('update_settings', { p_player_id: id, p_notify: bool(b, 'notify'), p_haptics: bool(b, 'haptics') })),
+  company: async (user, b) => {
+    const id = str(b, 'id');
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw new ApiError(400, 'Компания не найдена');
+    await playerId(user); // смотреть карточки могут только игроки
+    return { company: await rpc('company_card', { p_player_id: id }) };
+  },
   leaderboard: async (user, b) => {
     const kind = str(b, 'kind');
     if (kind !== 'capital' && kind !== 'growth') throw new ApiError(400, 'Неизвестный рейтинг');

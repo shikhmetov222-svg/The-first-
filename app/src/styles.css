@@ -1421,3 +1421,56 @@ h2.section-title {
 .switch:checked::after {
   transform: translateX(20px);
 }
+
+/* ---------- Рейтинг компаний ---------- */
+
+.leaderboard li {
+  padding: 0;
+}
+
+.leader-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.leaderboard li.me .leader-row {
+  padding: 8px 8px;
+}
+
+.logo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.leaderboard .you {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.chevron {
+  flex: none;
+  color: var(--muted);
+}
+
+.inline-icon {
+  vertical-align: -2px;
+  color: var(--gold);
+}
