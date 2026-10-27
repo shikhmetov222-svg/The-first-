@@ -31,7 +31,12 @@ export function BusinessCard({ item, business, market, cash, hasBakery, hasShop,
             <p className="hint small">{info.about}</p>
           </div>
         </div>
-        <button className="button secondary" disabled={busy || cash < item.open_cost} onClick={onOpen}>
+        <button
+          className="button secondary"
+          data-tour={`open-${item.type}`}
+          disabled={busy || cash < item.open_cost}
+          onClick={onOpen}
+        >
           Открыть за {money(item.open_cost)}
         </button>
       </section>
@@ -103,7 +108,12 @@ export function BusinessCard({ item, business, market, cash, hasBakery, hasShop,
           </>
         ) : (
           <>
-            <button className="button small" disabled={busy} onClick={() => onAction('restock')}>
+            <button
+              className="button small"
+              data-tour={`restock-${item.type}`}
+              disabled={busy}
+              onClick={() => onAction('restock')}
+            >
               Пополнить склад
             </button>
             {item.type === 'shop' && hasBakery && (
@@ -111,7 +121,12 @@ export function BusinessCard({ item, business, market, cash, hasBakery, hasShop,
                 Из пекарни
               </button>
             )}
-            <button className="button small secondary" disabled={busy} onClick={() => onAction('price')}>
+            <button
+              className="button small secondary"
+              data-tour={`price-${item.type}`}
+              disabled={busy}
+              onClick={() => onAction('price')}
+            >
               Цена
             </button>
           </>

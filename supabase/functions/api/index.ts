@@ -61,6 +61,16 @@ async function playerId(user: TelegramUser): Promise<string> {
   return data.id;
 }
 
+function companyArgs(id: string, b: Body) {
+  return {
+    p_player_id: id,
+    p_name: str(b, 'name'),
+    p_icon: str(b, 'icon'),
+    p_color: str(b, 'color'),
+    p_motto: typeof b.motto === 'string' ? b.motto : '',
+  };
+}
+
 const state = (id: string) => rpc<Body>('get_state', { p_player_id: id });
 
 async function login(user: TelegramUser) {
@@ -98,6 +108,9 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
     rpc('set_price', { p_player_id: id, p_type: str(b, 'type'), p_price: int(b, 'price') })),
   collect: action((id) => rpc('collect_revenue', { p_player_id: id })),
   decide: action((id, b) => rpc('decide', { p_player_id: id, p_option: int(b, 'option') })),
+  create_company: action((id, b) => rpc('create_company', companyArgs(id, b))),
+  update_company: action((id, b) => rpc('update_company', companyArgs(id, b))),
+  tutorial: action((id, b) => rpc('set_tutorial_step', { p_player_id: id, p_step: int(b, 'step') })),
   leaderboard: async (user, b) => {
     const kind = str(b, 'kind');
     if (kind !== 'capital' && kind !== 'growth') throw new ApiError(400, 'Неизвестный рейтинг');

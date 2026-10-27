@@ -11,6 +11,22 @@ export interface Player {
   first_name: string;
   cash: number; // все деньги — в копейках
   created_at: string;
+  tutorial_step: number; // 0–2 — текущий шаг обучения, 3 — пройдено
+}
+
+export interface Company {
+  name: string;
+  icon: string;
+  color: string;
+  motto: string;
+  can_rename: boolean;
+}
+
+export interface CompanyInput {
+  name: string;
+  icon: string;
+  color: string;
+  motto: string;
 }
 
 export interface CatalogItem {
@@ -123,6 +139,7 @@ export interface GameState {
   decision: Decision | null;
   effects: Effect[];
   discount: number;
+  company?: Company | null; // undefined — старый сервер без компаний
 }
 
 export interface LoginResult extends GameState {
@@ -164,5 +181,8 @@ export const api = {
   setPrice: (type: BusinessType, price: number) => call<WithResult<null>>('set_price', { type, price }),
   collect: () => call<WithResult<number>>('collect'),
   decide: (option: number) => call<WithResult<string>>('decide', { option }),
+  createCompany: (c: CompanyInput) => call<WithResult<null>>('create_company', { ...c }),
+  updateCompany: (c: CompanyInput) => call<WithResult<null>>('update_company', { ...c }),
+  tutorial: (step: number) => call<WithResult<null>>('tutorial', { step }),
   leaderboard: (kind: LeaderKind) => call<{ leaderboard: Leaderboard }>('leaderboard', { kind }),
 };
