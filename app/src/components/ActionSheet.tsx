@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { BusinessType, GameState, Market } from '../api';
 import { BOT_KIND, BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
+import { BizIcon } from './BizIcon';
 
 export type SheetKind =
   | { kind: 'open'; type: BusinessType }
@@ -43,7 +44,7 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
     return (
       <>
         <h2>
-          {BUSINESS_INFO[item.type].icon} {item.name}
+          <BizIcon type={item.type} /> {item.name}
         </h2>
         <p className="hint">{BUSINESS_INFO[item.type].about}</p>
         <p className="hint">

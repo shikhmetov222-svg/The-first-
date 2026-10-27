@@ -7,10 +7,16 @@ import { TickTimer } from './components/TickTimer';
 import { DecisionCard } from './components/DecisionCard';
 import { Leaderboard } from './components/Leaderboard';
 import { SeasonResultModal } from './components/SeasonResultModal';
+import { BottomNav, type Tab } from './components/BottomNav';
+import { LoadingScreen } from './components/LoadingScreen';
+import { MarketTab } from './components/MarketTab';
+import { ProfileTab } from './components/ProfileTab';
 import { duration, money } from './format';
 import { isInTelegram, notify } from './telegram';
+import { CircleAlert, CircleCheck } from 'lucide-react';
 
 const POLL_MS = 60_000;
+const MIN_LOADING_MS = 1200; // чтобы экран загрузки не мелькал
 
 export function App() {
   if (!isInTelegram) return <NotInTelegram />;
@@ -22,7 +28,7 @@ function Game() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [summary, setSummary] = useState<LoginResult['summary']>(null);
   const [seasonResult, setSeasonResult] = useState<SeasonResult | null>(null);
-  const [tab, setTab] = useState<'business' | 'rating'>('business');
+  const [tab, setTab] = useState<Tab>('empire');
   const [serverOffset, setServerOffset] = useState(0);
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,7 +44,7 @@ function Game() {
   const login = useCallback(async () => {
     setLoginError(null);
     try {
-      const res = await api.login();
+      const [res] = await Promise.all([api.login(), wait(MIN_LOADING_MS)]);
       setGame(res);
       setServerOffset(new Date(res.server_time).getTime() - Date.now());
       setSeasonResult(res.season_result);
@@ -86,7 +92,7 @@ function Game() {
 
   if (loginError) {
     return (
-      <Shell>
+      <LoadingScreen>
         <section className="card">
           <h2>Не получилось войти</h2>
           <p className="hint">{loginError}</p>
@@ -94,17 +100,11 @@ function Game() {
             Попробовать снова
           </button>
         </section>
-      </Shell>
+      </LoadingScreen>
     );
   }
 
-  if (!game) {
-    return (
-      <Shell>
-        <p className="center hint">Входим в игру…</p>
-      </Shell>
-    );
-  }
+  if (!game) return <LoadingScreen />;
 
   const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
   const owned = new Set(game.businesses.map((b) => b.type));
@@ -113,19 +113,16 @@ function Game() {
     : 0;
 
   return (
-    <Shell compact>
-      <nav className="segmented tabs">
-        <button className={tab === 'business' ? 'active' : ''} onClick={() => setTab('business')}>
-          Бизнес
-        </button>
-        <button className={tab === 'rating' ? 'active' : ''} onClick={() => setTab('rating')}>
-          Рейтинг
-        </button>
-      </nav>
+    <main className="screen">
+      <header className="topbar">
+        <span className="wordmark">CAPITAL</span>
+      </header>
 
+      {tab === 'market' && <MarketTab game={game} />}
       {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
+      {tab === 'profile' && <ProfileTab game={game} />}
 
-      {tab === 'business' && (
+      {tab === 'empire' && (
       <>
       <section className="card capital">
         <div className="capital-row">
@@ -230,33 +227,32 @@ function Game() {
         <SeasonResultModal result={seasonResult} onClose={() => setSeasonResult(null)} />
       )}
 
-      {toast && <div className={`toast ${toast.error ? 'toast-error' : ''}`}>{toast.text}</div>}
-    </Shell>
-  );
-}
+      {toast && (
+        <div className={`toast ${toast.error ? 'toast-error' : ''}`} role="status">
+          {toast.error ? <CircleAlert size={20} /> : <CircleCheck size={20} />}
+          {toast.text}
+        </div>
+      )}
 
-function Shell({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
-  return (
-    <main className="screen">
-      <header className={`hero ${compact ? 'hero-compact' : ''}`}>
-        <div className="logo">CAPITAL</div>
-        {!compact && <p className="subtitle">Бизнес-симулятор</p>}
-      </header>
-      {children}
+      <BottomNav tab={tab} onChange={setTab} />
     </main>
   );
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function NotInTelegram() {
   return (
-    <Shell>
+    <LoadingScreen>
       <section className="card">
         <h2>Открой игру в Telegram</h2>
-        <p className="hint">
+        <p className="hint" style={{ margin: 0 }}>
           CAPITAL работает только внутри Telegram: так мы узнаём, кто ты, без паролей. Открой бота
           и нажми кнопку «Играть».
         </p>
       </section>
-    </Shell>
+    </LoadingScreen>
   );
 }

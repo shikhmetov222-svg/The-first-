@@ -1,6 +1,8 @@
 import type { Business, CatalogItem, Market } from '../api';
 import { BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
+import { BizIcon } from './BizIcon';
+import { TriangleAlert } from 'lucide-react';
 
 export type CardAction = 'restock' | 'price' | 'transfer';
 
@@ -23,7 +25,7 @@ export function BusinessCard({ item, business, market, cash, hasBakery, hasShop,
     return (
       <section className="card business locked">
         <div className="business-head">
-          <span className="icon">{info.icon}</span>
+          <BizIcon type={item.type} />
           <div className="grow">
             <h3>{item.name}</h3>
             <p className="hint small">{info.about}</p>
@@ -41,7 +43,7 @@ export function BusinessCard({ item, business, market, cash, hasBakery, hasShop,
   return (
     <section className="card business">
       <div className="business-head">
-        <span className="icon">{info.icon}</span>
+        <BizIcon type={item.type} />
         <div className="grow">
           <h3>{item.name}</h3>
           {isFactory ? (
@@ -79,10 +81,10 @@ export function BusinessCard({ item, business, market, cash, hasBakery, hasShop,
       )}
 
       {!isFactory && business.stock === 0 && (
-        <p className="warning">Склад пуст — продажи стоят. Пополни склад!</p>
+        <p className="warning"><TriangleAlert size={16} /> Склад пуст — продажи стоят. Пополни склад!</p>
       )}
       {isFactory && business.raw_stock === 0 && (
-        <p className="warning">Мука закончилась — пекарня простаивает.</p>
+        <p className="warning"><TriangleAlert size={16} /> Мука закончилась — пекарня простаивает.</p>
       )}
 
       <div className="actions">

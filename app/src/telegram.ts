@@ -13,6 +13,9 @@ interface TelegramWebApp {
   initData: string;
   initDataUnsafe: { user?: TelegramUser };
   colorScheme: 'light' | 'dark';
+  setHeaderColor?(color: string): void;
+  setBackgroundColor?(color: string): void;
+  setBottomBarColor?(color: string): void;
   platform: string;
   version: string;
   ready(): void;
@@ -36,17 +39,21 @@ export const tg: TelegramWebApp | undefined = window.Telegram?.WebApp;
 /** true, если приложение реально открыто внутри Telegram. */
 export const isInTelegram = Boolean(tg && tg.initData);
 
+// У игры своя тёмная тема: тему Telegram не используем, только красим под неё рамки окна.
+const APP_BG = '#0B0C0F';
+
 export function initTelegram() {
   if (!tg) return;
   tg.ready();
   tg.expand();
   tg.disableVerticalSwipes?.();
-  applyColorScheme();
-  tg.onEvent('themeChanged', applyColorScheme);
-}
-
-function applyColorScheme() {
-  document.documentElement.dataset.scheme = tg?.colorScheme ?? 'light';
+  try {
+    tg.setHeaderColor?.(APP_BG);
+    tg.setBackgroundColor?.(APP_BG);
+    tg.setBottomBarColor?.(APP_BG);
+  } catch {
+    // Старые версии Telegram не умеют менять цвета — не страшно.
+  }
 }
 
 /** Имя, которое показываем на экране. Только для отображения — серверу не доверяем этим данным. */

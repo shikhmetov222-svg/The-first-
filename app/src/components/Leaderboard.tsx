@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, type LeaderKind, type Leaderboard as Board, type Season } from '../api';
 import { duration, money } from '../format';
+import { Medal } from 'lucide-react';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const PODIUM = ['gold', 'silver', 'bronze'];
 
 export function Leaderboard({ season, serverOffset }: { season: Season | null; serverOffset: number }) {
   const [kind, setKind] = useState<LeaderKind>('capital');
@@ -82,7 +83,9 @@ function Row({ row, kind }: { row: { place: number; name: string; capital: numbe
   const growth = `${row.growth > 0 ? '+' : ''}${String(row.growth).replace('.', ',')}%`;
   return (
     <li className={row.me ? 'me' : ''}>
-      <span className="place">{MEDALS[row.place - 1] ?? row.place}</span>
+      <span className={`place ${PODIUM[row.place - 1] ?? ''}`}>
+        {row.place <= 3 ? <Medal size={20} aria-label={`${row.place} место`} /> : row.place}
+      </span>
       <span className="name">{row.name || 'Игрок'}</span>
       <span className="value">{kind === 'capital' ? money(row.capital) : growth}</span>
     </li>

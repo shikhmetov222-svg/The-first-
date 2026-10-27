@@ -1,6 +1,6 @@
 import type { CatalogItem, LoginResult } from '../api';
-import { BUSINESS_INFO } from '../content';
 import { count, duration, money } from '../format';
+import { BizIcon } from './BizIcon';
 
 interface Props {
   summary: NonNullable<LoginResult['summary']>;
@@ -28,7 +28,7 @@ export function AwaySummary({ summary, catalog, pending, busy, onCollect, onClos
             const isFactory = item.production_rate > 0;
             return (
               <li key={i.type}>
-                <span className="icon">{BUSINESS_INFO[i.type].icon}</span>
+                <BizIcon type={i.type} />
                 <div className="grow">
                   <b>{item.name}</b>
                   <div className="hint small">
