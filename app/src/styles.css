@@ -110,3 +110,25 @@ body {
   font-size: 12px;
   color: var(--hint);
 }
+
+.center {
+  text-align: center;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--bg-secondary);
+}
+
+.stat-label {
+  color: var(--hint);
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
