@@ -1,0 +1,112 @@
+/*
+  Цвета берём из темы Telegram (переменные --tg-theme-* выставляет сам SDK).
+  Запасные значения — на случай открытия в обычном браузере.
+*/
+:root {
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --bg-secondary: var(--tg-theme-secondary-bg-color, #f1f1f4);
+  --text: var(--tg-theme-text-color, #111111);
+  --hint: var(--tg-theme-hint-color, #8a8a8e);
+  --accent: var(--tg-theme-button-color, #2f7cf6);
+  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --gold: #c9a227;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme='light']) {
+    --bg: var(--tg-theme-bg-color, #17181c);
+    --bg-secondary: var(--tg-theme-secondary-bg-color, #22242a);
+    --text: var(--tg-theme-text-color, #f2f2f2);
+    --hint: var(--tg-theme-hint-color, #8d8f96);
+    color-scheme: dark;
+  }
+}
+
+:root[data-scheme='dark'] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+.screen {
+  min-height: 100vh;
+  min-height: var(--tg-viewport-stable-height, 100vh);
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero {
+  text-align: center;
+  padding: 32px 0 8px;
+}
+
+.logo {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: var(--gold);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--hint);
+}
+
+.card {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.hint {
+  margin: 0 0 16px;
+  color: var(--hint);
+  line-height: 1.4;
+}
+
+.button {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:active {
+  opacity: 0.8;
+}
+
+.status {
+  margin-top: auto;
+  text-align: center;
+  font-size: 12px;
+  color: var(--hint);
+}
