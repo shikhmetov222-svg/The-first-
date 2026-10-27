@@ -1934,3 +1934,17 @@ h2.section-title {
     transition-duration: 0.01ms !important;
   }
 }
+
+.night-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.night-hint svg {
+  color: var(--warn);
+}

@@ -1,4 +1,4 @@
-import { Lock, Tag, TriangleAlert, Truck } from 'lucide-react';
+import { Lock, Moon, Tag, TriangleAlert, Truck } from 'lucide-react';
 import type { Business, CatalogItem, Market } from '../api';
 import { BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
@@ -102,6 +102,12 @@ function OpenCard({ item, business, market, hasBakery, hasShop, busy, onAction }
           </>
         )}
       </div>
+
+      {!isFactory && market && market.demand_level < 0.5 && business.stock > 0 && (
+        <p className="night-hint">
+          <Moon size={15} /> Ночь — покупателей мало, утром будет больше
+        </p>
+      )}
 
       {!isFactory && business.stock === 0 && (
         <p className="warning">
