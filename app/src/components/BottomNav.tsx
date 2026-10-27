@@ -1,7 +1,7 @@
-import { Building2, CandlestickChart, Trophy, UserRound, type LucideIcon } from 'lucide-react';
+import { Building2, CandlestickChart, Trophy, UserRound, Wrench, type LucideIcon } from 'lucide-react';
 import { haptic } from '../telegram';
 
-export type Tab = 'empire' | 'market' | 'rating' | 'profile';
+export type Tab = 'empire' | 'market' | 'rating' | 'profile' | 'dev';
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'empire', label: 'Империя', icon: Building2 },
@@ -10,10 +10,11 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'profile', label: 'Профиль', icon: UserRound },
 ];
 
-export function BottomNav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void }) {
+export function BottomNav({ tab, onChange, dev }: { tab: Tab; onChange: (tab: Tab) => void; dev?: boolean }) {
+  const tabs = dev ? [...TABS, { id: 'dev' as Tab, label: 'DEV', icon: Wrench }] : TABS;
   return (
     <nav className="bottom-nav">
-      {TABS.map(({ id, label, icon: Icon }) => (
+      {tabs.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           className={tab === id ? 'active' : ''}

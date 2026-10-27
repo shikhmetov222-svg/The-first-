@@ -1948,3 +1948,142 @@ h2.section-title {
 .night-hint svg {
   color: var(--warn);
 }
+
+/* ---------- Режим разработчика ---------- */
+
+.dev-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--gold);
+  color: var(--gold-text);
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  line-height: 14px;
+  vertical-align: 2px;
+}
+
+.dev-hero {
+  border-color: rgba(212, 167, 58, 0.55);
+  background:
+    repeating-linear-gradient(135deg, rgba(212, 167, 58, 0.05) 0 10px, transparent 10px 20px),
+    var(--card);
+}
+
+.dev-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--gold);
+}
+
+.dev-hero-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.dev-hero .hint {
+  margin: 8px 0 0;
+}
+
+.dev-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dev-section .hint {
+  margin: 0;
+}
+
+.dev-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dev-icon {
+  display: flex;
+  color: var(--gold);
+}
+
+.dev-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dev-row .chip {
+  min-height: 40px;
+}
+
+.chip-active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--gold-text);
+}
+
+.chip:disabled {
+  opacity: 0.45;
+}
+
+.dev-section .actions .input {
+  flex: 1;
+  min-height: 44px;
+  padding-right: 14px;
+}
+
+.dev-line {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dev-line b {
+  color: var(--text);
+}
+
+.dev-market + .dev-market {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.dev-market {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dev-market .list li {
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.list li.dim {
+  opacity: 0.45;
+}
+
+.dev-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dev-log li {
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.button.danger {
+  background: var(--down);
+  color: #1a0806;
+}

@@ -6,6 +6,14 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { verifyInitData, type TelegramUser } from '../_shared/telegram.ts';
 
 const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
+// Администраторы — только из секрета сервера (через запятую): ADMIN_TELEGRAM_IDS=123,456.
+const ADMIN_IDS = new Set(
+  (Deno.env.get('ADMIN_TELEGRAM_IDS') ?? '')
+    .split(/[\s,;]+/)
+    .filter(Boolean)
+    .map(Number),
+);
+const isAdmin = (user: TelegramUser) => ADMIN_IDS.has(user.id);
 const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -90,6 +98,14 @@ function bool(body: Body, key: string): boolean | null {
   return typeof v === 'boolean' ? v : null;
 }
 
+/** Игрок-администратор: проверка по секрету сервера + обновление флага в базе. */
+async function adminId(user: TelegramUser): Promise<string> {
+  if (!isAdmin(user)) throw new ApiError(403, 'Нет доступа');
+  const id = await playerId(user);
+  await rpc('set_admin_flag', { p_player_id: id, p_is_admin: true });
+  return id;
+}
+
 const state = (id: string) => rpc<Body>('get_state', { p_player_id: id });
 
 async function login(user: TelegramUser) {
@@ -100,6 +116,8 @@ async function login(user: TelegramUser) {
     p_language_code: user.language_code ?? null,
   });
   const id = player.id as string;
+  // Флаг администратора в базе всегда отражает текущий секрет сервера.
+  await rpc('set_admin_flag', { p_player_id: id, p_is_admin: isAdmin(user) });
   // Новичок пришёл по ссылке друга: t.me/<бот>?startapp=ref_<код>.
   const ref = user.start_param?.match(/^ref_([a-f0-9]{8})$/)?.[1];
   if (player.is_new && ref) {
@@ -110,7 +128,13 @@ async function login(user: TelegramUser) {
     ? await rpc<Body>('away_summary', { p_player_id: id, p_since: player.prev_seen_at })
     : null;
   const seasonResult = await rpc<Body | null>('pop_season_result', { p_player_id: id });
-  return { ...(await state(id)), is_new: player.is_new, summary, season_result: seasonResult };
+  return {
+    ...(await state(id)),
+    is_new: player.is_new,
+    summary,
+    season_result: seasonResult,
+    is_admin: isAdmin(user),
+  };
 }
 
 // Действие игрока → новое состояние экрана.
@@ -118,7 +142,7 @@ function action(run: (id: string, body: Body) => Promise<unknown>) {
   return async (user: TelegramUser, body: Body) => {
     const id = await playerId(user);
     const result = await run(id, body);
-    return { ...(await state(id)), result };
+    return { ...(await state(id)), result, is_admin: isAdmin(user) };
   };
 }
 
@@ -150,6 +174,37 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
     if (!/^[0-9a-f-]{36}$/.test(id)) throw new ApiError(400, 'Компания не найдена');
     await playerId(user); // смотреть карточки могут только игроки
     return { company: await rpc('company_card', { p_player_id: id }) };
+  },
+  // ---------- Режим разработчика: каждый вызов перепроверяет администратора по подписи Telegram ----------
+  dev_info: async (user) => {
+    const id = await adminId(user);
+    return { dev: await rpc('dev_info', { p_admin: id }) };
+  },
+  dev: async (user, b) => {
+    const id = await adminId(user);
+    const op = str(b, 'op');
+    const optInt = (key: string) => (b[key] === null || b[key] === undefined ? null : int(b, key));
+    const ops: Record<string, () => Promise<unknown>> = {
+      cash_add: () => rpc('dev_cash', { p_admin: id, p_mode: 'add', p_amount: int(b, 'amount') }),
+      cash_set: () => rpc('dev_cash', { p_admin: id, p_mode: 'set', p_amount: int(b, 'amount') }),
+      stock_fill: () => rpc('dev_stock', { p_admin: id, p_mode: 'fill', p_product: null, p_qty: null }),
+      stock_clear: () => rpc('dev_stock', { p_admin: id, p_mode: 'clear', p_product: null, p_qty: null }),
+      stock_add: () =>
+        rpc('dev_stock', { p_admin: id, p_mode: 'add', p_product: str(b, 'product'), p_qty: int(b, 'qty') }),
+      open_business: () => rpc('dev_open_business', { p_admin: id, p_type: str(b, 'type') }),
+      ticks: () => rpc('dev_ticks', { p_admin: id, p_n: int(b, 'n') }),
+      new_decision: () => rpc('dev_new_decision', { p_admin: id }),
+      test_create: () => rpc('dev_test_players', { p_admin: id, p_mode: 'create' }),
+      test_delete_all: () => rpc('dev_test_players', { p_admin: id, p_mode: 'delete_all' }),
+      bots: () => rpc('dev_bots', { p_admin: id, p_market: str(b, 'market'), p_count: optInt('count') }),
+      befriend: () => rpc('dev_befriend', { p_admin: id, p_test: str(b, 'player') }),
+      badge: () => rpc('dev_badge', { p_admin: id, p_show: bool(b, 'show') }),
+      reset_me: () => rpc('dev_reset_me', { p_admin: id }),
+    };
+    if (!Object.hasOwn(ops, op)) throw new ApiError(400, 'Неизвестное действие разработчика');
+    const result = await ops[op]();
+    const [st, dev] = await Promise.all([state(id), rpc('dev_info', { p_admin: id })]);
+    return { ...st, result, dev, is_admin: true };
   },
   leaderboard: async (user, b) => {
     const kind = str(b, 'kind');

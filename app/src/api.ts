@@ -16,6 +16,7 @@ export interface Player {
 }
 
 export interface PublicProfile {
+  dev?: boolean;
   company: { name: string | null; icon: string | null; color: string | null; motto: string };
   league: string;
   title: string;
@@ -142,6 +143,7 @@ export interface SeasonResult {
 
 export interface LeaderRow {
   id: string;
+  dev?: boolean;
   place: number;
   name: string;
   icon: string | null;
@@ -177,6 +179,24 @@ export interface GameState {
   league_place?: number;
   start_capital?: number;
   capital_history?: [number, number][]; // [секунды unix, копейки]
+  is_admin?: boolean; // решает сервер по секрету ADMIN_TELEGRAM_IDS
+}
+
+export interface DevInfo {
+  me: { dev_cash_total: number; show_dev_badge: boolean };
+  season: { number: number; ends_at: string; theme: string } | null;
+  markets: {
+    market: 'coffee' | 'bread';
+    name: string;
+    market_price: number;
+    demand_level: number;
+    last_demand: number;
+    sellers: number;
+    bot_override: number | null;
+    bots: { name: string; kind: string; price: number; active: boolean; last_sold: number }[];
+  }[];
+  test_players: { id: string; name: string; icon: string; color: string; cash: number; friend: boolean }[];
+  log: { action: string; details: Record<string, unknown>; amount: number | null; at: string; admin: string }[];
 }
 
 export interface LoginResult extends GameState {
@@ -224,5 +244,8 @@ export const api = {
   profile: () => call<{ profile: MyProfile; bot_username: string | null }>('profile'),
   settings: (s: { notify?: boolean; haptics?: boolean }) => call<WithResult<null>>('settings', s),
   company: (id: string) => call<{ company: PublicProfile }>('company', { id }),
+  devInfo: () => call<{ dev: DevInfo }>('dev_info'),
+  dev: (op: string, params: Record<string, unknown> = {}) =>
+    call<WithResult<string> & { dev: DevInfo }>('dev', { op, ...params }),
   leaderboard: (kind: LeaderKind) => call<{ leaderboard: Leaderboard }>('leaderboard', { kind }),
 };

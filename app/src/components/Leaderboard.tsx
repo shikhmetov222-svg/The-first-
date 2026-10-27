@@ -5,6 +5,7 @@ import { ChevronRight, Medal } from 'lucide-react';
 import type { LeaderRow } from '../api';
 import { CompanyLogo } from './CompanyLogo';
 import { CompanySheet } from './CompanySheet';
+import { DevBadge } from './DevBadge';
 
 const PODIUM = ['gold', 'silver', 'bronze'];
 
@@ -97,6 +98,7 @@ function Row({ row, kind, onOpen }: { row: LeaderRow; kind: LeaderKind; onOpen: 
         )}
         <span className="name">
           {row.name || 'Игрок'}
+          {row.dev && <DevBadge />}
           {row.me && <span className="you"> · ты</span>}
         </span>
         <span

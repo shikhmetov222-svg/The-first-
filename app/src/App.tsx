@@ -12,6 +12,7 @@ import { BottomNav, type Tab } from './components/BottomNav';
 import { LoadingScreen } from './components/LoadingScreen';
 import { MarketTab } from './components/MarketTab';
 import { ProfileTab } from './components/ProfileTab';
+import { DevPanel } from './components/DevPanel';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck } from 'lucide-react';
@@ -189,6 +190,7 @@ function Game() {
   }
 
   const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
+  const isAdmin = game.is_admin === true;
   const owned = new Set(game.businesses.map((b) => b.type));
 
   const collect = async () => {
@@ -202,6 +204,7 @@ function Game() {
       <AppHeader game={game} serverOffset={serverOffset} />
 
       {tab === 'market' && <MarketTab game={game} />}
+      {tab === 'dev' && isAdmin && <DevPanel game={game} onState={setGame} onToast={showToast} />}
       {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
       {tab === 'profile' && (
         <ProfileTab game={game} onEditCompany={() => setEditingCompany(true)} onToast={showToast} />
@@ -321,7 +324,7 @@ function Game() {
         </div>
       )}
 
-      <BottomNav tab={tab} onChange={setTab} />
+      <BottomNav tab={tab} onChange={setTab} dev={isAdmin} />
     </main>
   );
 }

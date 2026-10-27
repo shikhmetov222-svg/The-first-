@@ -1,6 +1,7 @@
 import { Award, Pencil, Shield } from 'lucide-react';
 import type { PublicProfile } from '../api';
 import { CompanyLogo } from './CompanyLogo';
+import { DevBadge } from './DevBadge';
 
 /** Карточка компании: логотип, название, девиз, лига и титул. */
 export function CompanyCard({ profile, onEdit }: { profile: PublicProfile; onEdit?: () => void }) {
@@ -10,7 +11,10 @@ export function CompanyCard({ profile, onEdit }: { profile: PublicProfile; onEdi
       <div className="company-card-head">
         <CompanyLogo icon={c.icon ?? 'crown'} color={c.color ?? 'gold'} size={64} />
         <div className="grow">
-          <div className="company-preview-name">{c.name ?? 'Компания без названия'}</div>
+          <div className="company-preview-name">
+            {c.name ?? 'Компания без названия'}
+            {profile.dev && <DevBadge />}
+          </div>
           {c.motto && <div className="company-motto">«{c.motto}»</div>}
         </div>
         {onEdit && (
