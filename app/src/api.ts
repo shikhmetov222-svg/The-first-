@@ -172,6 +172,11 @@ export interface GameState {
   effects: Effect[];
   discount: number;
   company?: Company | null; // undefined — старый сервер без компаний
+  // Ниже — поля для шапки и карточки «Капитал»; у старого сервера их нет.
+  league?: string;
+  league_place?: number;
+  start_capital?: number;
+  capital_history?: [number, number][]; // [секунды unix, копейки]
 }
 
 export interface LoginResult extends GameState {

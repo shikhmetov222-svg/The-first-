@@ -3,7 +3,8 @@ import { api, type BusinessType, type GameState, type LoginResult, type SeasonRe
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
 import { AwaySummary } from './components/AwaySummary';
-import { TickTimer } from './components/TickTimer';
+import { AppHeader } from './components/AppHeader';
+import { CapitalCard } from './components/CapitalCard';
 import { DecisionCard } from './components/DecisionCard';
 import { Leaderboard } from './components/Leaderboard';
 import { SeasonResultModal } from './components/SeasonResultModal';
@@ -184,15 +185,16 @@ function Game() {
 
   const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
   const owned = new Set(game.businesses.map((b) => b.type));
-  const seasonLeft = game.season
-    ? new Date(game.season.ends_at).getTime() - (Date.now() + serverOffset)
-    : 0;
+
+  const collect = async () => {
+    if (await run(api.collect, (sum) => `+${money(sum)} в капитал`)) {
+      if (tutorialStep === 2) advanceTutorial(3);
+    }
+  };
 
   return (
     <main className="screen">
-      <header className="topbar">
-        <span className="wordmark">CAPITAL</span>
-      </header>
+      <AppHeader game={game} serverOffset={serverOffset} />
 
       {tab === 'market' && <MarketTab game={game} />}
       {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
@@ -202,39 +204,7 @@ function Game() {
 
       {tab === 'empire' && (
       <>
-      <section className="card capital">
-        <div className="capital-row">
-          <div>
-            <div className="stat-label">Деньги</div>
-            <div className="capital-value">{money(game.player.cash)}</div>
-          </div>
-          <div className="right">
-            <div className="stat-label">В кассах</div>
-            <div className="pending-value">{money(pending)}</div>
-          </div>
-        </div>
-        <button
-          className="button"
-          data-tour="collect"
-          disabled={pending === 0 || busy}
-          onClick={async () => {
-            if (await run(api.collect, (sum) => `+${money(sum)} в капитал`)) {
-              if (tutorialStep === 2) advanceTutorial(3);
-            }
-          }}
-        >
-          {pending > 0 ? `Забрать выручку ${money(pending)}` : 'Касса пуста'}
-        </button>
-        <TickTimer serverTime={game.server_time} />
-        <div className="season-line" onClick={() => setTab('rating')}>
-          <span>Капитал: <b>{money(game.capital)}</b></span>
-          {game.season && (
-            <span>
-              Сезон {game.season.number} · {seasonLeft > 0 ? `ещё ${duration(seasonLeft)}` : 'итоги'} ›
-            </span>
-          )}
-        </div>
-      </section>
+      <CapitalCard game={game} serverOffset={serverOffset} pending={pending} busy={busy} onCollect={collect} />
 
       {game.effects.length > 0 && (
         <div className="effects">
