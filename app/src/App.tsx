@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type BusinessType, type GameState, type LoginResult } from './api';
+import { api, type BusinessType, type GameState, type LoginResult, type SeasonResult } from './api';
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
 import { AwaySummary } from './components/AwaySummary';
 import { TickTimer } from './components/TickTimer';
-import { money } from './format';
+import { DecisionCard } from './components/DecisionCard';
+import { Leaderboard } from './components/Leaderboard';
+import { SeasonResultModal } from './components/SeasonResultModal';
+import { duration, money } from './format';
 import { isInTelegram, notify } from './telegram';
 
 const POLL_MS = 60_000;
@@ -18,6 +21,9 @@ function Game() {
   const [game, setGame] = useState<GameState | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [summary, setSummary] = useState<LoginResult['summary']>(null);
+  const [seasonResult, setSeasonResult] = useState<SeasonResult | null>(null);
+  const [tab, setTab] = useState<'business' | 'rating'>('business');
+  const [serverOffset, setServerOffset] = useState(0);
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
@@ -34,6 +40,8 @@ function Game() {
     try {
       const res = await api.login();
       setGame(res);
+      setServerOffset(new Date(res.server_time).getTime() - Date.now());
+      setSeasonResult(res.season_result);
       const hasNews = res.summary?.items.some((i) => i.sold > 0 || i.produced > 0);
       if (hasNews) setSummary(res.summary);
     } catch (e) {
@@ -100,13 +108,29 @@ function Game() {
 
   const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
   const owned = new Set(game.businesses.map((b) => b.type));
+  const seasonLeft = game.season
+    ? new Date(game.season.ends_at).getTime() - (Date.now() + serverOffset)
+    : 0;
 
   return (
     <Shell compact>
+      <nav className="segmented tabs">
+        <button className={tab === 'business' ? 'active' : ''} onClick={() => setTab('business')}>
+          Бизнес
+        </button>
+        <button className={tab === 'rating' ? 'active' : ''} onClick={() => setTab('rating')}>
+          Рейтинг
+        </button>
+      </nav>
+
+      {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
+
+      {tab === 'business' && (
+      <>
       <section className="card capital">
         <div className="capital-row">
           <div>
-            <div className="stat-label">Капитал</div>
+            <div className="stat-label">Деньги</div>
             <div className="capital-value">{money(game.player.cash)}</div>
           </div>
           <div className="right">
@@ -122,7 +146,33 @@ function Game() {
           {pending > 0 ? `Забрать выручку ${money(pending)}` : 'Касса пуста'}
         </button>
         <TickTimer serverTime={game.server_time} />
+        <div className="season-line" onClick={() => setTab('rating')}>
+          <span>Капитал: <b>{money(game.capital)}</b></span>
+          {game.season && (
+            <span>
+              Сезон {game.season.number} · {seasonLeft > 0 ? `ещё ${duration(seasonLeft)}` : 'итоги'} ›
+            </span>
+          )}
+        </div>
       </section>
+
+      {game.effects.length > 0 && (
+        <div className="effects">
+          {game.effects.map((e, i) => (
+            <span key={i} className={`effect ${e.mult < 1 && e.kind === 'demand' ? 'bad' : ''}`}>
+              {e.label} · {duration(new Date(e.until).getTime() - (Date.now() + serverOffset))}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {game.decision && (
+        <DecisionCard
+          decision={game.decision}
+          busy={busy}
+          onChoose={(option) => run(() => api.decide(option), (text) => text)}
+        />
+      )}
 
       {game.catalog.map((item) => (
         <BusinessCard
@@ -138,6 +188,8 @@ function Game() {
           onAction={(kind) => setSheet({ kind, type: item.type } as SheetKind)}
         />
       ))}
+      </>
+      )}
 
       {sheet && (
         <ActionSheet
@@ -172,6 +224,10 @@ function Game() {
           }}
           onClose={() => setSummary(null)}
         />
+      )}
+
+      {seasonResult && !summary && (
+        <SeasonResultModal result={seasonResult} onClose={() => setSeasonResult(null)} />
       )}
 
       {toast && <div className={`toast ${toast.error ? 'toast-error' : ''}`}>{toast.text}</div>}

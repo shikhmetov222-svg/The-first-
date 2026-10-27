@@ -74,7 +74,8 @@ async function login(user: TelegramUser) {
   const summary = !player.is_new && player.prev_seen_at
     ? await rpc<Body>('away_summary', { p_player_id: id, p_since: player.prev_seen_at })
     : null;
-  return { ...(await state(id)), is_new: player.is_new, summary };
+  const seasonResult = await rpc<Body | null>('pop_season_result', { p_player_id: id });
+  return { ...(await state(id)), is_new: player.is_new, summary, season_result: seasonResult };
 }
 
 // Действие игрока → новое состояние экрана.
@@ -96,6 +97,12 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
   set_price: action((id, b) =>
     rpc('set_price', { p_player_id: id, p_type: str(b, 'type'), p_price: int(b, 'price') })),
   collect: action((id) => rpc('collect_revenue', { p_player_id: id })),
+  decide: action((id, b) => rpc('decide', { p_player_id: id, p_option: int(b, 'option') })),
+  leaderboard: async (user, b) => {
+    const kind = str(b, 'kind');
+    if (kind !== 'capital' && kind !== 'growth') throw new ApiError(400, 'Неизвестный рейтинг');
+    return { leaderboard: await rpc('leaderboard', { p_player_id: await playerId(user), p_kind: kind }) };
+  },
 };
 
 Deno.serve(async (req) => {

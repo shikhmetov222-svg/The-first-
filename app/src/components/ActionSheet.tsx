@@ -62,15 +62,16 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
   if (sheet.kind === 'restock') {
     const isFactory = item.production_rate > 0;
     const free = isFactory ? item.raw_capacity - business.raw_stock : item.capacity - business.stock;
-    const affordable = Math.floor(cash / item.unit_cost);
+    const unitCost = item.unit_cost * game.discount;
+    const affordable = Math.floor(cash / unitCost);
     return (
       <QuantityPicker
         title={isFactory ? 'Закупить муку' : `Закупить ${item.product}`}
-        hint={`${money(item.unit_cost)} за ${isFactory ? 'муку на 1 буханку' : '1 шт.'} · свободно на складе: ${count(free)}`}
+        hint={`${money(unitCost)} за ${isFactory ? 'муку на 1 буханку' : '1 шт.'}${game.discount < 1 ? ' (со скидкой)' : ''} · свободно на складе: ${count(free)}`}
         max={Math.min(free, affordable)}
         emptyText={free === 0 ? 'Склад полон' : 'Не хватает денег даже на 1 шт.'}
         busy={busy}
-        confirm={(qty) => `Купить ${count(qty)} шт. за ${money(qty * item.unit_cost)}`}
+        confirm={(qty) => `Купить ${count(qty)} шт. за ${money(Math.ceil(qty * unitCost))}`}
         onConfirm={(qty) => onRestock(item.type, qty)}
       />
     );

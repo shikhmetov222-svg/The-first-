@@ -64,17 +64,71 @@ export interface SummaryItem {
   raw_stock: number;
 }
 
+export interface Decision {
+  title: string;
+  body: string;
+  options: { label: string; hint: string }[];
+  choice: number | null;
+  result: string | null;
+  success: boolean | null;
+}
+
+export interface Effect {
+  label: string;
+  kind: 'demand' | 'discount';
+  market: string | null;
+  mult: number;
+  until: string;
+}
+
+export interface Season {
+  number: number;
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface SeasonResult {
+  season: number;
+  place: number;
+  total: number;
+  capital: number;
+  growth: number;
+}
+
+export interface LeaderRow {
+  place: number;
+  name: string;
+  capital: number;
+  growth: number;
+  me: boolean;
+}
+
+export type LeaderKind = 'capital' | 'growth';
+
+export interface Leaderboard {
+  kind: LeaderKind;
+  total: number;
+  top: LeaderRow[];
+  me: { place: number; capital: number; growth: number } | null;
+}
+
 export interface GameState {
   server_time: string;
   player: Player;
   catalog: CatalogItem[];
   businesses: Business[];
   markets: Market[];
+  capital: number;
+  season: Season | null;
+  decision: Decision | null;
+  effects: Effect[];
+  discount: number;
 }
 
 export interface LoginResult extends GameState {
   is_new: boolean;
   summary: { since: string; items: SummaryItem[] } | null;
+  season_result: SeasonResult | null;
 }
 
 export class ApiError extends Error {}
@@ -109,4 +163,6 @@ export const api = {
   transferBread: (qty: number) => call<WithResult<null>>('transfer_bread', { qty }),
   setPrice: (type: BusinessType, price: number) => call<WithResult<null>>('set_price', { type, price }),
   collect: () => call<WithResult<number>>('collect'),
+  decide: (option: number) => call<WithResult<string>>('decide', { option }),
+  leaderboard: (kind: LeaderKind) => call<{ leaderboard: Leaderboard }>('leaderboard', { kind }),
 };

@@ -1,0 +1,90 @@
+import { useEffect, useState } from 'react';
+import { api, type LeaderKind, type Leaderboard as Board, type Season } from '../api';
+import { duration, money } from '../format';
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+export function Leaderboard({ season, serverOffset }: { season: Season | null; serverOffset: number }) {
+  const [kind, setKind] = useState<LeaderKind>('capital');
+  const [board, setBoard] = useState<Board | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    api
+      .leaderboard(kind)
+      .then((r) => alive && setBoard(r.leaderboard))
+      .catch((e) => alive && setError((e as Error).message));
+    return () => {
+      alive = false;
+    };
+  }, [kind]);
+
+  const left = season ? new Date(season.ends_at).getTime() - (Date.now() + serverOffset) : 0;
+  const meInTop = board?.top.some((r) => r.me);
+
+  return (
+    <>
+      {season && (
+        <section className="card season">
+          <div>
+            <div className="stat-label">Сезон {season.number}</div>
+            <b>{left > 0 ? `до конца ${duration(left)}` : 'подводим итоги…'}</b>
+          </div>
+          <p className="hint small">
+            В конце сезона все начинают заново со 100&nbsp;000&nbsp;₽. Боты в рейтинге не участвуют.
+          </p>
+        </section>
+      )}
+
+      <div className="segmented">
+        <button className={kind === 'capital' ? 'active' : ''} onClick={() => setKind('capital')}>
+          По капиталу
+        </button>
+        <button className={kind === 'growth' ? 'active' : ''} onClick={() => setKind('growth')}>
+          Рост за сутки
+        </button>
+      </div>
+
+      <section className="card leaderboard">
+        {error && <p className="warning">{error}</p>}
+        {!board && !error && <p className="hint center">Загружаем рейтинг…</p>}
+        {board && (
+          <>
+            <p className="hint small">
+              {kind === 'capital'
+                ? 'Капитал = деньги + выручка в кассах + товар на складах + 70% стоимости бизнесов.'
+                : 'На сколько процентов вырос капитал за последние 24 часа.'}
+            </p>
+            <ol>
+              {board.top.map((r) => (
+                <Row key={r.place} row={r} kind={kind} />
+              ))}
+            </ol>
+            {board.me && !meInTop && (
+              <ol className="me-row">
+                <Row
+                  row={{ ...board.me, name: 'Ты', me: true }}
+                  kind={kind}
+                />
+              </ol>
+            )}
+            <p className="hint small center">Игроков в сезоне: {board.total}</p>
+          </>
+        )}
+      </section>
+    </>
+  );
+}
+
+function Row({ row, kind }: { row: { place: number; name: string; capital: number; growth: number; me: boolean }; kind: LeaderKind }) {
+  const growth = `${row.growth > 0 ? '+' : ''}${String(row.growth).replace('.', ',')}%`;
+  return (
+    <li className={row.me ? 'me' : ''}>
+      <span className="place">{MEDALS[row.place - 1] ?? row.place}</span>
+      <span className="name">{row.name || 'Игрок'}</span>
+      <span className="value">{kind === 'capital' ? money(row.capital) : growth}</span>
+    </li>
+  );
+}

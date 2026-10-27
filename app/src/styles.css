@@ -439,3 +439,186 @@ body {
   border-top: 1px solid var(--bg-secondary);
   font-size: 15px;
 }
+
+/* ---------- Этап 5: решение дня, сезон, рейтинг ---------- */
+
+.segmented {
+  display: flex;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 36px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--hint);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.season-line {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bg-secondary);
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.season-line b {
+  color: var(--text);
+}
+
+.effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.effect {
+  padding: 5px 10px;
+  border-radius: 14px;
+  background: rgba(46, 125, 50, 0.15);
+  color: #43a047;
+  font-size: 13px;
+}
+
+.effect.bad {
+  background: rgba(198, 40, 40, 0.15);
+  color: #e5533d;
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1.5px solid var(--gold);
+}
+
+.decision.decided {
+  border-color: transparent;
+}
+
+.decision h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.decision .hint {
+  margin: 0;
+}
+
+.decision-tag {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--gold);
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.decision-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+}
+
+.option:active {
+  opacity: 0.7;
+}
+
+.decision-result {
+  margin: 0;
+  color: #43a047;
+}
+
+.decision-result.bad {
+  color: #e5533d;
+}
+
+.season {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.season .hint {
+  margin: 0;
+}
+
+.leaderboard ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.leaderboard li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--bg-secondary);
+}
+
+.leaderboard li.me {
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.leaderboard .place {
+  width: 28px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--hint);
+}
+
+.leaderboard .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard .value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.me-row {
+  margin-top: 8px !important;
+}
+
+.big-medal {
+  font-size: 56px;
+}
