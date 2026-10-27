@@ -1,5 +1,5 @@
-import type { Business, CatalogItem } from '../api';
-import { BUSINESS_INFO } from '../content';
+import type { Business, CatalogItem, Market } from '../api';
+import { BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
 
 export type CardAction = 'restock' | 'price' | 'transfer';
@@ -7,6 +7,7 @@ export type CardAction = 'restock' | 'price' | 'transfer';
 interface Props {
   item: CatalogItem;
   business?: Business;
+  market?: Market;
   cash: number;
   hasBakery: boolean;
   hasShop: boolean;
@@ -15,7 +16,7 @@ interface Props {
   onAction: (kind: CardAction) => void;
 }
 
-export function BusinessCard({ item, business, cash, hasBakery, hasShop, busy, onOpen, onAction }: Props) {
+export function BusinessCard({ item, business, market, cash, hasBakery, hasShop, busy, onOpen, onAction }: Props) {
   const info = BUSINESS_INFO[item.type];
 
   if (!business) {
@@ -65,6 +66,17 @@ export function BusinessCard({ item, business, cash, hasBakery, hasShop, busy, o
         value={business.stock}
         max={item.capacity}
       />
+
+      {market && (
+        <div className="market-line">
+          <span>Рынок ~{money(market.market_price)}</span>
+          <span>продавцов {market.sellers}</span>
+          <span>спрос {demandLabel(market.demand_level)}</span>
+        </div>
+      )}
+      {market && business.last_sold > 0 && (
+        <p className="hint small">За последние 5 минут продано: {count(business.last_sold)} шт.</p>
+      )}
 
       {!isFactory && business.stock === 0 && (
         <p className="warning">Склад пуст — продажи стоят. Пополни склад!</p>

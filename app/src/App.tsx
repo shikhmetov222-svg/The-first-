@@ -129,6 +129,7 @@ function Game() {
           key={item.type}
           item={item}
           business={game.businesses.find((b) => b.type === item.type)}
+          market={game.markets.find((m) => m.market === item.market)}
           cash={game.player.cash}
           hasBakery={owned.has('bakery')}
           hasShop={owned.has('shop')}

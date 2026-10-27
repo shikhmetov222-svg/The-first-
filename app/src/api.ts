@@ -23,6 +23,26 @@ export interface CatalogItem {
   capacity: number;
   raw_capacity: number;
   production_rate: number;
+  market: 'coffee' | 'bread' | null;
+}
+
+export interface Bot {
+  name: string;
+  kind: 'dumper' | 'premium' | 'careful';
+  price: number;
+  last_sold: number;
+}
+
+export interface Market {
+  market: 'coffee' | 'bread';
+  name: string;
+  ref_price: number;
+  market_price: number;
+  demand_level: number;
+  sellers: number;
+  players: number;
+  last_demand: number;
+  bots: Bot[];
 }
 
 export interface Business {
@@ -32,6 +52,7 @@ export interface Business {
   stock: number;
   raw_stock: number;
   pending_revenue: number;
+  last_sold: number;
 }
 
 export interface SummaryItem {
@@ -48,6 +69,7 @@ export interface GameState {
   player: Player;
   catalog: CatalogItem[];
   businesses: Business[];
+  markets: Market[];
 }
 
 export interface LoginResult extends GameState {

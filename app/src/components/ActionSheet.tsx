@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { BusinessType, GameState } from '../api';
-import { BUSINESS_INFO } from '../content';
+import type { BusinessType, GameState, Market } from '../api';
+import { BOT_KIND, BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
 
 export type SheetKind =
@@ -100,6 +100,7 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
       title={`Цена: ${item.name}`}
       current={business.price ?? item.ref_price!}
       reference={item.ref_price!}
+      market={game.markets.find((m) => m.market === item.market)}
       product={item.product}
       busy={busy}
       onConfirm={(price) => onSetPrice(item.type, price)}
@@ -167,18 +168,20 @@ interface PriceProps {
   title: string;
   current: number;
   reference: number;
+  market?: Market;
   product: string;
   busy: boolean;
   onConfirm: (price: number) => void;
 }
 
-function PricePicker({ title, current, reference, product, busy, onConfirm }: PriceProps) {
+function PricePicker({ title, current, reference, market, product, busy, onConfirm }: PriceProps) {
   const min = Math.ceil((reference * 3) / 10 / 100) * 100;
   const max = reference * 3;
   const [price, setPrice] = useState(current);
   const change = (rub: number) => setPrice((p) => Math.max(min, Math.min(max, p + rub * 100)));
 
-  const ratio = price / reference;
+  const marketPrice = market?.market_price ?? reference;
+  const ratio = price / marketPrice;
   const verdict =
     ratio < 0.85
       ? 'Дешевле рынка: покупателей больше, но с каждой продажи меньше прибыли.'
@@ -190,7 +193,8 @@ function PricePicker({ title, current, reference, product, busy, onConfirm }: Pr
     <>
       <h2>{title}</h2>
       <p className="hint">
-        Обычная цена на {product} — около {money(reference)}.
+        Сейчас на рынке {product} стоит около {money(marketPrice)}.
+        {market && ` Спрос ${demandLabel(market.demand_level)}.`}
       </p>
       <div className="stepper">
         <button className="step" onClick={() => change(-10)}>−10</button>
@@ -203,6 +207,32 @@ function PricePicker({ title, current, reference, product, busy, onConfirm }: Pr
       <button className="button" disabled={busy || price === current} onClick={() => onConfirm(price)}>
         Поставить {money(price)}
       </button>
+      {market && <Competitors market={market} />}
     </>
+  );
+}
+
+function Competitors({ market }: { market: Market }) {
+  return (
+    <div className="competitors">
+      <div className="stat-label small">Конкуренты в городе</div>
+      <ul>
+        {market.bots.map((b) => (
+          <li key={b.name}>
+            <span>
+              {b.name} <span className="hint small">· {BOT_KIND[b.kind]}</span>
+            </span>
+            <b>{money(b.price)}</b>
+          </li>
+        ))}
+        <li>
+          <span>Игроки</span>
+          <b>{market.players}</b>
+        </li>
+      </ul>
+      {market.bots.length === 0 && (
+        <p className="hint small">Ботов нет — в городе достаточно живых игроков.</p>
+      )}
+    </div>
   );
 }

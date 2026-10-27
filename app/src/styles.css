@@ -415,3 +415,27 @@ body {
 .toast-error {
   background: #c62828;
 }
+
+/* ---------- Этап 4: рынок ---------- */
+
+.market-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.competitors ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.competitors li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--bg-secondary);
+  font-size: 15px;
+}
