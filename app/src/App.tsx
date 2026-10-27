@@ -12,7 +12,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { MarketTab } from './components/MarketTab';
 import { ProfileTab } from './components/ProfileTab';
 import { duration, money } from './format';
-import { isInTelegram, notify } from './telegram';
+import { isInTelegram, notify, setHapticsEnabled } from './telegram';
 import { CircleAlert, CircleCheck } from 'lucide-react';
 import { CompanyForm } from './components/CompanyForm';
 import { Tutorial, type TutorialStep } from './components/Tutorial';
@@ -37,6 +37,13 @@ function Game() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingCompany, setEditingCompany] = useState(false);
+
+  // Настройка вибрации хранится на сервере.
+  const hapticsSetting = game?.player.haptics;
+  useEffect(() => {
+    if (hapticsSetting !== undefined) setHapticsEnabled(hapticsSetting);
+  }, [hapticsSetting]);
   const toastTimer = useRef<number>();
 
   const showToast = useCallback((text: string, error = false) => {
@@ -123,6 +130,22 @@ function Game() {
     }
   };
 
+  const updateCompany = async (company: CompanyInput) => {
+    setBusy(true);
+    setFormError(null);
+    try {
+      setGame(await api.updateCompany(company));
+      notify('success');
+      setEditingCompany(false);
+      showToast('Компания обновлена');
+    } catch (e) {
+      notify('error');
+      setFormError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loginError) {
     return (
       <LoadingScreen>
@@ -144,6 +167,21 @@ function Game() {
     return <CompanyForm busy={busy} error={formError} onSubmit={createCompany} />;
   }
 
+  if (editingCompany && game.company) {
+    return (
+      <CompanyForm
+        initial={game.company}
+        busy={busy}
+        error={formError}
+        onSubmit={updateCompany}
+        onCancel={() => {
+          setFormError(null);
+          setEditingCompany(false);
+        }}
+      />
+    );
+  }
+
   const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
   const owned = new Set(game.businesses.map((b) => b.type));
   const seasonLeft = game.season
@@ -158,7 +196,9 @@ function Game() {
 
       {tab === 'market' && <MarketTab game={game} />}
       {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
-      {tab === 'profile' && <ProfileTab game={game} />}
+      {tab === 'profile' && (
+        <ProfileTab game={game} onEditCompany={() => setEditingCompany(true)} onToast={showToast} />
+      )}
 
       {tab === 'empire' && (
       <>

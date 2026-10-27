@@ -71,6 +71,25 @@ function companyArgs(id: string, b: Body) {
   };
 }
 
+// Имя бота для ссылки-приглашения — спрашиваем у Telegram один раз.
+let botUsername: string | null = null;
+async function getBotUsername(): Promise<string | null> {
+  if (botUsername) return botUsername;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
+    const data = await res.json();
+    botUsername = data?.result?.username ?? null;
+  } catch (e) {
+    console.error('getMe failed', e);
+  }
+  return botUsername;
+}
+
+function bool(body: Body, key: string): boolean | null {
+  const v = body[key];
+  return typeof v === 'boolean' ? v : null;
+}
+
 const state = (id: string) => rpc<Body>('get_state', { p_player_id: id });
 
 async function login(user: TelegramUser) {
@@ -81,6 +100,12 @@ async function login(user: TelegramUser) {
     p_language_code: user.language_code ?? null,
   });
   const id = player.id as string;
+  // Новичок пришёл по ссылке друга: t.me/<бот>?startapp=ref_<код>.
+  const ref = user.start_param?.match(/^ref_([a-f0-9]{8})$/)?.[1];
+  if (player.is_new && ref) {
+    // Приглашение — приятный бонус, вход из-за него ломаться не должен.
+    await rpc('apply_referral', { p_player_id: id, p_code: ref }).catch((e) => console.error('referral', e));
+  }
   const summary = !player.is_new && player.prev_seen_at
     ? await rpc<Body>('away_summary', { p_player_id: id, p_since: player.prev_seen_at })
     : null;
@@ -111,6 +136,15 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
   create_company: action((id, b) => rpc('create_company', companyArgs(id, b))),
   update_company: action((id, b) => rpc('update_company', companyArgs(id, b))),
   tutorial: action((id, b) => rpc('set_tutorial_step', { p_player_id: id, p_step: int(b, 'step') })),
+  profile: async (user) => {
+    const [profile, bot] = await Promise.all([
+      playerId(user).then((id) => rpc('my_profile', { p_player_id: id })),
+      getBotUsername(),
+    ]);
+    return { profile, bot_username: bot };
+  },
+  settings: action((id, b) =>
+    rpc('update_settings', { p_player_id: id, p_notify: bool(b, 'notify'), p_haptics: bool(b, 'haptics') })),
   leaderboard: async (user, b) => {
     const kind = str(b, 'kind');
     if (kind !== 'capital' && kind !== 'growth') throw new ApiError(400, 'Неизвестный рейтинг');

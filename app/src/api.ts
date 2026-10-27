@@ -12,6 +12,35 @@ export interface Player {
   cash: number; // все деньги — в копейках
   created_at: string;
   tutorial_step: number; // 0–2 — текущий шаг обучения, 3 — пройдено
+  haptics?: boolean;
+}
+
+export interface PublicProfile {
+  company: { name: string | null; icon: string | null; color: string | null; motto: string };
+  league: string;
+  title: string;
+  capital: number;
+  place: number | null;
+  achievements: { code: string; earned_at: string }[];
+}
+
+export interface SeasonHistoryItem {
+  season: number;
+  place: number;
+  total: number;
+  capital: number;
+  growth: number;
+  theme: 'normal' | 'crisis';
+}
+
+export interface MyProfile extends PublicProfile {
+  growth: number | null;
+  businesses: number;
+  streak: number;
+  season: { number: number; theme: 'normal' | 'crisis'; ends_at: string } | null;
+  history: SeasonHistoryItem[];
+  referral: { code: string; invited: number };
+  settings: { notify: boolean; haptics: boolean };
 }
 
 export interface Company {
@@ -184,5 +213,7 @@ export const api = {
   createCompany: (c: CompanyInput) => call<WithResult<null>>('create_company', { ...c }),
   updateCompany: (c: CompanyInput) => call<WithResult<null>>('update_company', { ...c }),
   tutorial: (step: number) => call<WithResult<null>>('tutorial', { step }),
+  profile: () => call<{ profile: MyProfile; bot_username: string | null }>('profile'),
+  settings: (s: { notify?: boolean; haptics?: boolean }) => call<WithResult<null>>('settings', s),
   leaderboard: (kind: LeaderKind) => call<{ leaderboard: Leaderboard }>('leaderboard', { kind }),
 };

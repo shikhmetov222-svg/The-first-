@@ -1189,3 +1189,235 @@ h3 {
   background: none;
   color: var(--muted);
 }
+
+/* ---------- Профиль ---------- */
+
+h2.section-title {
+  margin: 8px 2px -4px;
+}
+
+.company-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.company-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.company-motto {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tag.gold {
+  background: var(--gold-soft);
+  border-color: rgba(212, 167, 58, 0.35);
+  color: var(--gold);
+}
+
+.tag.warn {
+  background: rgba(242, 166, 90, 0.12);
+  border-color: rgba(242, 166, 90, 0.35);
+  color: var(--warn);
+}
+
+.small-tag {
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+.stat-tile b {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 2px 0;
+  color: var(--warn);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.badges {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: #5a5f69;
+}
+
+.badge.earned {
+  background: var(--gold-soft);
+  border-color: rgba(212, 167, 58, 0.45);
+  color: var(--gold);
+}
+
+.badge.selected {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.badge-lock {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--muted);
+}
+
+.badge-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.list li .right b {
+  font-weight: 800;
+}
+
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invite-link {
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 18px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 8px 0;
+}
+
+.toggle-row + .toggle-row {
+  border-top: 1px solid var(--border);
+}
+
+.toggle-row b {
+  display: block;
+  font-size: 15px;
+}
+
+.toggle-icon {
+  display: flex;
+  color: var(--gold);
+}
+
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 50px;
+  height: 30px;
+  margin: 0;
+  border-radius: 15px;
+  background: var(--border);
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.2s;
+}
+
+.switch:checked {
+  background: var(--gold);
+}
+
+.switch:checked::after {
+  transform: translateX(20px);
+}

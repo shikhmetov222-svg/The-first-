@@ -16,6 +16,8 @@ interface TelegramWebApp {
   setHeaderColor?(color: string): void;
   setBackgroundColor?(color: string): void;
   setBottomBarColor?(color: string): void;
+  openTelegramLink?(url: string): void;
+  requestWriteAccess?(cb?: (allowed: boolean) => void): void;
   platform: string;
   version: string;
   ready(): void;
@@ -63,10 +65,35 @@ export function displayName(): string {
   return u.first_name || u.username || 'Игрок';
 }
 
+// Вибрацию можно выключить в профиле.
+let hapticsOn = true;
+export function setHapticsEnabled(on: boolean) {
+  hapticsOn = on;
+}
+
 export function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
-  tg?.HapticFeedback?.impactOccurred(style);
+  if (hapticsOn) tg?.HapticFeedback?.impactOccurred(style);
 }
 
 export function notify(type: 'success' | 'error' | 'warning') {
-  tg?.HapticFeedback?.notificationOccurred(type);
+  if (hapticsOn) tg?.HapticFeedback?.notificationOccurred(type);
+}
+
+/** Окно «Поделиться» в Telegram. Вне Telegram — обычная вкладка. */
+export function shareLink(url: string, text: string) {
+  const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  if (tg?.openTelegramLink) tg.openTelegramLink(share);
+  else window.open(share, '_blank');
+}
+
+/** Разрешение боту писать игроку (нужно для уведомлений). */
+export function requestWriteAccess(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!tg?.requestWriteAccess) return resolve(true);
+    try {
+      tg.requestWriteAccess((allowed) => resolve(allowed));
+    } catch {
+      resolve(true);
+    }
+  });
 }
