@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowDownToLine, Clock, PackageOpen, Store, Upload, X } from 'lucide-react';
-import { api, type GameState, type Lot, type MarketView, type Product, type Source } from '../api';
+import { api, type BusinessLot, type GameState, type Lot, type MarketView, type Product, type Source } from '../api';
 import { PRODUCTS } from '../content';
 import { count, money, shortDuration } from '../format';
 import { vsMarket } from '../market';
 import { feel, notify } from '../telegram';
 import { CompanyLogo } from './CompanyLogo';
 import { DevBadge } from './DevBadge';
-import { BuySheet, SellSheet } from './MarketSheets';
+import { BuyBusinessSheet, BuySheet, SellBusinessSheet, SellSheet, businessStock } from './MarketSheets';
+import { BizIcon } from './BizIcon';
 
 type Section = 'goods' | 'business' | 'mine';
 
@@ -28,6 +29,8 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
   const [buying, setBuying] = useState<Lot | null>(null);
   const [selling, setSelling] = useState<{ preset?: Source; mode?: 'lot' | 'wholesale' } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [buyingBiz, setBuyingBiz] = useState<BusinessLot | null>(null);
+  const [sellingBiz, setSellingBiz] = useState(false);
 
   const load = useCallback(() => {
     api
@@ -176,13 +179,51 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
       )}
 
       {section === 'business' && (
-        <section className="card placeholder">
-          <div className="placeholder-icon">
-            <Store size={26} />
-          </div>
-          <h2>Продажа бизнесов</h2>
-          <p className="hint">Скоро здесь можно будет купить и продать бизнес целиком.</p>
-        </section>
+        <>
+          {(view.business_lots ?? []).length === 0 ? (
+            <section className="card placeholder">
+              <div className="placeholder-icon">
+                <Store size={26} />
+              </div>
+              <h2>Бизнесов на продаже нет</h2>
+              <p className="hint">Выставь свой — покупатель получит его вместе с товаром на складе.</p>
+            </section>
+          ) : (
+            (view.business_lots ?? []).map((l) => {
+              const item = game.catalog.find((c) => c.type === l.type)!;
+              const diff = Math.round((l.price / l.valuation - 1) * 100);
+              return (
+                <section key={l.id} className="card biz-lot">
+                  <div className="biz-head">
+                    <BizIcon type={l.type} />
+                    <div className="grow">
+                      <h3>{item.name}</h3>
+                      <div className="stat-label">
+                        {l.seller.name}
+                        {l.seller.dev && <DevBadge />}
+                        {l.seller.test && <span className="tag small-tag">тест</span>}
+                      </div>
+                    </div>
+                    <span className={`price-badge ${diff < 0 ? 'up' : diff > 0 ? 'warn' : ''}`}>
+                      {diff === 0 ? '≈ оценка' : `${diff < 0 ? '▼ −' : '▲ +'}${Math.abs(diff)}% к оценке`}
+                    </span>
+                  </div>
+                  <div className="price-line">
+                    Склад: <b>{businessStock(l.type, l.stock, l.raw_stock, item.capacity, item.raw_capacity)}</b>
+                    <br />
+                    Цена <b>{money(l.price)}</b> · оценка <b>{money(l.valuation)}</b>
+                  </div>
+                  <button className="button small" onClick={() => setBuyingBiz(l)}>
+                    Подробнее и купить
+                  </button>
+                </section>
+              );
+            })
+          )}
+          <button className="button secondary" onClick={() => setSellingBiz(true)}>
+            <Upload size={18} /> Продать свой бизнес
+          </button>
+        </>
       )}
 
       {section === 'mine' && (
@@ -199,6 +240,32 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
               const sold = l.qty_total - l.qty_left;
               const pct = Math.round((sold / l.qty_total) * 100);
               const left = new Date(l.expires_at).getTime() - Date.now();
+              if (l.kind === 'business' && l.business_type) {
+                const item = game.catalog.find((c) => c.type === l.business_type)!;
+                return (
+                  <section key={l.id} className="card my-lot">
+                    <div className="biz-head">
+                      <BizIcon type={l.business_type} />
+                      <div className="grow">
+                        <b>
+                          {item.name} · {money(l.price)}
+                        </b>
+                        <div className="stat-label">
+                          <Clock size={12} /> ещё {shortDuration(left)} · бизнес на паузе
+                        </div>
+                      </div>
+                      <button
+                        className="button small secondary"
+                        style={{ width: 'auto' }}
+                        disabled={busy}
+                        onClick={() => deal(() => api.cancelLot(l.id))}
+                      >
+                        <X size={16} /> Снять
+                      </button>
+                    </div>
+                  </section>
+                );
+              }
               const info = PRODUCTS[l.product];
               return (
                 <section key={l.id} className="card my-lot">
@@ -247,7 +314,10 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
                   <li key={i}>
                     <span>
                       <b>
-                        {t.side === 'sold' ? 'Продано' : 'Куплено'}: {PRODUCTS[t.product].name} × {count(t.qty)}
+                        {t.side === 'sold' ? 'Продано' : 'Куплено'}:{' '}
+                        {t.kind === 'business'
+                          ? game.catalog.find((c) => c.type === t.product)?.name ?? 'бизнес'
+                          : `${PRODUCTS[t.product as Product].name} × ${count(t.qty)}`}
                       </b>
                       <div className="stat-label">
                         {t.side === 'sold' ? 'покупатель' : 'продавец'}: {t.other ?? '—'} ·{' '}
@@ -275,6 +345,34 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
           onClose={() => setBuying(null)}
           onBuy={async (qty) => {
             if (await deal(() => api.buyLot(buying.id, qty))) setBuying(null);
+          }}
+        />
+      )}
+
+      {buyingBiz && (
+        <BuyBusinessSheet
+          lot={buyingBiz}
+          game={game}
+          busy={busy}
+          onClose={() => setBuyingBiz(null)}
+          onBuy={async () => {
+            if (await deal(() => api.buyBusinessLot(buyingBiz.id), 'collect')) setBuyingBiz(null);
+          }}
+        />
+      )}
+
+      {sellingBiz && (
+        <SellBusinessSheet
+          game={game}
+          valuations={view.my_businesses ?? []}
+          goodsLotSources={view.my_lots.filter((l) => l.kind !== 'business' && l.status === 'active').map((l) => l.source)}
+          busy={busy}
+          onClose={() => setSellingBiz(false)}
+          onSell={async (type, price) => {
+            if (await deal(() => api.createBusinessLot(type, price))) {
+              setSellingBiz(false);
+              setSection('mine');
+            }
           }}
         />
       )}

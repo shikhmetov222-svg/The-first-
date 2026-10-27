@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Info } from 'lucide-react';
-import type { GameState, GoodsPrice, Lot, Product, Source } from '../api';
+import type { BusinessLot, BusinessType, GameState, GoodsPrice, Lot, Product, Source } from '../api';
 import { PRODUCTS, SELL_SOURCES } from '../content';
 import { count, money } from '../format';
 import { FEE, available, freeSpace, priceCorridor, vsMarket } from '../market';
 import { selectionTick } from '../telegram';
 import { CompanyLogo } from './CompanyLogo';
 import { DevBadge } from './DevBadge';
+import { BizIcon } from './BizIcon';
 
 function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
@@ -240,4 +241,157 @@ export function SellSheet({
       )}
     </Sheet>
   );
+}
+
+// ---------------- Купить бизнес ----------------
+
+export function BuyBusinessSheet({
+  lot, game, busy, onBuy, onClose,
+}: {
+  lot: BusinessLot;
+  game: GameState;
+  busy: boolean;
+  onBuy: () => void;
+  onClose: () => void;
+}) {
+  const item = game.catalog.find((c) => c.type === lot.type)!;
+  const has = game.businesses.some((b) => b.type === lot.type);
+  const enough = game.player.cash >= lot.price;
+  const diff = Math.round((lot.price / lot.valuation - 1) * 100);
+
+  return (
+    <Sheet onClose={onClose}>
+      <h2>
+        <BizIcon type={lot.type} /> {item.name}
+      </h2>
+      <div className="lot-seller">
+        {lot.seller.icon ? <CompanyLogo icon={lot.seller.icon} color={lot.seller.color ?? 'gold'} size={28} /> : null}
+        <span>
+          {lot.seller.name}
+          {lot.seller.dev && <DevBadge />}
+        </span>
+      </div>
+      <div className="calc">
+        <div><span>Склад</span><b>{businessStock(lot.type, lot.stock, lot.raw_stock, item.capacity, item.raw_capacity)}</b></div>
+        <div><span>Оценочная стоимость</span><b>{money(lot.valuation)}</b></div>
+        <div className="calc-total">
+          <span>Цена</span>
+          <b>{money(lot.price)}</b>
+        </div>
+      </div>
+      <p className={`small ${diff < 0 ? 'up' : diff > 0 ? 'warn' : ''}`} style={{ margin: 0 }}>
+        {diff === 0 ? 'Цена равна оценке' : `${diff < 0 ? '▼' : '▲'} на ${Math.abs(diff)}% ${diff < 0 ? 'дешевле' : 'дороже'} оценки`}
+      </p>
+      <p className="hint small">
+        <Info size={13} /> Бизнес перейдёт к тебе вместе с товаром и ценой продажи. Касса будет пустой.
+      </p>
+      {has ? (
+        <p className="warning">У тебя уже есть {item.name.toLowerCase()} — двух одинаковых бизнесов быть не может.</p>
+      ) : !enough ? (
+        <p className="warning">Не хватает {money(lot.price - game.player.cash)}</p>
+      ) : (
+        <button className="button" disabled={busy} onClick={onBuy}>
+          Купить за {money(lot.price)}
+        </button>
+      )}
+    </Sheet>
+  );
+}
+
+// ---------------- Продать свой бизнес ----------------
+
+export function SellBusinessSheet({
+  game, valuations, goodsLotSources, busy, onSell, onClose,
+}: {
+  game: GameState;
+  valuations: { type: BusinessType; valuation: number; listed: boolean }[];
+  goodsLotSources: Source[];
+  busy: boolean;
+  onSell: (type: BusinessType, price: number) => void;
+  onClose: () => void;
+}) {
+  const options = valuations.filter((v) => !v.listed);
+  const [type, setType] = useState<BusinessType | undefined>(options[0]?.type);
+  const v = options.find((o) => o.type === type);
+  const lo = v ? Math.ceil((v.valuation * 0.7) / 100) * 100 : 0;
+  const hi = v ? Math.floor((v.valuation * 1.5) / 100) * 100 : 0;
+  const [price, setPrice] = useState(v ? Math.round(v.valuation / 100) * 100 : 0);
+
+  if (!v || !type) {
+    return (
+      <Sheet onClose={onClose}>
+        <h2>Продать бизнес</h2>
+        <p className="hint">Нечего продавать: нет бизнесов или все уже выставлены.</p>
+      </Sheet>
+    );
+  }
+  const p = Math.max(lo, Math.min(hi, price));
+  const fee = Math.ceil(p * FEE);
+  const diff = Math.round((p / v.valuation - 1) * 100);
+  const blocked = goodsLotSources.includes(type);
+
+  return (
+    <Sheet onClose={onClose}>
+      <h2>Продать бизнес</h2>
+      <div className="dev-row">
+        {options.map((o) => (
+          <button
+            key={o.type}
+            className={`chip ${o.type === type ? 'chip-active' : ''}`}
+            onClick={() => {
+              setType(o.type);
+              setPrice(Math.round(o.valuation / 100) * 100);
+            }}
+          >
+            {game.catalog.find((c) => c.type === o.type)?.name}
+          </button>
+        ))}
+      </div>
+      <div className="price-head">
+        <span className="stat-label">Цена бизнеса</span>
+        <b className="price-big">{money(p)}</b>
+      </div>
+      <input
+        className="slider"
+        type="range"
+        min={lo}
+        max={hi}
+        step={100}
+        value={p}
+        onChange={(e) => {
+          selectionTick();
+          setPrice(Number(e.target.value));
+        }}
+      />
+      <div className="bar-text">
+        <span>{money(lo)}</span>
+        <span className={diff === 0 ? '' : diff < 0 ? 'up' : 'warn'}>
+          {diff === 0 ? 'по оценке' : `${diff < 0 ? '▼' : '▲'} ${Math.abs(diff)}% к оценке`}
+        </span>
+        <span>{money(hi)}</span>
+      </div>
+      <div className="calc">
+        <div><span>Оценка (открытие + товар)</span><b>{money(v.valuation)}</b></div>
+        <div><span>Комиссия рынка 5%</span><b className="down">−{money(fee)}</b></div>
+        <div className="calc-total"><span>Получишь</span><b>{money(p - fee)}</b></div>
+      </div>
+      <p className="hint small">
+        <Info size={13} /> Пока бизнес выставлен (до 48 часов), он не торгует и его нельзя пополнить. Выручку из кассы
+        заберёшь сразу. После продажи можно открыть такой бизнес заново.
+      </p>
+      {blocked ? (
+        <p className="warning">Сначала сними товарные лоты с этого бизнеса.</p>
+      ) : (
+        <button className="button" disabled={busy} onClick={() => onSell(type, p)}>
+          Выставить за {money(p)}
+        </button>
+      )}
+    </Sheet>
+  );
+}
+
+export function businessStock(type: BusinessType, stock: number, raw: number, cap: number, rawCap: number): string {
+  return type === 'bakery'
+    ? `мука ${count(raw)}/${count(rawCap)} · хлеб ${count(stock)}/${count(cap)}`
+    : `${count(stock)}/${count(cap)} шт.`;
 }

@@ -2242,3 +2242,27 @@ h2.section-title {
 .flags .small-tag {
   margin-left: 0;
 }
+
+.biz-lot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.biz-lot h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.listed-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+}

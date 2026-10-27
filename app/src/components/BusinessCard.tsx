@@ -1,4 +1,4 @@
-import { Lock, Moon, Tag, TriangleAlert, Truck, Upload } from 'lucide-react';
+import { Lock, Moon, Store, Tag, TriangleAlert, Truck, Upload } from 'lucide-react';
 import type { Business, CatalogItem, Market } from '../api';
 import { BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
@@ -65,8 +65,10 @@ function LockedCard({ item, cash, busy, onOpen }: Props) {
   );
 }
 
-function OpenCard({ item, business, market, hasBakery, hasShop, busy, onAction }: Props & { business: Business }) {
+function OpenCard({ item, business, market, hasBakery, hasShop, busy: anyBusy, onAction }: Props & { business: Business }) {
   const isFactory = item.production_rate > 0;
+  // Бизнес на продаже заморожен: кнопки неактивны, пока лот не снят.
+  const busy = anyBusy || Boolean(business.listed);
 
   return (
     <section className="card biz">
@@ -102,6 +104,12 @@ function OpenCard({ item, business, market, hasBakery, hasShop, busy, onAction }
           </>
         )}
       </div>
+
+      {business.listed && (
+        <p className="listed-note">
+          <Store size={15} /> Выставлен на продажу — торговля на паузе. Снять: Рынок → Мои лоты.
+        </p>
+      )}
 
       {!isFactory && market && market.demand_level < 0.5 && business.stock > 0 && (
         <p className="night-hint">

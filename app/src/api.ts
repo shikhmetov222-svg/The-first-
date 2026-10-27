@@ -99,6 +99,7 @@ export interface Business {
   raw_stock: number;
   pending_revenue: number;
   last_sold: number;
+  listed?: boolean; // выставлен на продажу — заморожен
 }
 
 export interface SummaryItem {
@@ -239,8 +240,22 @@ export interface Lot {
   seller: { id: string; name: string; icon: string | null; color: string | null; dev: boolean; test: boolean };
 }
 
+export interface BusinessLot {
+  id: number;
+  type: BusinessType;
+  price: number;
+  valuation: number;
+  stock: number;
+  raw_stock: number;
+  expires_at: string;
+  seller: Lot['seller'];
+}
+
 export interface MyLot {
   id: number;
+  kind: 'goods' | 'business';
+  business_type: BusinessType | null;
+  valuation: number | null;
   product: Product;
   source: Source;
   qty_left: number;
@@ -253,8 +268,8 @@ export interface MyLot {
 
 export interface Trade {
   side: 'sold' | 'bought';
-  kind: 'lot' | 'wholesale';
-  product: Product;
+  kind: 'lot' | 'wholesale' | 'business';
+  product: Product | BusinessType;
   qty: number;
   price: number;
   total: number;
@@ -268,6 +283,8 @@ export interface MarketView {
   lots: Lot[];
   my_lots: MyLot[];
   my_trades: Trade[];
+  business_lots?: BusinessLot[];
+  my_businesses?: { type: BusinessType; valuation: number; listed: boolean }[];
 }
 
 export class ApiError extends Error {}
@@ -316,6 +333,9 @@ export const api = {
   buyLot: (lot: number, qty: number) => call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty }),
   sellWholesale: (p: { product: Product; source: Source; qty: number }) =>
     call<WithResult<string> & { market: MarketView }>('sell_wholesale', p),
+  createBusinessLot: (type: BusinessType, price: number) =>
+    call<WithResult<string> & { market: MarketView }>('create_business_lot', { type, price }),
+  buyBusinessLot: (lot: number) => call<WithResult<string> & { market: MarketView }>('buy_business_lot', { lot }),
   devInfo: () => call<{ dev: DevInfo }>('dev_info'),
   dev: (op: string, params: Record<string, unknown> = {}) =>
     call<WithResult<string> & { dev: DevInfo }>('dev', { op, ...params }),

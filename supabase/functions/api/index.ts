@@ -205,6 +205,9 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       p_source: str(b, 'source'),
       p_qty: int(b, 'qty'),
     })),
+  create_business_lot: marketAction((id, b) =>
+    rpc('create_business_lot', { p_player: id, p_type: str(b, 'type'), p_price: int(b, 'price') })),
+  buy_business_lot: marketAction((id, b) => rpc('buy_business_lot', { p_buyer: id, p_lot: int(b, 'lot') })),
   // ---------- Режим разработчика: каждый вызов перепроверяет администратора по подписи Telegram ----------
   dev_info: async (user) => {
     const id = await adminId(user);
