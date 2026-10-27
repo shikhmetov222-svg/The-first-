@@ -197,12 +197,77 @@ export interface DevInfo {
   }[];
   test_players: { id: string; name: string; icon: string; color: string; cash: number; friend: boolean }[];
   log: { action: string; details: Record<string, unknown>; amount: number | null; at: string; admin: string }[];
+  trades?: {
+    kind: 'lot' | 'wholesale';
+    product: string;
+    qty: number;
+    price: number;
+    total: number;
+    fee: number;
+    flags: string[];
+    at: string;
+    seller: string;
+    buyer: string;
+  }[];
+  flagged_24h?: number;
 }
 
 export interface LoginResult extends GameState {
   is_new: boolean;
   summary: { since: string; items: SummaryItem[] } | null;
   season_result: SeasonResult | null;
+}
+
+export type Product = 'coffee' | 'bread' | 'flour';
+export type Source = 'coffee' | 'shop' | 'bakery';
+
+export interface GoodsPrice {
+  product: Product;
+  price: number; // оптовая цена за штуку
+  wholesale: number; // столько платит оптовик
+  day_ago: number | null;
+  history: [number, number][];
+}
+
+export interface Lot {
+  id: number;
+  product: Product;
+  qty_left: number;
+  qty_total: number;
+  price: number;
+  expires_at: string;
+  seller: { id: string; name: string; icon: string | null; color: string | null; dev: boolean; test: boolean };
+}
+
+export interface MyLot {
+  id: number;
+  product: Product;
+  source: Source;
+  qty_left: number;
+  qty_total: number;
+  price: number;
+  status: 'active' | 'sold' | 'cancelled' | 'expired';
+  created_at: string;
+  expires_at: string;
+}
+
+export interface Trade {
+  side: 'sold' | 'bought';
+  kind: 'lot' | 'wholesale';
+  product: Product;
+  qty: number;
+  price: number;
+  total: number;
+  fee: number;
+  at: string;
+  other: string | null;
+}
+
+export interface MarketView {
+  prices: GoodsPrice[];
+  lots: Lot[];
+  my_lots: MyLot[];
+  my_trades: Trade[];
 }
 
 export class ApiError extends Error {}
@@ -244,6 +309,13 @@ export const api = {
   profile: () => call<{ profile: MyProfile; bot_username: string | null }>('profile'),
   settings: (s: { notify?: boolean; haptics?: boolean }) => call<WithResult<null>>('settings', s),
   company: (id: string) => call<{ company: PublicProfile }>('company', { id }),
+  market: () => call<{ market: MarketView }>('market'),
+  createLot: (p: { product: Product; source: Source; qty: number; price: number }) =>
+    call<WithResult<string> & { market: MarketView }>('create_lot', p),
+  cancelLot: (lot: number) => call<WithResult<string> & { market: MarketView }>('cancel_lot', { lot }),
+  buyLot: (lot: number, qty: number) => call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty }),
+  sellWholesale: (p: { product: Product; source: Source; qty: number }) =>
+    call<WithResult<string> & { market: MarketView }>('sell_wholesale', p),
   devInfo: () => call<{ dev: DevInfo }>('dev_info'),
   dev: (op: string, params: Record<string, unknown> = {}) =>
     call<WithResult<string> & { dev: DevInfo }>('dev', { op, ...params }),

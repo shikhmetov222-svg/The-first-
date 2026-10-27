@@ -1,10 +1,10 @@
-import { Lock, Moon, Tag, TriangleAlert, Truck } from 'lucide-react';
+import { Lock, Moon, Tag, TriangleAlert, Truck, Upload } from 'lucide-react';
 import type { Business, CatalogItem, Market } from '../api';
 import { BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
 import { BizIcon } from './BizIcon';
 
-export type CardAction = 'restock' | 'price' | 'transfer';
+export type CardAction = 'restock' | 'price' | 'transfer' | 'sell';
 
 interface Props {
   item: CatalogItem;
@@ -139,6 +139,15 @@ function OpenCard({ item, business, market, hasBakery, hasShop, busy, onAction }
             <Truck size={20} />
           </button>
         )}
+        <button
+          className="icon-button"
+          aria-label="Выставить товар на рынок"
+          title="Выставить на рынок"
+          disabled={busy}
+          onClick={() => onAction('sell')}
+        >
+          <Upload size={20} />
+        </button>
         {!isFactory && (
           <button
             className="icon-button"

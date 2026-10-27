@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Bot, CalendarClock, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
+  Bot, CalendarClock, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
   Warehouse, Wrench,
 } from 'lucide-react';
 import { api, type DevInfo, type GameState } from '../api';
@@ -22,6 +22,12 @@ const PRODUCTS = [
   { id: 'flour', label: 'Мука' },
   { id: 'baked', label: 'Хлеб (пекарня)' },
 ];
+
+const FLAG_LABELS: Record<string, string> = {
+  friends: 'друзья',
+  frequent: 'частые сделки',
+  big_share: '>30% капитала',
+};
 
 const ACTIONS: Record<string, string> = {
   cash_add: 'Деньги +',
@@ -359,7 +365,42 @@ export function DevPanel({ game, onState, onToast }: Props) {
             ))}
           </ul>
         )}
-        <p className="hint small">Журнал сделок рынка появится вместе с рынком игроков.</p>
+      </DevSection>
+
+      <DevSection icon={<ShieldAlert size={18} />} title={`Сделки рынка · на проверку за сутки: ${info.flagged_24h ?? 0}`}>
+        {!info.trades || info.trades.length === 0 ? (
+          <p className="hint small">Сделок пока не было.</p>
+        ) : (
+          <ul className="list dev-log">
+            {info.trades.map((t, i) => (
+              <li key={i}>
+                <span>
+                  <b>
+                    {t.seller} → {t.buyer}
+                  </b>
+                  <span className="stat-label">
+                    {' '}
+                    · {t.product} × {t.qty} по {money(t.price)}
+                  </span>
+                  {t.flags.length > 0 && (
+                    <div className="flags">
+                      {t.flags.map((f) => (
+                        <span key={f} className="tag warn small-tag">
+                          {FLAG_LABELS[f] ?? f}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="stat-label">
+                    {new Date(t.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {t.fee > 0 && ` · комиссия ${money(t.fee)}`}
+                  </div>
+                </span>
+                <b>{money(t.total)}</b>
+              </li>
+            ))}
+          </ul>
+        )}
       </DevSection>
     </>
   );

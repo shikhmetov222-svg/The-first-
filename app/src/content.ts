@@ -1,4 +1,5 @@
 import {
+  Wheat,
   Building2, CalendarCheck, Coffee, Croissant, Gem, Medal, Package, Scale, ShieldAlert, Store, Trophy,
   UserPlus, type LucideIcon,
 } from 'lucide-react';
@@ -48,4 +49,18 @@ export const ACHIEVEMENTS: { code: string; title: string; hint: string; icon: Lu
   { code: 'sold1000', title: 'Тысяча продаж', hint: 'Продай 1000 единиц товара за неделю.', icon: Package },
   { code: 'invite', title: 'Друг в деле', hint: 'Пригласи друга по своей ссылке.', icon: UserPlus },
   { code: 'crisis', title: 'Антикризисный', hint: 'Доиграй сезон «Кризис», сохранив больше половины стартового капитала.', icon: ShieldAlert },
+];
+
+export const PRODUCTS: Record<'coffee' | 'bread' | 'flour', { name: string; icon: LucideIcon; color: string }> = {
+  coffee: { name: 'Кофе', icon: Coffee, color: 'coffee' },
+  bread: { name: 'Хлеб', icon: Croissant, color: 'bakery' },
+  flour: { name: 'Мука', icon: Wheat, color: 'shop' },
+};
+
+/** Откуда можно выставить товар: товар + склад бизнеса. */
+export const SELL_SOURCES: { product: 'coffee' | 'bread' | 'flour'; source: 'coffee' | 'shop' | 'bakery'; label: string }[] = [
+  { product: 'coffee', source: 'coffee', label: 'Кофе · кофейня' },
+  { product: 'bread', source: 'shop', label: 'Хлеб · магазин' },
+  { product: 'bread', source: 'bakery', label: 'Хлеб · пекарня' },
+  { product: 'flour', source: 'bakery', label: 'Мука · пекарня' },
 ];

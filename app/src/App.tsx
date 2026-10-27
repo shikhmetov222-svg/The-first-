@@ -40,6 +40,8 @@ function Game() {
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [editingCompany, setEditingCompany] = useState(false);
+  const [sellPreset, setSellPreset] = useState<'coffee' | 'shop' | 'bakery' | null>(null);
+  const clearSellPreset = useCallback(() => setSellPreset(null), []);
 
   // Настройка вибрации хранится на сервере.
   const hapticsSetting = game?.player.haptics;
@@ -203,7 +205,15 @@ function Game() {
     <main className="screen">
       <AppHeader game={game} serverOffset={serverOffset} />
 
-      {tab === 'market' && <MarketTab game={game} />}
+      {tab === 'market' && (
+        <MarketTab
+          game={game}
+          onState={setGame}
+          onToast={showToast}
+          sellPreset={sellPreset}
+          onSellPresetUsed={clearSellPreset}
+        />
+      )}
       {tab === 'dev' && isAdmin && <DevPanel game={game} onState={setGame} onToast={showToast} />}
       {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
       {tab === 'profile' && (
@@ -258,7 +268,14 @@ function Game() {
           hasShop={owned.has('shop')}
           busy={busy}
           onOpen={() => setSheet({ kind: 'open', type: item.type })}
-          onAction={(kind) => setSheet({ kind, type: item.type } as SheetKind)}
+          onAction={(kind) => {
+            if (kind === 'sell') {
+              setSellPreset(item.type);
+              setTab('market');
+              return;
+            }
+            setSheet({ kind, type: item.type } as SheetKind);
+          }}
         />
       ))}
       </>

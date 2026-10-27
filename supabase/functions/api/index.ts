@@ -147,6 +147,16 @@ function action(run: (id: string, body: Body) => Promise<unknown>) {
   };
 }
 
+// Действие на рынке → новое состояние экрана и рынка.
+function marketAction(run: (id: string, body: Body) => Promise<unknown>) {
+  return async (user: TelegramUser, body: Body) => {
+    const id = await playerId(user);
+    const result = await run(id, body);
+    const [st, market] = await Promise.all([state(id), rpc('market_view', { p_player_id: id })]);
+    return { ...st, result, market, is_admin: isAdmin(user) };
+  };
+}
+
 const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknown>> = {
   login,
   state: action(async () => null),
@@ -176,6 +186,25 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
     await playerId(user); // смотреть карточки могут только игроки
     return { company: await rpc('company_card', { p_player_id: id }) };
   },
+  // ---------- Рынок между игроками: каждое действие — одна транзакция в базе ----------
+  market: async (user) => ({ market: await rpc('market_view', { p_player_id: await playerId(user) }) }),
+  create_lot: marketAction((id, b) =>
+    rpc('create_lot', {
+      p_player: id,
+      p_product: str(b, 'product'),
+      p_source: str(b, 'source'),
+      p_qty: int(b, 'qty'),
+      p_price: int(b, 'price'),
+    })),
+  cancel_lot: marketAction((id, b) => rpc('cancel_lot', { p_player: id, p_lot: int(b, 'lot') })),
+  buy_lot: marketAction((id, b) => rpc('buy_lot', { p_buyer: id, p_lot: int(b, 'lot'), p_qty: int(b, 'qty') })),
+  sell_wholesale: marketAction((id, b) =>
+    rpc('sell_wholesale', {
+      p_player: id,
+      p_product: str(b, 'product'),
+      p_source: str(b, 'source'),
+      p_qty: int(b, 'qty'),
+    })),
   // ---------- Режим разработчика: каждый вызов перепроверяет администратора по подписи Telegram ----------
   dev_info: async (user) => {
     const id = await adminId(user);
