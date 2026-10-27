@@ -2,6 +2,7 @@ import { Trophy, Wallet } from 'lucide-react';
 import type { GameState } from '../api';
 import { money, signedMoney } from '../format';
 import { TICK_MS, useTickCountdown } from './useTick';
+import { useCountUp } from './useCountUp';
 
 const START_FALLBACK = 10_000_000;
 
@@ -19,6 +20,9 @@ export function CapitalCard({ game, serverOffset, pending, busy, onCollect }: Pr
   const diff = game.capital - start;
   const pct = Math.round((diff / start) * 100);
   const trend = diff > 0 ? 'up' : diff < 0 ? 'down' : '';
+  const [capital, capitalDir] = useCountUp(game.capital);
+  const [cash, cashDir] = useCountUp(game.player.cash);
+  const [pendingShown] = useCountUp(pending, 600);
 
   return (
     <section className="card capital-card">
@@ -30,7 +34,7 @@ export function CapitalCard({ game, serverOffset, pending, busy, onCollect }: Pr
           </span>
         )}
       </div>
-      <div className="capital-big">{money(game.capital)}</div>
+      <div className={`capital-big ${capitalDir ? `flash-${capitalDir}` : ''}`}>{money(capital)}</div>
       <div className={`capital-change ${trend}`}>
         {signedMoney(diff)} ({pct > 0 ? '+' : pct < 0 ? '−' : ''}
         {Math.abs(pct)}%) <span className="muted">от старта</span>
@@ -43,12 +47,12 @@ export function CapitalCard({ game, serverOffset, pending, busy, onCollect }: Pr
           <span className="stat-label">
             <Wallet size={14} /> Деньги
           </span>
-          <b>{money(game.player.cash)}</b>
+          <b className={cashDir ? `flash-${cashDir}` : ''}>{money(cash)}</b>
         </div>
         {pending > 0 ? (
           <button className="tile tile-collect" data-tour="collect" disabled={busy} onClick={onCollect}>
             <span>Забрать</span>
-            <b>{money(pending)}</b>
+            <b>{money(pendingShown)}</b>
           </button>
         ) : (
           <TickTile serverOffset={serverOffset} />

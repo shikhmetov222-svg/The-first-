@@ -25,8 +25,9 @@ interface TelegramWebApp {
   disableVerticalSwipes?(): void;
   onEvent(event: string, cb: () => void): void;
   HapticFeedback?: {
-    impactOccurred(style: 'light' | 'medium' | 'heavy'): void;
+    impactOccurred(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
     notificationOccurred(type: 'success' | 'error' | 'warning'): void;
+    selectionChanged(): void;
   };
 }
 
@@ -96,4 +97,34 @@ export function requestWriteAccess(): Promise<boolean> {
       resolve(true);
     }
   });
+}
+
+/** Тактильный отклик под событие игры. */
+export type Feel = 'collect' | 'purchase' | 'decision' | 'decision-bad' | 'default';
+
+export function feel(kind: Feel) {
+  if (!hapticsOn || !tg?.HapticFeedback) return;
+  const h = tg.HapticFeedback;
+  switch (kind) {
+    case 'collect':
+      // «Звон кассы»: тяжёлый удар и затем «успех».
+      h.impactOccurred('heavy');
+      window.setTimeout(() => h.notificationOccurred('success'), 120);
+      break;
+    case 'purchase':
+      h.impactOccurred('medium');
+      break;
+    case 'decision':
+      h.notificationOccurred('success');
+      break;
+    case 'decision-bad':
+      h.notificationOccurred('warning');
+      break;
+    default:
+      h.notificationOccurred('success');
+  }
+}
+
+export function selectionTick() {
+  if (hapticsOn) tg?.HapticFeedback?.selectionChanged?.();
 }

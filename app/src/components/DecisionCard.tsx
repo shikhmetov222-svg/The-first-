@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CalendarClock, CircleCheck, CircleX } from 'lucide-react';
 import type { Decision } from '../api';
+import { haptic } from '../telegram';
 
 interface Props {
   decision: Decision;
@@ -42,7 +43,10 @@ export function DecisionCard({ decision, busy, onChoose }: Props) {
               <button
                 className={`button small ${i === 0 ? '' : 'secondary'}`}
                 disabled={busy}
-                onClick={() => onChoose(i)}
+                onClick={() => {
+                  haptic('light');
+                  onChoose(i);
+                }}
               >
                 {o.label}
               </button>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { BusinessType, GameState, Market } from '../api';
 import { BOT_KIND, BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
+import { selectionTick } from '../telegram';
 import { BizIcon } from './BizIcon';
 
 export type SheetKind =
@@ -122,7 +123,10 @@ interface QuantityProps {
 
 function QuantityPicker({ title, hint, max, emptyText, busy, confirm, onConfirm }: QuantityProps) {
   const [qty, setQty] = useState(() => Math.min(max, 100));
-  const clamp = (n: number) => Math.max(Math.min(1, max), Math.min(max, n));
+  const clamp = (n: number) => {
+    selectionTick();
+    return Math.max(Math.min(1, max), Math.min(max, n));
+  };
 
   return (
     <>
@@ -180,7 +184,10 @@ function PricePicker({ title, current, reference, market, product, busy, onConfi
   const min = Math.ceil((reference * 3) / 10 / 100) * 100;
   const max = reference * 3;
   const [price, setPrice] = useState(current);
-  const change = (rub: number) => setPrice((p) => Math.max(min, Math.min(max, p + rub * 100)));
+  const change = (rub: number) => {
+    selectionTick();
+    setPrice((p) => Math.max(min, Math.min(max, p + rub * 100)));
+  };
 
   const marketPrice = market?.market_price ?? reference;
   const ratio = price / marketPrice;

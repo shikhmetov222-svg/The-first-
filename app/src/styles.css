@@ -1862,3 +1862,75 @@ h2.section-title {
   flex: none;
   margin-top: 1px;
 }
+
+/* ---------- Редизайн, этап 4: анимации ---------- */
+
+/* Карточки мягко появляются снизу, по очереди. */
+.screen > * {
+  animation: rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.screen > *:nth-child(2) { animation-delay: 0.04s; }
+.screen > *:nth-child(3) { animation-delay: 0.08s; }
+.screen > *:nth-child(4) { animation-delay: 0.12s; }
+.screen > *:nth-child(5) { animation-delay: 0.16s; }
+.screen > *:nth-child(6) { animation-delay: 0.2s; }
+.screen > *:nth-child(7) { animation-delay: 0.24s; }
+.screen > *:nth-child(n + 8) { animation-delay: 0.28s; }
+
+/* Нижнее меню, шторки и подсказки не «всплывают» вместе с карточками. */
+.screen > .bottom-nav,
+.screen > .backdrop,
+.screen > .toast,
+.screen > .tour {
+  animation: none;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* Цифра капитала коротко подсвечивается при изменении. */
+.flash-up {
+  animation: flash-up 1.2s ease-out;
+}
+
+.flash-down {
+  animation: flash-down 1.2s ease-out;
+}
+
+@keyframes flash-up {
+  0%, 40% { color: var(--up); text-shadow: 0 0 18px rgba(95, 211, 154, 0.45); }
+}
+
+@keyframes flash-down {
+  0%, 40% { color: var(--down); }
+}
+
+/* Золотая кнопка «Забрать» слегка пульсирует, пока в кассе есть деньги. */
+.tile-collect {
+  animation: collect-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes collect-glow {
+  50% { box-shadow: 0 0 0 4px rgba(212, 167, 58, 0.18), 0 8px 24px rgba(212, 167, 58, 0.25); }
+}
+
+.bar-fill,
+.segments span {
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+}

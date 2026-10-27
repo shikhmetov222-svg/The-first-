@@ -13,7 +13,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { MarketTab } from './components/MarketTab';
 import { ProfileTab } from './components/ProfileTab';
 import { duration, money } from './format';
-import { isInTelegram, notify, setHapticsEnabled } from './telegram';
+import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck } from 'lucide-react';
 import { CompanyForm } from './components/CompanyForm';
 import { Tutorial, type TutorialStep } from './components/Tutorial';
@@ -82,13 +82,17 @@ function Game() {
 
   /** Выполнить действие на сервере и показать новое состояние. */
   const run = useCallback(
-    async <R,>(fn: () => Promise<GameState & { result: R }>, success?: (r: R) => string) => {
+    async <R,>(
+      fn: () => Promise<GameState & { result: R }>,
+      success?: (r: R) => string,
+      kind: Feel | ((res: GameState) => Feel) = 'default',
+    ) => {
       if (busy) return false;
       setBusy(true);
       try {
         const res = await fn();
         setGame(res);
-        notify('success');
+        feel(typeof kind === 'function' ? kind(res) : kind);
         const text = success?.(res.result);
         if (text) showToast(text);
         return true;
@@ -188,7 +192,7 @@ function Game() {
   const owned = new Set(game.businesses.map((b) => b.type));
 
   const collect = async () => {
-    if (await run(api.collect, (sum) => `+${money(sum)} в капитал`)) {
+    if (await run(api.collect, (sum) => `+${money(sum)} в капитал`, 'collect')) {
       if (tutorialStep === 2) advanceTutorial(3);
     }
   };
@@ -221,7 +225,13 @@ function Game() {
         <DecisionCard
           decision={game.decision}
           busy={busy}
-          onChoose={(option) => run(() => api.decide(option), (text) => text)}
+          onChoose={(option) =>
+            run(
+              () => api.decide(option),
+              (text) => text,
+              (res) => (res.decision?.success === false ? 'decision-bad' : 'decision'),
+            )
+          }
         />
       )}
 
@@ -259,13 +269,15 @@ function Game() {
           onClose={() => setSheet(null)}
           onOpenBusiness={async (type: BusinessType) => {
             const name = game.catalog.find((c) => c.type === type)?.name;
-            if (await run(() => api.openBusiness(type), () => `${name} открыта!`)) setSheet(null);
+            if (await run(() => api.openBusiness(type), () => `${name} открыта!`, 'purchase')) setSheet(null);
           }}
           onRestock={async (type, qty) => {
-            if (await run(() => api.restock(type, qty), () => 'Склад пополнен')) setSheet(null);
+            if (await run(() => api.restock(type, qty), () => 'Склад пополнен', 'purchase')) setSheet(null);
           }}
           onTransfer={async (qty) => {
-            if (await run(() => api.transferBread(qty), () => 'Хлеб доставлен в магазин')) setSheet(null);
+            if (await run(() => api.transferBread(qty), () => 'Хлеб доставлен в магазин', 'purchase')) {
+              setSheet(null);
+            }
           }}
           onSetPrice={async (type, price) => {
             if (await run(() => api.setPrice(type, price), () => 'Цена изменена')) {
@@ -283,7 +295,7 @@ function Game() {
           pending={pending}
           busy={busy}
           onCollect={async () => {
-            if (await run(api.collect, (sum) => `+${money(sum)} в капитал`)) setSummary(null);
+            if (await run(api.collect, (sum) => `+${money(sum)} в капитал`, 'collect')) setSummary(null);
           }}
           onClose={() => setSummary(null)}
         />
