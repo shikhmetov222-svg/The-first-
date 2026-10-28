@@ -47,6 +47,8 @@ export function createWorld(scene: THREE.Scene) {
   const k = createKit(scene);
   const env = createEnvironment(k, scene);
   const state: EnvState = { day: isDaytime(), district: 1, weather: 'clear' };
+  /** Что ещё перекрасить при смене дня/района/погоды (прохожие, облака, дождь — см. life.ts). */
+  const envHooks: Array<(s: EnvState) => void> = [];
 
   function applyEnv() {
     const { day, district: dk, weather: wx } = state;
@@ -93,6 +95,7 @@ export function createWorld(scene: THREE.Scene) {
       m.visible = dk > 0;
     });
     env.curbMesh.visible = dk > 0;
+    envHooks.forEach((h) => h(state));
   }
   applyEnv();
 
@@ -105,7 +108,7 @@ export function createWorld(scene: THREE.Scene) {
     dir.target.updateMatrixWorld();
   }
 
-  return { k, env, hemi, dir, state, applyEnv, placeCamera };
+  return { k, env, hemi, dir, state, envHooks, applyEnv, placeCamera };
 }
 
 /** Рамка ортокамеры как в макете: на узком экране ширина 18 единиц, на широком — высота 14. */

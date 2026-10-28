@@ -106,6 +106,7 @@ export interface Business {
   listed?: boolean; // выставлен на продажу — заморожен
   goods?: Partial<Record<'coffee' | 'bread' | 'flour', number>> | null; // склад маркетплейса
   last_revenue?: number; // выручка за последние 5 минут (после комиссий)
+  last_sale_at?: string | null; // когда была последняя выручка на тике (для монеток на улице)
   progress?: number; // агентство: готовность следующей кампании, 0…1
   level?: number; // уровень 1–5
   capacity?: number; // склад с учётом уровня
@@ -278,6 +279,10 @@ export interface GameState {
   ads?: AdsConfig;
   upgrade?: UpgradeConfig;
   npc_niches?: { marketplace?: string[]; pvz?: string[] } | null; // NPC-конкуренты в новых нишах
+  street?: {
+    district: [number, number]; // капитал (коп.), с которого «Район» и «Центр»
+    weather: { kind: 'clear' | 'rain' | 'snow'; until: string }; // одна погода на весь город
+  };
 }
 
 export interface DevInfo {

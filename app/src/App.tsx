@@ -19,7 +19,7 @@ import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
-import { streetViews } from './street/views';
+import { streetLife, streetVan, streetViews } from './street/views';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
@@ -363,6 +363,7 @@ function Game() {
       <Suspense fallback={<StreetPlaceholder />}>
         <Street
           views={streetViews(game)}
+          life={streetLife(game)}
           showFps={isAdmin}
           onSelect={(type, has) => {
             if (has) {
@@ -443,11 +444,15 @@ function Game() {
             if (await run(() => api.openBusiness(type), () => `Бизнес «${name}» открыт!`, 'purchase')) setSheet(null);
           }}
           onRestock={async (type, qty) => {
-            if (await run(() => api.restock(type, qty), () => 'Склад пополнен', 'purchase')) setSheet(null);
+            if (await run(() => api.restock(type, qty), () => 'Склад пополнен', 'purchase')) {
+              setSheet(null);
+              streetVan(type as Parameters<typeof streetVan>[0]);
+            }
           }}
           onTransfer={async (qty) => {
             if (await run(() => api.transferBread(qty), () => 'Хлеб доставлен в магазин', 'purchase')) {
               setSheet(null);
+              streetVan('shop');
             }
           }}
           onSetPrice={async (type, price) => {
@@ -502,7 +507,10 @@ function Game() {
           busy={busy}
           onClose={() => setTransferring(false)}
           onTransfer={async (p) => {
-            if (await run(() => api.marketplaceTransfer(p), (r) => r, 'purchase')) setTransferring(false);
+            if (await run(() => api.marketplaceTransfer(p), (r) => r, 'purchase')) {
+              setTransferring(false);
+              streetVan('marketplace');
+            }
           }}
         />
       )}

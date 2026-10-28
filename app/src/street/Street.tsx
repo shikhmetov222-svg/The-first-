@@ -5,7 +5,8 @@ import { OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { HOME, createWorld, frameCamera, isDaytime, type World } from './world';
 import { createSlots, type Slots } from './slots';
-import type { GameType, StreetViews } from './views';
+import { streetBus, type GameType, type StreetLife, type StreetViews } from './views';
+import { createLifeController, type LifeController } from './life';
 import { feel } from '../telegram';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -14,6 +15,7 @@ const noop = () => {};
 
 interface WorldProps {
   views: StreetViews;
+  life: StreetLife;
   onWorld: (w: World) => void;
   onSelect: (type: GameType, owned: boolean) => void;
 }
@@ -21,11 +23,12 @@ interface WorldProps {
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Сцена: собирает мир один раз, ставит здания, камеру и управление жестами. */
-function StreetWorld({ views, onWorld, onSelect }: WorldProps) {
+function StreetWorld({ views, life, onWorld, onSelect }: WorldProps) {
   const { scene, gl, size, camera } = useThree();
   const target = useRef(HOME.clone());
   const world = useRef<World | null>(null);
   const slots = useRef<Slots | null>(null);
+  const lifeCtl = useRef<LifeController | null>(null);
   const first = useRef(true);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
@@ -34,7 +37,30 @@ function StreetWorld({ views, onWorld, onSelect }: WorldProps) {
   if (!world.current) {
     world.current = createWorld(scene);
     slots.current = createSlots(world.current, scene, reduceMotion);
+    lifeCtl.current = createLifeController(world.current, slots.current, scene, gl.getPixelRatio(), reduceMotion);
   }
+
+  // Район, погода, щит, прохожие и монетки — по данным игры.
+  const lifeKey = JSON.stringify(life);
+  useEffect(() => {
+    lifeCtl.current!.setData(life);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifeKey]);
+
+  // Фургон после пополнения склада и монетки из панели разработчика.
+  useEffect(() => {
+    const onVan = (e: Event) => lifeCtl.current!.van((e as CustomEvent<GameType>).detail);
+    const onCoin = (e: Event) => {
+      const d = (e as CustomEvent<{ type: GameType; amount: number }>).detail;
+      lifeCtl.current!.coin(d.type, d.amount);
+    };
+    streetBus.addEventListener('van', onVan);
+    streetBus.addEventListener('coin', onCoin);
+    return () => {
+      streetBus.removeEventListener('van', onVan);
+      streetBus.removeEventListener('coin', onCoin);
+    };
+  }, []);
 
   // Уровни зданий — с сервера. При первом показе без анимации, дальше улучшение — со стройкой и вибрацией.
   const viewsKey = JSON.stringify(views);
@@ -144,6 +170,7 @@ function StreetWorld({ views, onWorld, onSelect }: WorldProps) {
     const dt = Math.min(0.05, delta);
     clock.current += dt;
     slots.current!.update(clock.current, dt);
+    lifeCtl.current!.update(clock.current, dt);
     world.current!.placeCamera(camera, target.current);
   });
 
@@ -167,9 +194,10 @@ function FpsMeter({ el }: { el: React.RefObject<HTMLDivElement> }) {
 }
 
 export default function Street({
-  views, onSelect, onWorld, showFps = false,
+  views, life, onSelect, onWorld, showFps = false,
 }: {
   views: StreetViews;
+  life: StreetLife;
   onSelect: (type: GameType, owned: boolean) => void;
   onWorld?: (w: World) => void;
   showFps?: boolean;
@@ -198,7 +226,7 @@ export default function Street({
         }}
       >
         <OrthographicCamera makeDefault manual near={0.1} far={200} />
-        <StreetWorld views={views} onSelect={onSelect} onWorld={onWorld ?? noop} />
+        <StreetWorld views={views} life={life} onSelect={onSelect} onWorld={onWorld ?? noop} />
         {showFps && <FpsMeter el={fpsEl} />}
       </Canvas>
       {showFps && <div className="street-fps" ref={fpsEl} />}

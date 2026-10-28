@@ -118,4 +118,30 @@ open(os.path.join(OUT, 'anim.js'), 'w', encoding='utf-8').write(
     "export function createAnim(k, scene) {\n" + destructure(anim) + dedent(anim, 2)
     + "  return { " + ', '.join(anim_names) + " };\n}\n")
 
+# ---------- жизнь улицы: прохожие, собака, машины, дождь/снег/облака, фургон, монетки ----------
+life = section('    /* ---------- walkers & cars', '    /* ---------- district decor')
+life = life.replace('size: 2 * renderer.getPixelRatio()', 'size: 2 * pixelRatio')
+coin = section('    function coinSprite(amount){', '    function spawnCoin(){')
+life_names = ['walkers', 'dogOwner', 'dog', 'cars', 'car', 'RN', 'rainPos', 'rainGeo', 'rain', 'SN', 'snowPos', 'snowGeo',
+              'snow', 'cloudMat', 'clouds', 'labelSprite', 'dv', 'vanState', 'VAN_LABEL', 'coinSprite']
+open(os.path.join(OUT, 'life.js'), 'w', encoding='utf-8').write(
+    HEADER + "import * as THREE from 'three';\n\n"
+    "/** Жизнь улицы: прохожие, машины, погода, фургон и монетки. */\n"
+    "export function createLife(k, scene, pixelRatio) {\n" + destructure(life + coin) + dedent(life + coin, 2)
+    + "  return { " + ', '.join(life_names) + " };\n}\n")
+
+# ---------- оформление района (окраина / район / центр) ----------
+decor = section('    /* ---------- district decor', '    /* ---------- slots')
+# Щит у дороги показывает рекламу игрока — им управляет игра, а не район.
+decor = decor.replace("        decor.add(billboard(['РЕКЛАМА', 'место свободно'], '#9EA3AD', -22.6, 1.0));\n", '')
+decor = decor.replace("        decor.add(billboard(['КОФЕЙНЯ', 'латте −10% до 18:00'], '#D4A73A', -22.6, 1.0));\n", '')
+assert 'decor.add(billboard' not in decor
+open(os.path.join(OUT, 'decor.js'), 'w', encoding='utf-8').write(
+    HEADER + "import * as THREE from 'three';\n\n"
+    "/** Оформление района и рекламный щит. env — окружение (разметка, бордюр, фонари), types — для disposeGroup. */\n"
+    "export function createDecor(k, scene, env, types) {\n"
+    "  const { dashes, curbMesh, LAMPS } = env;\n  const { disposeGroup } = types;\n"
+    + destructure(decor) + dedent(decor, 2)
+    + "  return { buildDecor, billboard, getFountainJet: () => fountainJet };\n}\n")
+
 print('ok:', len(KIT_NAMES), 'kit names')
