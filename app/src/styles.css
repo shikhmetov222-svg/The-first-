@@ -2600,3 +2600,24 @@ h2.section-title {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+/* Тап по зданию на улице подсвечивает карточку бизнеса. */
+.biz-anchor {
+  border-radius: 24px;
+  scroll-margin: 80px;
+}
+
+.biz-anchor.biz-flash > .card {
+  animation: biz-flash 1.2s ease-out;
+}
+
+@keyframes biz-flash {
+  0%, 40% {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px var(--gold-soft);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}

@@ -86,7 +86,11 @@ types = types.replace('build: buildCoffee', 'build: (T, L) => buildCoffee(k, T, 
     .replace('build: buildMarket', 'build: (T, L) => buildMarket(k, T, L)') \
     .replace('build: buildPvz', 'build: (T, L) => buildPvz(k, T, L)') \
     .replace('build: buildAds', 'build: (T, L) => buildAds(k, T, L)') \
-    .replace('build: buildRepair', 'build: (T, L) => buildRepair(k, T, L)')
+    .replace('build: buildRepair', 'build: (T, L) => buildRepair(k, T, L)') \
+    .replace('function buildLot(){', 'function buildLot(pct){') \
+    .replace("sign(['ПРОДАЁТСЯ', '88% собрано']", "sign(['ПРОДАЁТСЯ', (pct == null ? 88 : pct) + '% собрано']") \
+    .replace('function makeFor(type, L){', 'function makeFor(type, L, pct){') \
+    .replace('if (L === 0) return buildLot();', 'if (L === 0) return buildLot(pct);')
 open(os.path.join(OUT, 'types.js'), 'w', encoding='utf-8').write(
     HEADER + "import * as THREE from 'three';\n"
     + ''.join(f"import {{ {fn} }} from './{file}.js';\n" for file, fn, _, _ in builders)
@@ -104,5 +108,14 @@ open(os.path.join(OUT, 'environment.js'), 'w', encoding='utf-8').write(
     "/** Окружение улицы. Всё добавляется в scene; возвращает то, что меняется днём/ночью и по району. */\n"
     "export function createEnvironment(k, scene) {\n" + destructure(env) + dedent(env, 2)
     + "  return { " + ', '.join(env_names) + " };\n}\n")
+
+# ---------- стройка: твины, леса с краном, пыль и дым ----------
+anim = section('    /* ---------- tweens', '    function setLevel(slot, L){')
+anim_names = ['tweens', 'tween', 'easeOutBack', 'scaffold', 'puffGeo', 'puff', 'dust']
+open(os.path.join(OUT, 'anim.js'), 'w', encoding='utf-8').write(
+    HEADER + "import * as THREE from 'three';\n\n"
+    "/** Твины и эффекты стройки (леса, кран, пыль, дым). */\n"
+    "export function createAnim(k, scene) {\n" + destructure(anim) + dedent(anim, 2)
+    + "  return { " + ', '.join(anim_names) + " };\n}\n")
 
 print('ok:', len(KIT_NAMES), 'kit names')

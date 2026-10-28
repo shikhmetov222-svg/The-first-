@@ -1,22 +1,49 @@
-// 3D-улица игрока на экране «Империя». Этап 1: сцена, камера, управление и окружение — как в макете.
+// 3D-улица игрока на экране «Империя»: сцена, окружение и здания бизнесов — как в docs/street-mockup.js.
 import { useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { HOME, createWorld, frameCamera, isDaytime, type World } from './world';
+import { createSlots, type Slots } from './slots';
+import type { GameType, StreetViews } from './views';
+import { feel } from '../telegram';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const noop = () => {};
 
-/** Сцена: собирает мир один раз, ставит камеру и управление жестами. */
-function StreetWorld({ onWorld }: { onWorld: (w: World) => void }) {
+
+interface WorldProps {
+  views: StreetViews;
+  onWorld: (w: World) => void;
+  onSelect: (type: GameType, owned: boolean) => void;
+}
+
+const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Сцена: собирает мир один раз, ставит здания, камеру и управление жестами. */
+function StreetWorld({ views, onWorld, onSelect }: WorldProps) {
   const { scene, gl, size, camera } = useThree();
   const target = useRef(HOME.clone());
   const world = useRef<World | null>(null);
+  const slots = useRef<Slots | null>(null);
+  const first = useRef(true);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
+  const clock = useRef(0);
 
   if (!world.current) {
     world.current = createWorld(scene);
+    slots.current = createSlots(world.current, scene, reduceMotion);
   }
+
+  // Уровни зданий — с сервера. При первом показе без анимации, дальше улучшение — со стройкой и вибрацией.
+  const viewsKey = JSON.stringify(views);
+  useEffect(() => {
+    const animate = !first.current;
+    first.current = false;
+    slots.current!.apply(views, animate, () => feel('purchase'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewsKey]);
 
   useEffect(() => {
     onWorld(world.current!);
@@ -86,6 +113,11 @@ function StreetWorld({ onWorld }: { onWorld: (w: World) => void }) {
           lastTap = 0;
         } else {
           lastTap = now;
+          // Тап по зданию → его карточка (или открытие, если это участок).
+          const r = canvas.getBoundingClientRect();
+          const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+          const hit = slots.current!.pick(ndc, cam);
+          if (hit) selectRef.current(hit.game, hit.level > 0);
         }
       }
       if (pointers.size === 0) down = null;
@@ -108,7 +140,10 @@ function StreetWorld({ onWorld }: { onWorld: (w: World) => void }) {
     };
   }, [gl, camera]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    const dt = Math.min(0.05, delta);
+    clock.current += dt;
+    slots.current!.update(clock.current, dt);
     world.current!.placeCamera(camera, target.current);
   });
 
@@ -131,7 +166,14 @@ function FpsMeter({ el }: { el: React.RefObject<HTMLDivElement> }) {
   return null;
 }
 
-export default function Street({ onWorld, showFps = false }: { onWorld?: (w: World) => void; showFps?: boolean }) {
+export default function Street({
+  views, onSelect, onWorld, showFps = false,
+}: {
+  views: StreetViews;
+  onSelect: (type: GameType, owned: boolean) => void;
+  onWorld?: (w: World) => void;
+  showFps?: boolean;
+}) {
   const [hint, setHint] = useState(true);
   const fpsEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -156,7 +198,7 @@ export default function Street({ onWorld, showFps = false }: { onWorld?: (w: Wor
         }}
       >
         <OrthographicCamera makeDefault manual near={0.1} far={200} />
-        <StreetWorld onWorld={onWorld ?? noop} />
+        <StreetWorld views={views} onSelect={onSelect} onWorld={onWorld ?? noop} />
         {showFps && <FpsMeter el={fpsEl} />}
       </Canvas>
       {showFps && <div className="street-fps" ref={fpsEl} />}

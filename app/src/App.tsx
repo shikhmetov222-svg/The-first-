@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Business, type BusinessType, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
+import { api, type Business, type BusinessType, type CatalogItem, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
 import { AwaySummary } from './components/AwaySummary';
@@ -19,6 +19,7 @@ import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
+import { streetViews } from './street/views';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
@@ -232,6 +233,97 @@ function Game() {
     }
   };
 
+  /** Карточка бизнеса на «Империи». */
+  const renderCard = (item: CatalogItem) => {
+    const business = game.businesses.find((b) => b.type === item.type);
+    const adStrip = (b: Business) => (
+      <>
+        <AdStrip business={b} ads={game.ads} serverOffset={serverOffset} busy={busy} onOpen={() => setAdFor(b.type)} />
+        <UpgradeStrip
+          business={b}
+          game={game}
+          serverOffset={serverOffset}
+          busy={busy}
+          onOpen={() => setUpgradeFor(b.type)}
+        />
+      </>
+    );
+    if (business && item.type === 'repair') {
+      return (
+        <RepairCard
+          key={item.type}
+          item={item}
+          business={business}
+          game={game}
+          serverOffset={serverOffset}
+          busy={busy}
+          onSetPrice={(pct) => run(() => api.setRepairPrice(pct), (r) => r)}
+        />
+      );
+    }
+    if (business && item.type === 'agency') {
+      return (
+        <AgencyCard
+          key={item.type}
+          item={item}
+          business={business}
+          ads={game.ads}
+          busy={busy}
+          extra={adStrip(business)}
+          onLaunch={() => setAdFor(null)}
+          onSell={() => {
+            setSellPreset('agency');
+            setTab('market');
+          }}
+        />
+      );
+    }
+    if (business && item.type === 'marketplace') {
+      return (
+        <MarketplaceCard
+          key={item.type}
+          item={item}
+          business={business}
+          extra={adStrip(business)}
+          rivals={game.npc_niches?.marketplace}
+          busy={busy}
+          onTransfer={() => setTransferring(true)}
+          onBuyOnMarket={() => {
+            setBuyToMarketplace(true);
+            setTab('market');
+          }}
+        />
+      );
+    }
+    if (business && item.type === 'pvz') {
+      return (
+        <PvzCard key={item.type} item={item} business={business} extra={adStrip(business)} rivals={game.npc_niches?.pvz} />
+      );
+    }
+    return (
+      <BusinessCard
+        key={item.type}
+        item={item}
+        business={business}
+        market={game.markets.find((m) => m.market === item.market)}
+        cash={game.player.cash}
+        hasBakery={owned.has('bakery')}
+        hasShop={owned.has('shop')}
+        extra={business ? adStrip(business) : undefined}
+        busy={busy}
+        onOpen={() => setSheet({ kind: 'open', type: item.type })}
+        onAction={(kind) => {
+          if (kind === 'sell') {
+            setSellPreset(item.type as Source);
+            setTab('market');
+            return;
+          }
+          setSheet({ kind, type: item.type } as SheetKind);
+        }}
+      />
+    );
+  };
+
   return (
     <main className="screen">
       <AppHeader
@@ -269,7 +361,25 @@ function Game() {
       {tab === 'empire' && (
       <>
       <Suspense fallback={<StreetPlaceholder />}>
-        <Street showFps={isAdmin} />
+        <Street
+          views={streetViews(game)}
+          showFps={isAdmin}
+          onSelect={(type, has) => {
+            if (has) {
+              // Тап по зданию → прокрутить к карточке бизнеса и подсветить её.
+              const el = document.getElementById(`biz-${type}`);
+              if (!el) return;
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.classList.remove('biz-flash');
+              void el.offsetWidth;
+              el.classList.add('biz-flash');
+            } else if (game.catalog.some((c) => c.type === type)) {
+              setSheet({ kind: 'open', type });
+            } else {
+              setCatalogOpen(true);
+            }
+          }}
+        />
       </Suspense>
 
       <CapitalCard game={game} serverOffset={serverOffset} pending={pending} busy={busy} onCollect={collect} />
@@ -308,92 +418,11 @@ function Game() {
       {game.catalog
         .filter((item) => owned.has(item.type) || (game.businesses.length === 0 && (item.category ?? 'classic') === 'classic'))
         .map((item) => {
-          const business = game.businesses.find((b) => b.type === item.type);
-          const adStrip = (b: Business) => (
-            <>
-              <AdStrip business={b} ads={game.ads} serverOffset={serverOffset} busy={busy} onOpen={() => setAdFor(b.type)} />
-              <UpgradeStrip
-                business={b}
-                game={game}
-                serverOffset={serverOffset}
-                busy={busy}
-                onOpen={() => setUpgradeFor(b.type)}
-              />
-            </>
-          );
-          if (business && item.type === 'repair') {
-            return (
-              <RepairCard
-                key={item.type}
-                item={item}
-                business={business}
-                game={game}
-                serverOffset={serverOffset}
-                busy={busy}
-                onSetPrice={(pct) => run(() => api.setRepairPrice(pct), (r) => r)}
-              />
-            );
-          }
-          if (business && item.type === 'agency') {
-            return (
-              <AgencyCard
-                key={item.type}
-                item={item}
-                business={business}
-                ads={game.ads}
-                busy={busy}
-                extra={adStrip(business)}
-                onLaunch={() => setAdFor(null)}
-                onSell={() => {
-                  setSellPreset('agency');
-                  setTab('market');
-                }}
-              />
-            );
-          }
-          if (business && item.type === 'marketplace') {
-            return (
-              <MarketplaceCard
-                key={item.type}
-                item={item}
-                business={business}
-                extra={adStrip(business)}
-                rivals={game.npc_niches?.marketplace}
-                busy={busy}
-                onTransfer={() => setTransferring(true)}
-                onBuyOnMarket={() => {
-                  setBuyToMarketplace(true);
-                  setTab('market');
-                }}
-              />
-            );
-          }
-          if (business && item.type === 'pvz') {
-            return (
-              <PvzCard key={item.type} item={item} business={business} extra={adStrip(business)} rivals={game.npc_niches?.pvz} />
-            );
-          }
+          const card = renderCard(item);
           return (
-            <BusinessCard
-              key={item.type}
-              item={item}
-              business={business}
-              market={game.markets.find((m) => m.market === item.market)}
-              cash={game.player.cash}
-              hasBakery={owned.has('bakery')}
-              hasShop={owned.has('shop')}
-              extra={business ? adStrip(business) : undefined}
-              busy={busy}
-              onOpen={() => setSheet({ kind: 'open', type: item.type })}
-              onAction={(kind) => {
-                if (kind === 'sell') {
-                  setSellPreset(item.type as Source);
-                  setTab('market');
-                  return;
-                }
-                setSheet({ kind, type: item.type } as SheetKind);
-              }}
-            />
+            <div key={item.type} id={`biz-${item.type}`} className="biz-anchor">
+              {card}
+            </div>
           );
         })}
 

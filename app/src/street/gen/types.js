@@ -37,7 +37,7 @@ export function createTypes(k) {
   };
   Object.values(TYPES).forEach(T => { T.minLevel = 0; if (!T.desc[0]) T.desc[0] = 'Участок продаётся'; });
 
-  function buildLot(){
+  function buildLot(pct){
     const g = new THREE.Group();
     add(g, box(3.6, .04, 2.6, M(0x3a3226)), 0, .02, -1.3);
     for (let x = -1.8; x <= 1.81; x += .6) add(g, box(.07, .6, .07, woodMat), x, .3, -.05);
@@ -47,13 +47,13 @@ export function createTypes(k) {
     add(g, box(.05, .05, 2.6, woodMat), 1.8, .45, -1.3);
     add(g, cyl(.04, .04, 1.6, darkMat, 6), 0, .8, -1.05);
     add(g, box(1.98, .9, .06, darkMat), 0, 1.72, -1.04);
-    add(g, sign(['ПРОДАЁТСЯ', '88% собрано'], '#D4A73A', 1.9, .82), 0, 1.72, -1.005);
+    add(g, sign(['ПРОДАЁТСЯ', (pct == null ? 88 : pct) + '% собрано'], '#D4A73A', 1.9, .82), 0, 1.72, -1.005);
     g.userData.top = 2.6;
     return g;
   }
-  function makeFor(type, L){
+  function makeFor(type, L, pct){
     const T = TYPES[type];
-    if (L === 0) return buildLot();
+    if (L === 0) return buildLot(pct);
     const g = T.build(T, L);
     const pw = T.dims[L].w + 1.4;
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(pw, 2.0), poolMat);
