@@ -1,0 +1,40 @@
+# Обновления базы Supabase: новые файлы из supabase/migrations загружаются сами после каждого изменения в main.
+# Нужен секрет репозитория SUPABASE_DB_URL — строка подключения Supabase (Session pooler) с паролем базы.
+# Файлы до 0015 включительно загружены вручную раньше и не трогаются.
+# Каждый файл — одна транзакция: если в нём ошибка, база остаётся как была.
+name: Database
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**', '.github/workflows/db.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: database
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BASELINE: '0015'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secret
+        run: |
+          if [ -z "$DB_URL" ]; then echo "::error::Нет секрета SUPABASE_DB_URL"; exit 1; fi
+      - name: Apply new migrations
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "create table if not exists public.deploy_log (name text primary key, applied_at timestamptz not null default now()); alter table public.deploy_log enable row level security; revoke all on public.deploy_log from anon, authenticated;"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            name=$(basename "$f" .sql)
+            [ "${name:0:4}" \> "$BASELINE" ] || continue
+            done_already=$(psql "$DB_URL" -At -c "select 1 from public.deploy_log where name = '$name'")
+            if [ "$done_already" = "1" ]; then echo "skip $name"; continue; fi
+            echo "apply $name"
+            { cat "$f"; echo; echo "insert into public.deploy_log (name) values ('$name');"; } \
+              | psql "$DB_URL" -v ON_ERROR_STOP=1 -q --single-transaction -f -
+          done
+          echo "Готово"
