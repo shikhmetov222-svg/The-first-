@@ -152,7 +152,7 @@ function marketAction(run: (id: string, body: Body) => Promise<unknown>) {
   return async (user: TelegramUser, body: Body) => {
     const id = await playerId(user);
     const result = await run(id, body);
-    const [st, market] = await Promise.all([state(id), rpc('market_view', { p_player_id: id })]);
+    const [st, market] = await Promise.all([state(id), rpc('market_view', { p_player: id })]);
     return { ...st, result, market, is_admin: isAdmin(user) };
   };
 }
@@ -187,7 +187,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
     return { company: await rpc('company_card', { p_player_id: id }) };
   },
   // ---------- Рынок между игроками: каждое действие — одна транзакция в базе ----------
-  market: async (user) => ({ market: await rpc('market_view', { p_player_id: await playerId(user) }) }),
+  market: async (user) => ({ market: await rpc('market_view', { p_player: await playerId(user) }) }),
   create_lot: marketAction((id, b) =>
     rpc('create_lot', {
       p_player: id,
