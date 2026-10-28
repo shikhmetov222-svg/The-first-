@@ -267,7 +267,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
 
 // ---------- Рассылка уведомлений ботом ----------
 // Вызывает сама база (pg_cron + pg_net) каждые 5 минут со своим секретным ключом — не игрок.
-const GAME_URL = 'https://effulgent-bunny-36f729.netlify.app';
+const GAME_URL = 'https://shikhmetov222-svg.github.io/The-first-/';
 let dispatchKey: string | null = null;
 
 async function dispatch(req: Request): Promise<Response> {
