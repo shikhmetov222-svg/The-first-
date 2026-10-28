@@ -1,0 +1,25 @@
+# Ручная выкладка сайта на Netlify (запасной путь, если автосборка из GitHub не сработала).
+# Запускается вручную; ссылка для выкладки передаётся параметром и скрывается в логах.
+name: Netlify deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      proxy_path:
+        description: Ссылка выкладки Netlify MCP
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy
+        env:
+          PROXY_PATH: ${{ inputs.proxy_path }}
+        run: |
+          echo "::add-mask::$PROXY_PATH"
+          npx -y @netlify/mcp@latest --site-id 96fff123-e393-4a59-aa71-f58728845574 --proxy-path "$PROXY_PATH"
