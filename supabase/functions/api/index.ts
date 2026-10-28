@@ -202,7 +202,8 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       p_buyer: id,
       p_lot: int(b, 'lot'),
       p_qty: int(b, 'qty'),
-      p_dest: b.dest === 'marketplace' ? 'marketplace' : null,
+      // «Куда положить» передаём только для маркетплейса — так работают и старая, и новая версия функции.
+      ...(b.dest === 'marketplace' ? { p_dest: 'marketplace' } : {}),
     })),
   marketplace_transfer: action((id, b) =>
     rpc('marketplace_transfer', {
