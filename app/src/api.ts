@@ -181,6 +181,8 @@ export interface GameState {
   start_capital?: number;
   capital_history?: [number, number][]; // [секунды unix, копейки]
   is_admin?: boolean; // решает сервер по секрету ADMIN_TELEGRAM_IDS
+  notifications?: { id: number; text: string; at: string; read: boolean }[];
+  unread?: number;
 }
 
 export interface DevInfo {
@@ -237,7 +239,16 @@ export interface Lot {
   qty_total: number;
   price: number;
   expires_at: string;
-  seller: { id: string; name: string; icon: string | null; color: string | null; dev: boolean; test: boolean };
+  seller: {
+    id: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+    dev: boolean;
+    test: boolean;
+    bot?: boolean;
+    kind?: 'dumper' | 'premium' | 'careful';
+  };
 }
 
 export interface BusinessLot {
@@ -333,6 +344,7 @@ export const api = {
   buyLot: (lot: number, qty: number) => call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty }),
   sellWholesale: (p: { product: Product; source: Source; qty: number }) =>
     call<WithResult<string> & { market: MarketView }>('sell_wholesale', p),
+  notificationsRead: () => call<WithResult<null>>('notifications_read'),
   createBusinessLot: (type: BusinessType, price: number) =>
     call<WithResult<string> & { market: MarketView }>('create_business_lot', { type, price }),
   buyBusinessLot: (lot: number) => call<WithResult<string> & { market: MarketView }>('buy_business_lot', { lot }),

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowDownToLine, Clock, PackageOpen, Store, Upload, X } from 'lucide-react';
+import { ArrowDownToLine, Bot, Clock, PackageOpen, Store, Upload, X } from 'lucide-react';
 import { api, type BusinessLot, type GameState, type Lot, type MarketView, type Product, type Source } from '../api';
-import { PRODUCTS } from '../content';
+import { BOT_KIND, PRODUCTS } from '../content';
+import { MiniChart } from './MiniChart';
 import { count, money, shortDuration } from '../format';
 import { vsMarket } from '../market';
 import { feel, notify } from '../telegram';
@@ -101,6 +102,7 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
               <span className={`small ${change === null || change === 0 ? 'muted' : change > 0 ? 'up' : 'down'}`}>
                 {change === null ? 'за сутки —' : change === 0 ? '0% за сутки' : `${change > 0 ? '▲ +' : '▼ '}${String(change).replace('.', ',')}%`}
               </span>
+              <MiniChart points={p.history} color={change !== null && change < 0 ? '#F07167' : '#D4A73A'} />
               <span className="stat-label">оптовик {money(p.wholesale)}</span>
             </div>
           );
@@ -146,7 +148,11 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
                 const cmp = m ? vsMarket(l.price, m.price) : null;
                 return (
                   <div key={l.id} className="lot-row">
-                    {l.seller.icon ? (
+                    {l.seller.bot ? (
+                      <span className="logo-fallback bot-logo">
+                        <Bot size={18} />
+                      </span>
+                    ) : l.seller.icon ? (
                       <CompanyLogo icon={l.seller.icon} color={l.seller.color ?? 'gold'} size={36} />
                     ) : (
                       <span className="logo-fallback">{l.seller.name.slice(0, 1).toUpperCase()}</span>
@@ -156,6 +162,9 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
                         {l.seller.name}
                         {l.seller.dev && <DevBadge />}
                         {l.seller.test && <span className="tag small-tag">тест</span>}
+                        {l.seller.bot && (
+                          <span className="tag small-tag">бот · {BOT_KIND[l.seller.kind ?? 'careful']}</span>
+                        )}
                       </div>
                       <div className="stat-label">
                         {count(l.qty_left)} шт. · <b className="lot-price">{money(l.price)}</b>/шт.

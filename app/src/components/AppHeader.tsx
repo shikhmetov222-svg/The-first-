@@ -1,11 +1,11 @@
-import { Clock } from 'lucide-react';
+import { Bell, Clock } from 'lucide-react';
 import type { GameState } from '../api';
 import { shortDuration } from '../format';
 import { CompanyLogo } from './CompanyLogo';
 import { useNow } from './useTick';
 
 /** Шапка: логотип и название компании, «Лига · Сезон N», чип с таймером до конца сезона. */
-export function AppHeader({ game, serverOffset }: { game: GameState; serverOffset: number }) {
+export function AppHeader({ game, serverOffset, onBell }: { game: GameState; serverOffset: number; onBell?: () => void }) {
   const now = useNow(serverOffset);
   const company = game.company;
   const name = company?.name ?? game.player.first_name ?? 'Компания';
@@ -25,6 +25,12 @@ export function AppHeader({ game, serverOffset }: { game: GameState; serverOffse
         <div className="app-header-name">{name}</div>
         <div className="stat-label">{sub}</div>
       </div>
+      {onBell && (
+        <button className="bell" aria-label={`Уведомления${game.unread ? `: ${game.unread} новых` : ''}`} onClick={onBell}>
+          <Bell size={20} />
+          {game.unread ? <span className="bell-dot">{game.unread > 9 ? '9+' : game.unread}</span> : null}
+        </button>
+      )}
       {game.season && (
         <span className="chip-timer" aria-label="До конца сезона">
           <Clock size={14} />

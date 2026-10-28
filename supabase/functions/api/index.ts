@@ -205,6 +205,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       p_source: str(b, 'source'),
       p_qty: int(b, 'qty'),
     })),
+  notifications_read: action((id) => rpc('notifications_read', { p_player: id })),
   create_business_lot: marketAction((id, b) =>
     rpc('create_business_lot', { p_player: id, p_type: str(b, 'type'), p_price: int(b, 'price') })),
   buy_business_lot: marketAction((id, b) => rpc('buy_business_lot', { p_buyer: id, p_lot: int(b, 'lot') })),
@@ -246,9 +247,57 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
   },
 };
 
+// ---------- Рассылка уведомлений ботом ----------
+// Вызывает сама база (pg_cron + pg_net) каждые 5 минут со своим секретным ключом — не игрок.
+const GAME_URL = 'https://effulgent-bunny-36f729.netlify.app';
+let dispatchKey: string | null = null;
+
+async function dispatch(req: Request): Promise<Response> {
+  dispatchKey ??= await rpc<string>('dispatch_key', {});
+  const given = req.headers.get('x-dispatch-key') ?? '';
+  if (!dispatchKey || given.length !== dispatchKey.length || given !== dispatchKey) {
+    return json({ error: 'Нет доступа' }, 403);
+  }
+  const batch = await rpc<{ telegram_id: number; ids: number[]; texts: string[] }[]>('notifications_batch', {});
+  let sent = 0;
+  for (const m of batch) {
+    const text = ['<b>CAPITAL</b>', ...m.texts.map((t) => `• ${escapeHtml(t)}`)].join('\n');
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: m.telegram_id,
+          text,
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: 'Открыть CAPITAL', web_app: { url: GAME_URL } }]] },
+        }),
+      });
+      if (res.ok) sent++;
+      else await rpc('notifications_failed', { p_ids: m.ids });
+    } catch (e) {
+      console.error('sendMessage', e);
+      await rpc('notifications_failed', { p_ids: m.ids });
+    }
+  }
+  return json({ ok: true, messages: batch.length, sent });
+}
+
+function escapeHtml(t: string): string {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Метод не поддерживается' }, 405);
+  if (req.headers.has('x-dispatch-key')) {
+    try {
+      return await dispatch(req);
+    } catch (e) {
+      console.error('dispatch', e);
+      return json({ error: 'Ошибка рассылки' }, 500);
+    }
+  }
 
   try {
     if (!BOT_TOKEN) throw new ApiError(500, 'Сервер не настроен: нет токена бота');

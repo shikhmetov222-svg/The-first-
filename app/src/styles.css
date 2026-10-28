@@ -2266,3 +2266,76 @@ h2.section-title {
   font-size: 13px;
   font-weight: 700;
 }
+
+/* ---------- Уведомления, графики цен, боты ---------- */
+
+.bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.bell-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--gold);
+  color: var(--gold-text);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.notif-list li {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.notif-list li.unread span:first-child {
+  font-weight: 800;
+}
+
+.notif-list li.unread::before {
+  content: '';
+  position: absolute;
+}
+
+.mini-chart {
+  display: block;
+  width: 100%;
+  margin: 4px 0 2px;
+}
+
+.mini-chart-empty {
+  margin: 4px 0 2px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.bot-logo {
+  color: var(--muted);
+}
+
+.app-header .stat-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lot-name {
+  white-space: normal;
+}

@@ -13,6 +13,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { MarketTab } from './components/MarketTab';
 import { ProfileTab } from './components/ProfileTab';
 import { DevPanel } from './components/DevPanel';
+import { NotificationsSheet } from './components/NotificationsSheet';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck } from 'lucide-react';
@@ -40,6 +41,8 @@ function Game() {
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [editingCompany, setEditingCompany] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+
   const [sellPreset, setSellPreset] = useState<'coffee' | 'shop' | 'bakery' | null>(null);
   const clearSellPreset = useCallback(() => setSellPreset(null), []);
 
@@ -55,6 +58,18 @@ function Game() {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 2600);
   }, []);
+
+  // Новые уведомления (например, «Твой лот продан») — всплывающим сообщением и вибрацией.
+  const lastNotif = useRef<number | null>(null);
+  const newestNotif = game?.notifications?.[0];
+  useEffect(() => {
+    if (!newestNotif) return;
+    if (lastNotif.current !== null && newestNotif.id > lastNotif.current && !newestNotif.read) {
+      showToast(newestNotif.text);
+      feel('collect');
+    }
+    lastNotif.current = Math.max(lastNotif.current ?? 0, newestNotif.id);
+  }, [newestNotif, showToast]);
 
   const login = useCallback(async () => {
     setLoginError(null);
@@ -203,7 +218,18 @@ function Game() {
 
   return (
     <main className="screen">
-      <AppHeader game={game} serverOffset={serverOffset} />
+      <AppHeader
+        game={game}
+        serverOffset={serverOffset}
+        onBell={
+          game.notifications
+            ? () => {
+                setShowNotifs(true);
+                if (game.unread) api.notificationsRead().then(setGame).catch(() => {});
+              }
+            : undefined
+        }
+      />
 
       {tab === 'market' && (
         <MarketTab
@@ -333,6 +359,8 @@ function Game() {
           onSkip={() => advanceTutorial(3)}
         />
       )}
+
+      {showNotifs && <NotificationsSheet game={game} onClose={() => setShowNotifs(false)} />}
 
       {toast && (
         <div className={`toast ${toast.error ? 'toast-error' : ''}`} role="status">
