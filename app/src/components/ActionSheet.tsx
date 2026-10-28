@@ -49,8 +49,11 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
         </h2>
         <p className="hint">{BUSINESS_INFO[item.type].about}</p>
         <p className="hint">
-          После открытия склад будет пустым — не забудь закупить{' '}
-          {item.production_rate > 0 ? 'муку' : 'товар'}.
+          {item.type === 'pvz'
+            ? 'Посылки начнут приходить сами — от маркетплейсов игроков и жителей города.'
+            : item.type === 'marketplace'
+              ? 'После открытия перевези на его склад товар со своих бизнесов или купи на рынке.'
+              : `После открытия склад будет пустым — не забудь закупить ${item.production_rate > 0 ? 'муку' : 'товар'}.`}
         </p>
         <button className="button" disabled={busy || cash < item.open_cost} onClick={() => onOpenBusiness(item.type)}>
           Открыть за {money(item.open_cost)}

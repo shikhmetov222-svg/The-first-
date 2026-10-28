@@ -197,7 +197,20 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       p_price: int(b, 'price'),
     })),
   cancel_lot: marketAction((id, b) => rpc('cancel_lot', { p_player: id, p_lot: int(b, 'lot') })),
-  buy_lot: marketAction((id, b) => rpc('buy_lot', { p_buyer: id, p_lot: int(b, 'lot'), p_qty: int(b, 'qty') })),
+  buy_lot: marketAction((id, b) =>
+    rpc('buy_lot', {
+      p_buyer: id,
+      p_lot: int(b, 'lot'),
+      p_qty: int(b, 'qty'),
+      p_dest: b.dest === 'marketplace' ? 'marketplace' : null,
+    })),
+  marketplace_transfer: action((id, b) =>
+    rpc('marketplace_transfer', {
+      p_player: id,
+      p_product: str(b, 'product'),
+      p_source: str(b, 'source'),
+      p_qty: int(b, 'qty'),
+    })),
   sell_wholesale: marketAction((id, b) =>
     rpc('sell_wholesale', {
       p_player: id,

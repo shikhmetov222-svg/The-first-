@@ -35,3 +35,12 @@ export function vsMarket(price: number, market: number): { pct: number; cheaper:
   const pct = Math.round((price / market - 1) * 100);
   return { pct: Math.abs(pct), cheaper: pct < 0 };
 }
+
+/** Свободное место на складе маркетплейса. */
+export function marketplaceSpace(game: GameState): { dest: 'marketplace' | null; free: number } {
+  const mp = game.businesses.find((b) => b.type === 'marketplace');
+  if (!mp) return { dest: null, free: 0 };
+  const cap = game.catalog.find((c) => c.type === 'marketplace')?.capacity ?? 0;
+  const g = mp.goods ?? {};
+  return { dest: 'marketplace', free: Math.max(0, cap - ((g.coffee ?? 0) + (g.bread ?? 0) + (g.flour ?? 0))) };
+}

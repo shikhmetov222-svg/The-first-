@@ -1,4 +1,8 @@
 import {
+  Hammer,
+  Megaphone,
+  PackageCheck,
+  ShoppingBag,
   Wheat,
   Building2, CalendarCheck, Coffee, Croissant, Gem, Medal, Package, Scale, ShieldAlert, Store, Trophy,
   UserPlus, type LucideIcon,
@@ -10,7 +14,17 @@ export const BUSINESS_INFO: Record<BusinessType, { icon: LucideIcon; about: stri
   coffee: { icon: Coffee, about: 'Продаёт кофе прохожим. Быстрый оборот, хорошая наценка.' },
   shop: { icon: Store, about: 'Продаёт хлеб. Дешевле всего возить его из своей пекарни.' },
   bakery: { icon: Croissant, about: 'Печёт хлеб из муки и снабжает твой магазин.' },
+  marketplace: { icon: ShoppingBag, about: 'Продаёт твои товары на всю страну.' },
+  pvz: { icon: PackageCheck, about: 'Выдаёт посылки и получает плату за каждую.' },
+  agency: { icon: Megaphone, about: 'Делает рекламные кампании для бизнесов.' },
+  repair: { icon: Hammer, about: 'Ремонтирует и улучшает бизнесы.' },
 };
+
+export const CATEGORIES: { id: 'classic' | 'online' | 'services'; title: string }[] = [
+  { id: 'classic', title: 'Классика' },
+  { id: 'online', title: 'Онлайн' },
+  { id: 'services', title: 'Услуги' },
+];
 
 export const BOT_KIND: Record<'dumper' | 'premium' | 'careful', string> = {
   dumper: 'Демпингер',

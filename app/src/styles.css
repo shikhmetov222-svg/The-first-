@@ -2339,3 +2339,97 @@ h2.section-title {
 .lot-name {
   white-space: normal;
 }
+
+/* ---------- Новые бизнесы: каталог, маркетплейс, ПВЗ ---------- */
+
+.biz-icon.marketplace { background: rgba(167, 139, 250, 0.14); color: #a78bfa; }
+.biz-icon.pvz { background: rgba(90, 179, 242, 0.14); color: #5ab3f2; }
+.biz-icon.agency { background: rgba(244, 114, 182, 0.14); color: #f472b6; }
+.biz-icon.repair { background: rgba(196, 200, 208, 0.14); color: #c4c8d0; }
+
+.catalog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.catalog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.catalog-card.locked {
+  border-style: dashed;
+  background: transparent;
+}
+
+.catalog-card.owned {
+  opacity: 0.7;
+}
+
+.catalog-price {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.catalog-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.catalog-owned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--up);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.goods-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goods-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.goods-chip b {
+  color: var(--text);
+}
+
+.link-button {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  min-height: 32px;
+}
+
+.catalog-card .biz-head .stat-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

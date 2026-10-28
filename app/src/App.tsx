@@ -14,9 +14,12 @@ import { MarketTab } from './components/MarketTab';
 import { ProfileTab } from './components/ProfileTab';
 import { DevPanel } from './components/DevPanel';
 import { NotificationsSheet } from './components/NotificationsSheet';
+import { CatalogSheet } from './components/CatalogSheet';
+import { MarketplaceCard, PvzCard } from './components/OnlineCards';
+import { TransferSheet } from './components/TransferSheet';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
-import { CircleAlert, CircleCheck } from 'lucide-react';
+import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
 import { CompanyForm } from './components/CompanyForm';
 import { Tutorial, type TutorialStep } from './components/Tutorial';
 import type { CompanyInput } from './api';
@@ -42,6 +45,9 @@ function Game() {
   const [formError, setFormError] = useState<string | null>(null);
   const [editingCompany, setEditingCompany] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [buyToMarketplace, setBuyToMarketplace] = useState(false);
 
   const [sellPreset, setSellPreset] = useState<'coffee' | 'shop' | 'bakery' | null>(null);
   const clearSellPreset = useCallback(() => setSellPreset(null), []);
@@ -238,6 +244,8 @@ function Game() {
           onToast={showToast}
           sellPreset={sellPreset}
           onSellPresetUsed={clearSellPreset}
+          buyToMarketplace={buyToMarketplace}
+          onBuyToMarketplaceOff={() => setBuyToMarketplace(false)}
         />
       )}
       {tab === 'dev' && isAdmin && <DevPanel game={game} onState={setGame} onToast={showToast} />}
@@ -281,29 +289,52 @@ function Game() {
         </span>
       </h2>
 
-      {[...game.catalog]
-        .sort((x, y) => Number(owned.has(y.type)) - Number(owned.has(x.type)))
-        .map((item) => (
-        <BusinessCard
-          key={item.type}
-          item={item}
-          business={game.businesses.find((b) => b.type === item.type)}
-          market={game.markets.find((m) => m.market === item.market)}
-          cash={game.player.cash}
-          hasBakery={owned.has('bakery')}
-          hasShop={owned.has('shop')}
-          busy={busy}
-          onOpen={() => setSheet({ kind: 'open', type: item.type })}
-          onAction={(kind) => {
-            if (kind === 'sell') {
-              setSellPreset(item.type);
-              setTab('market');
-              return;
-            }
-            setSheet({ kind, type: item.type } as SheetKind);
-          }}
-        />
-      ))}
+      {game.catalog
+        .filter((item) => owned.has(item.type) || (game.businesses.length === 0 && (item.category ?? 'classic') === 'classic'))
+        .map((item) => {
+          const business = game.businesses.find((b) => b.type === item.type);
+          if (business && item.type === 'marketplace') {
+            return (
+              <MarketplaceCard
+                key={item.type}
+                item={item}
+                business={business}
+                busy={busy}
+                onTransfer={() => setTransferring(true)}
+                onBuyOnMarket={() => {
+                  setBuyToMarketplace(true);
+                  setTab('market');
+                }}
+              />
+            );
+          }
+          if (business && item.type === 'pvz') return <PvzCard key={item.type} item={item} business={business} />;
+          return (
+            <BusinessCard
+              key={item.type}
+              item={item}
+              business={business}
+              market={game.markets.find((m) => m.market === item.market)}
+              cash={game.player.cash}
+              hasBakery={owned.has('bakery')}
+              hasShop={owned.has('shop')}
+              busy={busy}
+              onOpen={() => setSheet({ kind: 'open', type: item.type })}
+              onAction={(kind) => {
+                if (kind === 'sell') {
+                  setSellPreset(item.type as 'coffee' | 'shop' | 'bakery');
+                  setTab('market');
+                  return;
+                }
+                setSheet({ kind, type: item.type } as SheetKind);
+              }}
+            />
+          );
+        })}
+
+      <button className="button secondary" onClick={() => setCatalogOpen(true)}>
+        <Plus size={18} /> Открыть новый бизнес
+      </button>
       </>
       )}
 
@@ -357,6 +388,28 @@ function Game() {
           index={tutorialStep}
           total={3}
           onSkip={() => advanceTutorial(3)}
+        />
+      )}
+
+      {catalogOpen && (
+        <CatalogSheet
+          game={game}
+          onClose={() => setCatalogOpen(false)}
+          onPick={(type) => {
+            setCatalogOpen(false);
+            setSheet({ kind: 'open', type });
+          }}
+        />
+      )}
+
+      {transferring && (
+        <TransferSheet
+          game={game}
+          busy={busy}
+          onClose={() => setTransferring(false)}
+          onTransfer={async (p) => {
+            if (await run(() => api.marketplaceTransfer(p), (r) => r, 'purchase')) setTransferring(false);
+          }}
         />
       )}
 

@@ -4,7 +4,7 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './config';
 import { tg } from './telegram';
 
-export type BusinessType = 'coffee' | 'shop' | 'bakery';
+export type BusinessType = 'coffee' | 'shop' | 'bakery' | 'marketplace' | 'pvz' | 'agency' | 'repair';
 
 export interface Player {
   id: string;
@@ -70,6 +70,10 @@ export interface CatalogItem {
   raw_capacity: number;
   production_rate: number;
   market: 'coffee' | 'bread' | null;
+  category?: 'classic' | 'online' | 'services';
+  description?: string;
+  link_text?: string;
+  payback_days?: number | null;
 }
 
 export interface Bot {
@@ -100,6 +104,8 @@ export interface Business {
   pending_revenue: number;
   last_sold: number;
   listed?: boolean; // выставлен на продажу — заморожен
+  goods?: Partial<Record<'coffee' | 'bread' | 'flour', number>> | null; // склад маркетплейса
+  last_revenue?: number; // выручка за последние 5 минут (после комиссий)
 }
 
 export interface SummaryItem {
@@ -341,7 +347,10 @@ export const api = {
   createLot: (p: { product: Product; source: Source; qty: number; price: number }) =>
     call<WithResult<string> & { market: MarketView }>('create_lot', p),
   cancelLot: (lot: number) => call<WithResult<string> & { market: MarketView }>('cancel_lot', { lot }),
-  buyLot: (lot: number, qty: number) => call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty }),
+  buyLot: (lot: number, qty: number, dest?: 'marketplace') =>
+    call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty, dest }),
+  marketplaceTransfer: (p: { product: Product; source: Source; qty: number }) =>
+    call<WithResult<string>>('marketplace_transfer', p),
   sellWholesale: (p: { product: Product; source: Source; qty: number }) =>
     call<WithResult<string> & { market: MarketView }>('sell_wholesale', p),
   notificationsRead: () => call<WithResult<null>>('notifications_read'),

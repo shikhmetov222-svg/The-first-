@@ -3,7 +3,7 @@ import { Info } from 'lucide-react';
 import type { BusinessLot, BusinessType, GameState, GoodsPrice, Lot, Product, Source } from '../api';
 import { PRODUCTS, SELL_SOURCES } from '../content';
 import { count, money } from '../format';
-import { FEE, available, freeSpace, priceCorridor, vsMarket } from '../market';
+import { FEE, available, freeSpace, marketplaceSpace, priceCorridor, vsMarket } from '../market';
 import { selectionTick } from '../telegram';
 import { CompanyLogo } from './CompanyLogo';
 import { DevBadge } from './DevBadge';
@@ -48,16 +48,17 @@ function Qty({ value, max, onChange }: { value: number; max: number; onChange: (
 // ---------------- Купить лот ----------------
 
 export function BuySheet({
-  lot, game, market, busy, onBuy, onClose,
+  lot, game, market, toMarketplace = false, busy, onBuy, onClose,
 }: {
   lot: Lot;
   game: GameState;
   market: GoodsPrice | undefined;
+  toMarketplace?: boolean;
   busy: boolean;
   onBuy: (qty: number) => void;
   onClose: () => void;
 }) {
-  const { dest, free } = freeSpace(game, lot.product);
+  const { dest, free } = toMarketplace ? marketplaceSpace(game) : freeSpace(game, lot.product);
   const affordable = Math.floor(game.player.cash / lot.price);
   const max = Math.max(0, Math.min(lot.qty_left, free, affordable));
   const [qty, setQty] = useState(Math.min(max, lot.qty_left) || 1);
@@ -92,7 +93,7 @@ export function BuySheet({
       ) : (
         <>
           <p className="hint small">
-            Место на складе: {count(free)} шт. · хватает денег на {count(affordable)} шт.
+            {toMarketplace ? 'Место на складе маркетплейса' : 'Место на складе'}: {count(free)} шт. · хватает денег на {count(affordable)} шт.
           </p>
           <Qty value={qty} max={max} onChange={setQty} />
           <button className="button" disabled={busy} onClick={() => onBuy(qty)}>
@@ -328,7 +329,7 @@ export function SellBusinessSheet({
   const p = Math.max(lo, Math.min(hi, price));
   const fee = Math.ceil(p * FEE);
   const diff = Math.round((p / v.valuation - 1) * 100);
-  const blocked = goodsLotSources.includes(type);
+  const blocked = (goodsLotSources as string[]).includes(type);
 
   return (
     <Sheet onClose={onClose}>

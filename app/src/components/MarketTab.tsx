@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowDownToLine, Bot, Clock, PackageOpen, Store, Upload, X } from 'lucide-react';
+import { ArrowDownToLine, Bot, Clock, PackageOpen, ShoppingBag, Store, Upload, X } from 'lucide-react';
 import { api, type BusinessLot, type GameState, type Lot, type MarketView, type Product, type Source } from '../api';
 import { BOT_KIND, PRODUCTS } from '../content';
 import { MiniChart } from './MiniChart';
@@ -20,9 +20,12 @@ interface Props {
   /** Открыть окно продажи сразу (кнопка «Выставить» на карточке бизнеса). */
   sellPreset: Source | null;
   onSellPresetUsed: () => void;
+  /** Пришли с карточки маркетплейса: покупки идут на его склад. */
+  buyToMarketplace?: boolean;
+  onBuyToMarketplaceOff?: () => void;
 }
 
-export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed }: Props) {
+export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed, buyToMarketplace, onBuyToMarketplaceOff }: Props) {
   const [view, setView] = useState<MarketView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<Section>('goods');
@@ -123,6 +126,14 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
 
       {section === 'goods' && (
         <>
+          {buyToMarketplace && (
+            <div className="listed-note">
+              <ShoppingBag size={15} /> Покупки идут на склад маркетплейса
+              <button className="link-button" onClick={onBuyToMarketplaceOff}>
+                отменить
+              </button>
+            </div>
+          )}
           <div className="dev-row">
             {(['coffee', 'bread', 'flour'] as Product[]).map((p) => {
               const n = view.lots.filter((l) => l.product === p).length;
@@ -350,10 +361,11 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
           lot={buying}
           game={game}
           market={priceOf(buying.product)}
+          toMarketplace={Boolean(buyToMarketplace)}
           busy={busy}
           onClose={() => setBuying(null)}
           onBuy={async (qty) => {
-            if (await deal(() => api.buyLot(buying.id, qty))) setBuying(null);
+            if (await deal(() => api.buyLot(buying.id, qty, buyToMarketplace ? 'marketplace' : undefined))) setBuying(null);
           }}
         />
       )}
