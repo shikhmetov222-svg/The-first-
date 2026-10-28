@@ -1,4 +1,13 @@
-import type { GameState, Product, Source } from './api';
+import type { Business, CatalogItem, GameState, Product, Source } from './api';
+
+/** Склад бизнеса с учётом уровня (старый сервер уровней не знает — тогда как в справочнике). */
+export function capOf(item: CatalogItem, b: Business | undefined): number {
+  return b?.capacity ?? item.capacity;
+}
+
+export function rawCapOf(item: CatalogItem, b: Business | undefined): number {
+  return b?.raw_capacity ?? item.raw_capacity;
+}
 
 // Подсказки для экрана. Окончательно всё проверяет сервер.
 
@@ -19,7 +28,7 @@ export function freeSpace(game: GameState, product: Product): { dest: Source | n
   if (!dest) return { dest: null, free: 0 };
   const b = owned(dest)!;
   const t = game.catalog.find((c) => c.type === dest)!;
-  const free = product === 'flour' ? t.raw_capacity - b.raw_stock : t.capacity - b.stock;
+  const free = product === 'flour' ? rawCapOf(t, b) - b.raw_stock : capOf(t, b) - b.stock;
   return { dest, free: Math.max(0, free) };
 }
 
@@ -40,7 +49,8 @@ export function vsMarket(price: number, market: number): { pct: number; cheaper:
 export function marketplaceSpace(game: GameState): { dest: 'marketplace' | null; free: number } {
   const mp = game.businesses.find((b) => b.type === 'marketplace');
   if (!mp) return { dest: null, free: 0 };
-  const cap = game.catalog.find((c) => c.type === 'marketplace')?.capacity ?? 0;
+  const item = game.catalog.find((c) => c.type === 'marketplace');
+  const cap = item ? capOf(item, mp) : 0;
   const g = mp.goods ?? {};
   return { dest: 'marketplace', free: Math.max(0, cap - ((g.coffee ?? 0) + (g.bread ?? 0) + (g.flour ?? 0))) };
 }

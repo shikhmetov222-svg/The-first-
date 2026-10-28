@@ -354,6 +354,8 @@ export function MarketTab({
                         {t.side === 'sold' ? 'Продано' : 'Куплено'}:{' '}
                         {t.kind === 'business'
                           ? game.catalog.find((c) => c.type === t.product)?.name ?? 'бизнес'
+                          : t.kind === 'repair'
+                          ? `Ремонт: ${game.catalog.find((c) => c.type === t.product)?.name ?? 'бизнес'} → ур. ${t.qty}`
                           : `${PRODUCTS[t.product as Product].name} × ${count(t.qty)}`}
                       </b>
                       <div className="stat-label">

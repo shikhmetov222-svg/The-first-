@@ -18,6 +18,7 @@ import { CatalogSheet } from './components/CatalogSheet';
 import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
+import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
@@ -56,6 +57,7 @@ function Game() {
   const clearProductPreset = useCallback(() => setProductPreset(null), []);
   // Окно запуска рекламы: undefined — закрыто; null — без выбранного бизнеса.
   const [adFor, setAdFor] = useState<BusinessType | null | undefined>(undefined);
+  const [upgradeFor, setUpgradeFor] = useState<BusinessType | null>(null);
 
   // Настройка вибрации хранится на сервере.
   const hapticsSetting = game?.player.haptics;
@@ -301,8 +303,30 @@ function Game() {
         .map((item) => {
           const business = game.businesses.find((b) => b.type === item.type);
           const adStrip = (b: Business) => (
-            <AdStrip business={b} ads={game.ads} serverOffset={serverOffset} busy={busy} onOpen={() => setAdFor(b.type)} />
+            <>
+              <AdStrip business={b} ads={game.ads} serverOffset={serverOffset} busy={busy} onOpen={() => setAdFor(b.type)} />
+              <UpgradeStrip
+                business={b}
+                game={game}
+                serverOffset={serverOffset}
+                busy={busy}
+                onOpen={() => setUpgradeFor(b.type)}
+              />
+            </>
           );
+          if (business && item.type === 'repair') {
+            return (
+              <RepairCard
+                key={item.type}
+                item={item}
+                business={business}
+                game={game}
+                serverOffset={serverOffset}
+                busy={busy}
+                onSetPrice={(pct) => run(() => api.setRepairPrice(pct), (r) => r)}
+              />
+            );
+          }
           if (business && item.type === 'agency') {
             return (
               <AgencyCard
@@ -311,6 +335,7 @@ function Game() {
                 business={business}
                 ads={game.ads}
                 busy={busy}
+                extra={adStrip(business)}
                 onLaunch={() => setAdFor(null)}
                 onSell={() => {
                   setSellPreset('agency');
@@ -461,6 +486,18 @@ function Game() {
             setAdFor(undefined);
             setProductPreset('campaign');
             setTab('market');
+          }}
+        />
+      )}
+
+      {upgradeFor && (
+        <UpgradeSheet
+          game={game}
+          type={upgradeFor}
+          busy={busy}
+          onClose={() => setUpgradeFor(null)}
+          onOrder={async (contractor) => {
+            if (await run(() => api.orderUpgrade(upgradeFor, contractor), (r) => r, 'purchase')) setUpgradeFor(null);
           }}
         />
       )}

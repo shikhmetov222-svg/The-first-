@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { capOf } from '../market';
+import { LevelTag } from './Repair';
 import { Bot, Info, Megaphone, Rocket, ShoppingCart, Upload } from 'lucide-react';
 import type { AdsConfig, Business, BusinessType, CatalogItem, GameState } from '../api';
 import { ADVERTISABLE } from '../content';
@@ -47,8 +49,9 @@ export function AdStrip({
 
 /** Карточка рекламного агентства: готовые кампании, прогресс следующей, кнопки. */
 export function AgencyCard({
-  item, business, ads, busy, onLaunch, onSell,
+  item, business, ads, busy, onLaunch, onSell, extra,
 }: {
+  extra?: ReactNode;
   item: CatalogItem;
   business: Business;
   ads: AdsConfig | undefined;
@@ -56,31 +59,35 @@ export function AgencyCard({
   onLaunch: () => void;
   onSell: () => void;
 }) {
-  const full = business.stock >= item.capacity;
+  const cap = capOf(item, business);
+  const full = business.stock >= cap;
   const progress = Math.min(1, business.progress ?? 0);
   const per = ads?.minutes_per_campaign ?? 30;
   const minutesLeft = Math.max(1, Math.ceil((1 - progress) * per));
-  const pct = Math.min(100, (business.stock / item.capacity) * 100);
+  const pct = Math.min(100, (business.stock / cap) * 100);
 
   return (
     <section className="card biz">
       <div className="biz-head">
         <BizIcon type="agency" />
         <div className="grow">
-          <h3>{item.name}</h3>
-          <div className="stat-label">1 кампания за {per} мин</div>
+          <h3>
+            {item.name} <LevelTag business={business} />
+          </h3>
+          <div className="stat-label">1 кампания за {Math.round(per / (1 + 0.1 * ((business.level ?? 1) - 1)))} мин</div>
         </div>
         <div className="right">
           <div className="stat-label small">готово</div>
           <div className="kassa">{count(business.stock)} шт.</div>
         </div>
       </div>
+      {extra}
       <div className="biz-columns">
         <div className="meter">
           <div className="bar-text">
             <span>Склад кампаний</span>
             <span>
-              {count(business.stock)}/{count(item.capacity)}
+              {count(business.stock)}/{count(cap)}
             </span>
           </div>
           <div className="bar-track">

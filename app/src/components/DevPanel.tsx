@@ -37,6 +37,8 @@ const ACTIONS: Record<string, string> = {
   stock_add: 'Товар добавлен',
   open_business: 'Бизнес бесплатно',
   campaigns_add: 'Выданы кампании',
+  finish_repairs: 'Ремонты завершены',
+  set_level: 'Уровень бизнеса',
   ticks: 'Тики рынка',
   new_decision: 'Новое решение дня',
   test_player_create: 'Создан тестовый игрок',
@@ -186,7 +188,28 @@ export function DevPanel({ game, onState, onToast }: Props) {
             Выдать 10 кампаний в агентство
           </button>
         )}
-        <p className="hint small">Уровней у бизнесов в игре пока нет — когда появятся, здесь будет выбор уровня.</p>
+        <button className="button small secondary" disabled={busy} onClick={() => run('finish_repairs')}>
+          Мгновенно завершить мои ремонты
+        </button>
+        {game.businesses
+          .filter((b) => b.type !== 'repair' && b.level !== undefined)
+          .map((b) => (
+            <div key={b.type} className="dev-row">
+              <span className="stat-label" style={{ minWidth: 110 }}>
+                {game.catalog.find((c) => c.type === b.type)?.name}
+              </span>
+              {Array.from({ length: game.upgrade?.max_level ?? 5 }, (_, i) => i + 1).map((lvl) => (
+                <button
+                  key={lvl}
+                  className={`chip ${b.level === lvl ? 'chip-active' : ''}`}
+                  disabled={busy || b.level === lvl}
+                  onClick={() => run('set_level', { type: b.type, level: lvl })}
+                >
+                  ур. {lvl}
+                </button>
+              ))}
+            </div>
+          ))}
       </DevSection>
 
       <DevSection icon={<Clock size={18} />} title="Время">

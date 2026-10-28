@@ -2502,3 +2502,44 @@ h2.section-title {
 .ad-option:disabled {
   opacity: 0.45;
 }
+
+/* ---------- Уровни и ремонт ---------- */
+
+.lvl-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-family: var(--font-body, inherit);
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.ad-strip.repair-on {
+  border: 1px solid rgba(196, 200, 208, 0.3);
+  background: rgba(196, 200, 208, 0.1);
+  color: #c4c8d0;
+}
+
+.muted-timer {
+  color: var(--muted);
+}
+
+.ad-option-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold) inset;
+}
+
+.ad-option .right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+}
+
+.crew-queue li {
+  align-items: center;
+}

@@ -208,6 +208,13 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
     })),
   apply_campaign: action((id, b) => rpc('apply_campaign', { p_player: id, p_type: str(b, 'type') })),
   buy_npc_campaign: action((id, b) => rpc('buy_npc_campaign', { p_player: id, p_type: str(b, 'type') })),
+  // ---------- Улучшения и ремонт ----------
+  repair_offers: async (user, b) => ({
+    offers: await rpc('repair_offers', { p_player: await playerId(user), p_type: str(b, 'type') }),
+  }),
+  order_upgrade: action((id, b) =>
+    rpc('order_upgrade', { p_player: id, p_type: str(b, 'type'), p_contractor: str(b, 'contractor') })),
+  set_repair_price: action((id, b) => rpc('set_repair_pct', { p_player: id, p_pct: int(b, 'pct') })),
   marketplace_transfer: action((id, b) =>
     rpc('marketplace_transfer', {
       p_player: id,
@@ -244,6 +251,8 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
         rpc('dev_stock', { p_admin: id, p_mode: 'add', p_product: str(b, 'product'), p_qty: int(b, 'qty') }),
       open_business: () => rpc('dev_open_business', { p_admin: id, p_type: str(b, 'type') }),
       campaigns: () => rpc('dev_campaigns', { p_admin: id, p_n: int(b, 'n') }),
+      finish_repairs: () => rpc('dev_finish_repairs', { p_admin: id }),
+      set_level: () => rpc('dev_set_level', { p_admin: id, p_type: str(b, 'type'), p_level: int(b, 'level') }),
       ticks: () => rpc('dev_ticks', { p_admin: id, p_n: int(b, 'n') }),
       new_decision: () => rpc('dev_new_decision', { p_admin: id }),
       test_create: () => rpc('dev_test_players', { p_admin: id, p_mode: 'create' }),

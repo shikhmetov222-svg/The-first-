@@ -4,6 +4,8 @@ import type { Business, CatalogItem } from '../api';
 import { PRODUCTS } from '../content';
 import { count, money } from '../format';
 import { BizIcon } from './BizIcon';
+import { capOf } from '../market';
+import { LevelTag } from './Repair';
 
 /** Магазин на маркетплейсе: товары на складе, продажи и выручка после комиссии. */
 export function MarketplaceCard({
@@ -18,13 +20,16 @@ export function MarketplaceCard({
 }) {
   const goods = business.goods ?? {};
   const total = (goods.coffee ?? 0) + (goods.bread ?? 0) + (goods.flour ?? 0);
-  const pct = Math.min(100, (total / item.capacity) * 100);
+  const cap = capOf(item, business);
+  const pct = Math.min(100, (total / cap) * 100);
   return (
     <section className="card biz">
       <div className="biz-head">
         <BizIcon type="marketplace" />
         <div className="grow">
-          <h3>{item.name}</h3>
+          <h3>
+            {item.name} <LevelTag business={business} />
+          </h3>
           <div className="stat-label">{count(business.last_sold ?? 0)} шт. за 5 мин · вся страна</div>
         </div>
         <div className="right">
@@ -47,7 +52,7 @@ export function MarketplaceCard({
         <div className="bar-text">
           <span>Склад</span>
           <span>
-            {count(total)}/{count(item.capacity)}
+            {count(total)}/{count(cap)}
           </span>
         </div>
         <div className="bar-track">
@@ -71,13 +76,16 @@ export function MarketplaceCard({
 
 /** Пункт выдачи заказов: посылки за 5 минут, заполненность полки, доход. */
 export function PvzCard({ item, business, extra }: { item: CatalogItem; business: Business; extra?: ReactNode }) {
-  const pct = Math.min(100, (business.stock / item.capacity) * 100);
+  const cap = capOf(item, business);
+  const pct = Math.min(100, (business.stock / cap) * 100);
   return (
     <section className="card biz">
       <div className="biz-head">
         <BizIcon type="pvz" />
         <div className="grow">
-          <h3>{item.name}</h3>
+          <h3>
+            {item.name} <LevelTag business={business} />
+          </h3>
           <div className="stat-label">
             <PackageCheck size={13} /> выдано {count(business.last_sold ?? 0)} посылок за 5 мин
           </div>
@@ -92,7 +100,7 @@ export function PvzCard({ item, business, extra }: { item: CatalogItem; business
         <div className="bar-text">
           <span>Полка</span>
           <span>
-            {count(business.stock)}/{count(item.capacity)}
+            {count(business.stock)}/{count(cap)}
             {pct >= 100 ? ' · полна' : ''}
           </span>
         </div>

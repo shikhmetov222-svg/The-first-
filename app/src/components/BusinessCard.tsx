@@ -4,6 +4,8 @@ import type { Business, CatalogItem, Market } from '../api';
 import { BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
 import { BizIcon } from './BizIcon';
+import { capOf, rawCapOf } from '../market';
+import { LevelTag } from './Repair';
 
 export type CardAction = 'restock' | 'price' | 'transfer' | 'sell';
 
@@ -78,10 +80,12 @@ function OpenCard({ item, business, market, hasBakery, hasShop, busy: anyBusy, o
       <div className="biz-head">
         <BizIcon type={item.type} />
         <div className="grow">
-          <h3>{item.name}</h3>
+          <h3>
+            {item.name} <LevelTag business={business} />
+          </h3>
           <div className="stat-label">
             {isFactory
-              ? `до ${item.production_rate} шт. за 5 мин`
+              ? `до ${Math.floor(item.production_rate * (1 + 0.1 * ((business.level ?? 1) - 1)))} шт. за 5 мин`
               : `${count(business.last_sold ?? 0)} шт. за 5 мин`}
           </div>
         </div>
@@ -98,12 +102,12 @@ function OpenCard({ item, business, market, hasBakery, hasShop, busy: anyBusy, o
       <div className="biz-columns">
         {isFactory ? (
           <>
-            <Meter label="Мука" value={business.raw_stock} max={item.raw_capacity} />
-            <Meter label="Готовый хлеб" value={business.stock} max={item.capacity} />
+            <Meter label="Мука" value={business.raw_stock} max={rawCapOf(item, business)} />
+            <Meter label="Готовый хлеб" value={business.stock} max={capOf(item, business)} />
           </>
         ) : (
           <>
-            <Meter label="Склад" value={business.stock} max={item.capacity} />
+            <Meter label="Склад" value={business.stock} max={capOf(item, business)} />
             {market && <Demand level={market.demand_level} />}
           </>
         )}

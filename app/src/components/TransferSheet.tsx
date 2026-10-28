@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { GameState, Product, Source } from '../api';
 import { SELL_SOURCES } from '../content';
 import { count } from '../format';
-import { available } from '../market';
+import { available, capOf } from '../market';
 import { selectionTick } from '../telegram';
 
 /** Перевезти товар со своих бизнесов на склад маркетплейса. */
@@ -15,7 +15,8 @@ export function TransferSheet({
   onClose: () => void;
 }) {
   const mp = game.businesses.find((b) => b.type === 'marketplace');
-  const cap = game.catalog.find((c) => c.type === 'marketplace')?.capacity ?? 0;
+  const item = game.catalog.find((c) => c.type === 'marketplace');
+  const cap = item ? capOf(item, mp) : 0;
   const goods = mp?.goods ?? {};
   const free = Math.max(0, cap - ((goods.coffee ?? 0) + (goods.bread ?? 0) + (goods.flour ?? 0)));
   const options = SELL_SOURCES.filter((o) => o.product !== 'campaign' && game.businesses.some((b) => b.type === o.source));

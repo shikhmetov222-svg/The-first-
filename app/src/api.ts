@@ -107,7 +107,79 @@ export interface Business {
   goods?: Partial<Record<'coffee' | 'bread' | 'flour', number>> | null; // склад маркетплейса
   last_revenue?: number; // выручка за последние 5 минут (после комиссий)
   progress?: number; // агентство: готовность следующей кампании, 0…1
+  level?: number; // уровень 1–5
+  capacity?: number; // склад с учётом уровня
+  raw_capacity?: number;
+  repair?: ActiveRepair | null; // идёт ремонт для улучшения
+  crew?: CrewInfo | null; // ремонтная бригада: цена, очередь, рейтинг
   ads?: string[]; // окончания активных рекламных кампаний
+}
+
+export interface ActiveRepair {
+  to_level: number;
+  kind: 'crew' | 'self' | 'npc';
+  status: 'queued' | 'working';
+  finish_at: string;
+  due_at: string;
+  contractor: string | null;
+}
+
+export interface CrewOrder {
+  id: number;
+  type: BusinessType;
+  to_level: number;
+  kind: 'crew' | 'self';
+  status: 'queued' | 'working';
+  fee: number;
+  finish_at: string;
+  customer: string;
+}
+
+export interface CrewInfo {
+  pct: number;
+  rating: number | null;
+  done: number;
+  earned_24h: number;
+  queue: CrewOrder[];
+}
+
+export interface UpgradeConfig {
+  max_level: number;
+  capacity_step: number;
+  sales_step: number;
+  min_pct: number;
+  max_pct: number;
+  queue: number;
+  minutes: number;
+  costs: Partial<Record<BusinessType, number>> | null; // цена следующего улучшения
+}
+
+export interface RepairOffer {
+  kind: 'crew' | 'self' | 'npc';
+  id: string | null;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  dev?: boolean;
+  test?: boolean;
+  pct: number;
+  fee: number;
+  wait_minutes: number;
+  rating: number | null;
+  done?: number;
+  queue: number;
+  full: boolean;
+}
+
+export interface RepairOffers {
+  type: BusinessType;
+  level: number;
+  to_level: number;
+  cost: number;
+  capacity_step: number;
+  sales_step: number;
+  active: boolean;
+  offers: RepairOffer[];
 }
 
 /** Настройки рекламы с сервера (числа берутся из конфига баланса). */
@@ -202,6 +274,7 @@ export interface GameState {
   notifications?: { id: number; text: string; at: string; read: boolean }[];
   unread?: number;
   ads?: AdsConfig;
+  upgrade?: UpgradeConfig;
 }
 
 export interface DevInfo {
@@ -298,7 +371,7 @@ export interface MyLot {
 
 export interface Trade {
   side: 'sold' | 'bought';
-  kind: 'lot' | 'wholesale' | 'business';
+  kind: 'lot' | 'wholesale' | 'business' | 'repair';
   product: Product | BusinessType;
   qty: number;
   price: number;
@@ -365,6 +438,11 @@ export const api = {
     call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty, dest }),
   applyCampaign: (type: BusinessType) => call<WithResult<string>>('apply_campaign', { type }),
   buyNpcCampaign: (type: BusinessType) => call<WithResult<string>>('buy_npc_campaign', { type }),
+  repairOffers: (type: BusinessType) => call<{ offers: RepairOffers }>('repair_offers', { type }),
+  /** contractor: 'npc', 'self' или id бригады другого игрока. */
+  orderUpgrade: (type: BusinessType, contractor: string) =>
+    call<WithResult<string>>('order_upgrade', { type, contractor }),
+  setRepairPrice: (pct: number) => call<WithResult<string>>('set_repair_price', { pct }),
   marketplaceTransfer: (p: { product: Product; source: Source; qty: number }) =>
     call<WithResult<string>>('marketplace_transfer', p),
   sellWholesale: (p: { product: Product; source: Source; qty: number }) =>

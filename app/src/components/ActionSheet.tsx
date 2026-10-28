@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { BusinessType, GameState, Market } from '../api';
 import { BOT_KIND, BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
+import { capOf, rawCapOf } from '../market';
 import { selectionTick } from '../telegram';
 import { BizIcon } from './BizIcon';
 
@@ -66,7 +67,7 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
 
   if (sheet.kind === 'restock') {
     const isFactory = item.production_rate > 0;
-    const free = isFactory ? item.raw_capacity - business.raw_stock : item.capacity - business.stock;
+    const free = isFactory ? rawCapOf(item, business) - business.raw_stock : capOf(item, business) - business.stock;
     const unitCost = item.unit_cost * game.discount;
     const affordable = Math.floor(cash / unitCost);
     return (
@@ -85,7 +86,7 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
   if (sheet.kind === 'transfer') {
     const bakery = game.businesses.find((b) => b.type === 'bakery');
     const shop = game.businesses.find((b) => b.type === 'shop');
-    const shopCap = game.catalog.find((c) => c.type === 'shop')!.capacity;
+    const shopCap = shop ? capOf(game.catalog.find((c) => c.type === 'shop')!, shop) : 0;
     if (!bakery || !shop) return <p className="hint">Нужны и пекарня, и магазин.</p>;
     return (
       <QuantityPicker
