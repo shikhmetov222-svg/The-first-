@@ -9,9 +9,10 @@ import { LevelTag } from './Repair';
 
 /** Магазин на маркетплейсе: товары на складе, продажи и выручка после комиссии. */
 export function MarketplaceCard({
-  item, business, busy, onTransfer, onBuyOnMarket, extra,
+  item, business, busy, onTransfer, onBuyOnMarket, extra, rivals,
 }: {
   extra?: ReactNode;
+  rivals?: string[];
   item: CatalogItem;
   business: Business;
   busy: boolean;
@@ -62,6 +63,7 @@ export function MarketplaceCard({
       <p className="hint small" style={{ margin: 0 }}>
         Выручка уже за вычетом комиссии площадки. Каждая продажа — посылка для ПВЗ.
       </p>
+      <Rivals names={rivals} what="магазины" />
       <div className="actions">
         <button className="button light small" disabled={busy || business.listed} onClick={onTransfer}>
           <ArrowRightLeft size={16} /> Перевезти своё
@@ -75,7 +77,9 @@ export function MarketplaceCard({
 }
 
 /** Пункт выдачи заказов: посылки за 5 минут, заполненность полки, доход. */
-export function PvzCard({ item, business, extra }: { item: CatalogItem; business: Business; extra?: ReactNode }) {
+export function PvzCard({
+  item, business, extra, rivals,
+}: { item: CatalogItem; business: Business; extra?: ReactNode; rivals?: string[] }) {
   const cap = capOf(item, business);
   const pct = Math.min(100, (business.stock / cap) * 100);
   return (
@@ -111,6 +115,17 @@ export function PvzCard({ item, business, extra }: { item: CatalogItem; business
       <p className="hint small" style={{ margin: 0 }}>
         Работает сам: посылки приходят от маркетплейсов игроков и от жителей города.
       </p>
+      <Rivals names={rivals} what="пункты" />
     </section>
+  );
+}
+
+/** Строка о NPC-конкурентах: их становится меньше, когда в городе больше игроков. */
+function Rivals({ names, what }: { names?: string[]; what: string }) {
+  if (!names || names.length === 0) return null;
+  return (
+    <p className="stat-label small" style={{ margin: 0 }}>
+      Конкуренты (NPC-{what}): {names.join(', ')}
+    </p>
   );
 }

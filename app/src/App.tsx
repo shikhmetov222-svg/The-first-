@@ -351,6 +351,7 @@ function Game() {
                 item={item}
                 business={business}
                 extra={adStrip(business)}
+                rivals={game.npc_niches?.marketplace}
                 busy={busy}
                 onTransfer={() => setTransferring(true)}
                 onBuyOnMarket={() => {
@@ -361,7 +362,9 @@ function Game() {
             );
           }
           if (business && item.type === 'pvz') {
-            return <PvzCard key={item.type} item={item} business={business} extra={adStrip(business)} />;
+            return (
+              <PvzCard key={item.type} item={item} business={business} extra={adStrip(business)} rivals={game.npc_niches?.pvz} />
+            );
           }
           return (
             <BusinessCard
@@ -479,8 +482,8 @@ function Game() {
           onOwn={async (type) => {
             if (await run(() => api.applyCampaign(type), (r) => r, 'purchase')) setAdFor(undefined);
           }}
-          onNpc={async (type) => {
-            if (await run(() => api.buyNpcCampaign(type), (r) => r, 'purchase')) setAdFor(undefined);
+          onNpc={async (type, npc) => {
+            if (await run(() => api.buyNpcCampaign(type, npc), (r) => r, 'purchase')) setAdFor(undefined);
           }}
           onMarket={() => {
             setAdFor(undefined);

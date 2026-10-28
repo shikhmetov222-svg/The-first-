@@ -223,13 +223,13 @@ export function RepairCard({
         <div className="grow">
           <h3>{item.name}</h3>
           <div className="stat-label">
-            1 заказ за {String(hours).replace('.', ',')} ч ·{' '}
+            1 заказ за {String(hours).replace('.', ',')} ч · от игроков за сутки {money(crew?.earned_24h ?? 0)} ·{' '}
             {crew?.rating == null ? 'заказов ещё не было' : `вовремя ${Math.round(crew.rating * 100)}%`}
           </div>
         </div>
         <div className="right">
-          <div className="stat-label small">за сутки</div>
-          <div className="kassa">{money(crew?.earned_24h ?? 0)}</div>
+          <div className="stat-label small">в кассе</div>
+          <div className="kassa">{money(business.pending_revenue)}</div>
         </div>
       </div>
 
@@ -246,9 +246,16 @@ export function RepairCard({
       </div>
 
       {queue.length === 0 ? (
-        <p className="hint small" style={{ margin: 0 }}>
-          Заказов нет. Игроки видят твою бригаду, когда улучшают бизнес. Чем ниже цена и выше рейтинг — тем чаще выбирают.
-        </p>
+        crew?.npc_job_until && new Date(crew.npc_job_until).getTime() > Date.now() + serverOffset ? (
+          <p className="listed-note">
+            <Hammer size={15} /> Городской заказ · ≈ {duration(new Date(crew.npc_job_until).getTime() - (Date.now() + serverOffset))}
+          </p>
+        ) : (
+          <p className="hint small" style={{ margin: 0 }}>
+            Заказов от игроков нет — бригада берёт городские заказы, деньги приходят в кассу. Игроки видят твою бригаду,
+            когда улучшают бизнес.
+          </p>
+        )
       ) : (
         <ul className="list crew-queue">
           {queue.map((o) => {

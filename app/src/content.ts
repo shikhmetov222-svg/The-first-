@@ -62,6 +62,9 @@ export const ACHIEVEMENTS: { code: string; title: string; hint: string; icon: Lu
   { code: 'decisions10', title: 'Решала', hint: 'Прими 10 решений дня.', icon: Scale },
   { code: 'sold1000', title: 'Тысяча продаж', hint: 'Продай 1000 единиц товара за неделю.', icon: Package },
   { code: 'invite', title: 'Друг в деле', hint: 'Пригласи друга по своей ссылке.', icon: UserPlus },
+  { code: 'first_parcel', title: 'Первая посылка', hint: 'Продай товар через маркетплейс или выдай посылку в ПВЗ.', icon: PackageCheck },
+  { code: 'ad_magnate', title: 'Рекламный магнат', hint: 'Продай 50 рекламных кампаний.', icon: Megaphone },
+  { code: 'foreman', title: 'Прораб', hint: 'Выполни 20 заказов ремонтной бригадой.', icon: Hammer },
   { code: 'crisis', title: 'Антикризисный', hint: 'Доиграй сезон «Кризис», сохранив больше половины стартового капитала.', icon: ShieldAlert },
 ];
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Bot, CalendarClock, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
+  BarChart3, Bot, CalendarClock, Package, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
   Warehouse, Wrench,
 } from 'lucide-react';
 import { api, type DevInfo, type GameState } from '../api';
@@ -37,6 +37,7 @@ const ACTIONS: Record<string, string> = {
   stock_add: 'Товар добавлен',
   open_business: 'Бизнес бесплатно',
   campaigns_add: 'Выданы кампании',
+  parcels_add: 'Фоновые посылки',
   finish_repairs: 'Ремонты завершены',
   set_level: 'Уровень бизнеса',
   ticks: 'Тики рынка',
@@ -58,6 +59,7 @@ export function DevPanel({ game, onState, onToast }: Props) {
   const [product, setProduct] = useState('coffee');
   const [qty, setQty] = useState('100');
   const [ticks, setTicks] = useState('12');
+  const [parcels, setParcels] = useState('50');
   const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
@@ -294,6 +296,66 @@ export function DevPanel({ game, onState, onToast }: Props) {
           следующем этапе.
         </p>
       </DevSection>
+
+      <DevSection icon={<Package size={18} />} title="Посылки и NPC в новых нишах">
+        <div className="actions">
+          <input className="input" inputMode="numeric" value={parcels} onChange={(e) => setParcels(e.target.value)} />
+          <button
+            className="button small"
+            disabled={busy || !(Number(parcels) >= 1 && Number(parcels) <= 10000)}
+            onClick={() => run('parcels', { n: Math.floor(Number(parcels)) })}
+          >
+            Добавить посылки
+          </button>
+        </div>
+        <p className="hint small">Фоновые посылки сразу раскладываются по ПВЗ игроков, пропорционально полкам.</p>
+        {info.npc_niches && (
+          <ul className="list">
+            {info.npc_niches.map((n) => (
+              <li key={n.name} className={n.active ? '' : 'dim'}>
+                <span>
+                  {n.name}{' '}
+                  <span className="stat-label">
+                    · {n.kind === 'marketplace' ? 'маркетплейс' : n.kind === 'pvz' ? 'ПВЗ' : 'агентство'}
+                  </span>
+                </span>
+                <span>
+                  {n.active
+                    ? n.kind === 'agency'
+                      ? 'работает'
+                      : `${n.last_count} ${n.kind === 'pvz' ? 'посылок' : 'продаж'} за тик`
+                    : `ушёл (игроков ≥ ${n.max_players})`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {info.live_players !== undefined && (
+          <p className="hint small">Живых игроков за сутки: {info.live_players}. NPC уходят, когда игроков становится больше их порога.</p>
+        )}
+      </DevSection>
+
+      {info.analytics && (
+        <DevSection icon={<BarChart3 size={18} />} title="Аналитика бизнесов">
+          <ul className="list">
+            {info.analytics.map((a) => (
+              <li key={a.type}>
+                <span>
+                  <b>{a.name}</b>
+                  <div className="stat-label">
+                    открыто {count(a.opened)} (за 7 дн. {count(a.opened_7d)}) · сейчас у {count(a.owners)}
+                  </div>
+                </span>
+                <span className="right">
+                  <b>{money(a.revenue_7d)}</b>
+                  <div className="stat-label">7 дн. · сегодня {money(a.revenue_1d)}</div>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="hint small">Выручка всех игроков, кроме тестовых: продажи, посылки, кампании, заказы бригад.</p>
+        </DevSection>
+      )}
 
       <DevSection icon={<Bot size={18} />} title="Рынок и боты">
         {info.markets.map((m) => (

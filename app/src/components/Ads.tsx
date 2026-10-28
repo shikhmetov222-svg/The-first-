@@ -134,7 +134,7 @@ export function CampaignSheet({
   serverOffset: number;
   busy: boolean;
   onOwn: (type: BusinessType) => void;
-  onNpc: (type: BusinessType) => void;
+  onNpc: (type: BusinessType, npc?: number) => void;
   onMarket: () => void;
   onClose: () => void;
 }) {
@@ -192,20 +192,25 @@ export function CampaignSheet({
                     <b className="up">бесплатно</b>
                   </button>
                 )}
-                <button
-                  className="ad-option"
-                  disabled={busy || game.player.cash < ads.npc_price || !type}
-                  onClick={() => type && onNpc(type)}
-                >
-                  <span className="logo-fallback bot-logo">
-                    <Bot size={18} />
-                  </span>
-                  <span className="grow">
-                    <b>«{ads.npc_name}»</b>
-                    <span className="stat-label">NPC-агентство, всегда есть</span>
-                  </span>
-                  <b>{money(ads.npc_price)}</b>
-                </button>
+                {(ads.npc ?? [{ id: undefined as number | undefined, name: ads.npc_name, price: ads.npc_price }]).map((n) => (
+                  <button
+                    key={n.name}
+                    className="ad-option"
+                    disabled={busy || game.player.cash < n.price || !type}
+                    onClick={() => type && onNpc(type, n.id)}
+                  >
+                    <span className="logo-fallback bot-logo">
+                      <Bot size={18} />
+                    </span>
+                    <span className="grow">
+                      <b>«{n.name}»</b>
+                      <span className="stat-label">
+                        {n.name === ads.npc_name ? 'NPC-агентство, всегда есть' : 'NPC-агентство, пока в городе мало игроков'}
+                      </span>
+                    </span>
+                    <b>{money(n.price)}</b>
+                  </button>
+                ))}
                 <button className="ad-option" disabled={busy} onClick={onMarket}>
                   <span className="logo-fallback">
                     <ShoppingCart size={18} />

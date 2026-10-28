@@ -136,6 +136,7 @@ export interface CrewOrder {
 }
 
 export interface CrewInfo {
+  npc_job_until?: string | null; // идёт городской заказ
   pct: number;
   rating: number | null;
   done: number;
@@ -190,6 +191,7 @@ export interface AdsConfig {
   npc_price: number; // цена у NPC-агентства, коп.
   npc_name: string;
   minutes_per_campaign: number; // агентство делает одну кампанию за столько минут
+  npc?: { id: number; name: string; price: number }[]; // работающие NPC-агентства, от дешёвого
 }
 
 export interface SummaryItem {
@@ -275,6 +277,7 @@ export interface GameState {
   unread?: number;
   ads?: AdsConfig;
   upgrade?: UpgradeConfig;
+  npc_niches?: { marketplace?: string[]; pvz?: string[] } | null; // NPC-конкуренты в новых нишах
 }
 
 export interface DevInfo {
@@ -305,6 +308,17 @@ export interface DevInfo {
     buyer: string;
   }[];
   flagged_24h?: number;
+  analytics?: {
+    type: BusinessType;
+    name: string;
+    opened: number;
+    opened_7d: number;
+    revenue_7d: number;
+    revenue_1d: number;
+    owners: number;
+  }[];
+  npc_niches?: { kind: string; name: string; active: boolean; max_players: number; last_count: number }[];
+  live_players?: number;
 }
 
 export interface LoginResult extends GameState {
@@ -437,7 +451,7 @@ export const api = {
   buyLot: (lot: number, qty: number, dest?: string) =>
     call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty, dest }),
   applyCampaign: (type: BusinessType) => call<WithResult<string>>('apply_campaign', { type }),
-  buyNpcCampaign: (type: BusinessType) => call<WithResult<string>>('buy_npc_campaign', { type }),
+  buyNpcCampaign: (type: BusinessType, npc?: number) => call<WithResult<string>>('buy_npc_campaign', { type, npc }),
   repairOffers: (type: BusinessType) => call<{ offers: RepairOffers }>('repair_offers', { type }),
   /** contractor: 'npc', 'self' или id бригады другого игрока. */
   orderUpgrade: (type: BusinessType, contractor: string) =>

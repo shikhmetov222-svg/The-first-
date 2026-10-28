@@ -207,7 +207,12 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       ...(typeof b.dest === 'string' && b.dest ? { p_dest: str(b, 'dest') } : {}),
     })),
   apply_campaign: action((id, b) => rpc('apply_campaign', { p_player: id, p_type: str(b, 'type') })),
-  buy_npc_campaign: action((id, b) => rpc('buy_npc_campaign', { p_player: id, p_type: str(b, 'type') })),
+  buy_npc_campaign: action((id, b) =>
+    rpc('buy_npc_campaign', {
+      p_player: id,
+      p_type: str(b, 'type'),
+      ...(typeof b.npc === 'number' ? { p_npc: int(b, 'npc') } : {}),
+    })),
   // ---------- Улучшения и ремонт ----------
   repair_offers: async (user, b) => ({
     offers: await rpc('repair_offers', { p_player: await playerId(user), p_type: str(b, 'type') }),
@@ -252,6 +257,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       open_business: () => rpc('dev_open_business', { p_admin: id, p_type: str(b, 'type') }),
       campaigns: () => rpc('dev_campaigns', { p_admin: id, p_n: int(b, 'n') }),
       finish_repairs: () => rpc('dev_finish_repairs', { p_admin: id }),
+      parcels: () => rpc('dev_parcels', { p_admin: id, p_n: int(b, 'n') }),
       set_level: () => rpc('dev_set_level', { p_admin: id, p_type: str(b, 'type'), p_level: int(b, 'level') }),
       ticks: () => rpc('dev_ticks', { p_admin: id, p_n: int(b, 'n') }),
       new_decision: () => rpc('dev_new_decision', { p_admin: id }),
