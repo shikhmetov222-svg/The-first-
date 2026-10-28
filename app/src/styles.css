@@ -2543,3 +2543,60 @@ h2.section-title {
 .crew-queue li {
   align-items: center;
 }
+
+/* ---------- 3D-улица ---------- */
+
+.street-stage {
+  position: relative;
+  height: clamp(280px, 44vh, 420px);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #10131d;
+}
+
+/* Вертикальный свайп листает экран, горизонтальный — улицу. */
+.street-stage canvas {
+  display: block;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.street-stage canvas:active {
+  cursor: grabbing;
+}
+
+.street-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(11, 12, 15, 0.78);
+  color: #c9ccd3;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.street-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 14px;
+  background: linear-gradient(180deg, #161a28 0%, #10131d 55%, #1b2620 100%);
+}
+
+.street-fps {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(11, 12, 15, 0.78);
+  color: var(--up);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}

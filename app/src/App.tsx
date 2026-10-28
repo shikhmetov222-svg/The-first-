@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Business, type BusinessType, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
@@ -25,6 +25,9 @@ import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
 import { CompanyForm } from './components/CompanyForm';
 import { Tutorial, type TutorialStep } from './components/Tutorial';
 import type { CompanyInput } from './api';
+
+// 3D-улица грузится отдельным файлом, уже после основного интерфейса.
+const Street = lazy(() => import('./street/Street'));
 
 const POLL_MS = 60_000;
 const MIN_LOADING_MS = 1200; // чтобы экран загрузки не мелькал
@@ -265,6 +268,10 @@ function Game() {
 
       {tab === 'empire' && (
       <>
+      <Suspense fallback={<StreetPlaceholder />}>
+        <Street showFps={isAdmin} />
+      </Suspense>
+
       <CapitalCard game={game} serverOffset={serverOffset} pending={pending} busy={busy} onCollect={collect} />
 
       {game.effects.length > 0 && (
@@ -552,6 +559,15 @@ function tutorialSteps(game: GameState, pending: number): TutorialStep[] {
     },
     third,
   ];
+}
+
+/** 2D-заглушка, пока грузится 3D-улица. */
+function StreetPlaceholder() {
+  return (
+    <div className="street-stage street-placeholder">
+      <span>Строим улицу…</span>
+    </div>
+  );
 }
 
 function wait(ms: number) {

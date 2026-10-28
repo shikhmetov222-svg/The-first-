@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CAPITAL 3D-улица</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Unbounded:wght@600;700&display=swap">
+<style>
+/* Layout: one phone-width column — 3D stage on top, the business rows that drive it below. Dark only, like the game. */
+:root{
+  --bg:#0B0C0F; --surface:#15171C; --sunk:#0F1014; --line:#23262E;
+  --fg:#F2F2F4; --muted:#9EA3AD; --gold:#D4A73A; --gold-soft:#2A2312; --gold-ink:#0B0C0F;
+  --display:'Unbounded','Manrope',system-ui,sans-serif;
+  --body:'Manrope',system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);margin:0}
+.wrap{max-width:760px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+.brand{font-family:var(--display);font-weight:700;letter-spacing:.16em;color:var(--gold);font-size:13px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(22px,5.4vw,30px);line-height:1.15;margin:6px 0 8px;text-wrap:balance}
+header p{margin:0;color:var(--muted);line-height:1.5;max-width:60ch;font-size:15px}
+.stage{position:relative;height:clamp(380px,62vh,560px);border-radius:24px;overflow:hidden;border:1px solid var(--line);background:#10131d}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.stage-msg{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted);line-height:1.5}
+.toggle{position:absolute;top:12px;right:12px;display:flex;gap:2px;padding:3px;border-radius:12px;background:rgba(11,12,15,.82);border:1px solid var(--line)}
+.toggle button{min-height:36px;padding:0 14px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:700 13px var(--body);cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink)}
+.hint{position:absolute;left:12px;bottom:12px;max-width:calc(100% - 24px);padding:6px 10px;border-radius:10px;background:rgba(11,12,15,.78);color:#C9CCD3;font-size:12px;pointer-events:none}
+.slots{display:flex;flex-direction:column;gap:10px}
+.slot{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px;transition:border-color .35s}
+.slot.flash{border-color:var(--gold)}
+.slot-head{display:flex;align-items:center;gap:12px}
+.dot{width:12px;height:12px;border-radius:4px;flex:none}
+.slot-title{flex:1;min-width:0}
+.slot-name{font-weight:800;font-size:16px}
+.slot-desc{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.4}
+.lvl{font-size:12px;font-weight:800;color:var(--gold);background:var(--gold-soft);padding:5px 9px;border-radius:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.slot-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:6px;flex:1 1 220px;min-width:0;flex-wrap:wrap}
+.chip{min-width:44px;height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:700 14px var(--body);cursor:pointer;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
+.up{height:44px;padding:0 20px;border-radius:12px;border:0;background:var(--gold);color:var(--gold-ink);font:800 14px var(--body);cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.note{font-size:13px;color:var(--muted);line-height:1.55;margin:0;max-width:62ch}
+.env{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.env-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.env-label{font-weight:800;font-size:15px;min-width:64px}
+.seg{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 240px;min-width:0}
+.seg button{flex:1 1 0;min-width:84px;height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:700 14px var(--body);cursor:pointer}
+.seg button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
+.env-note{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">CAPITAL</div>
+    <h1>Твоя улица в 3D</h1>
+    <p>Семь бизнесов, у каждого свой облик и путь роста по пяти уровням: от гаража с коробками до логистического хаба, от бытовки до девелопера. Листай улицу пальцем влево и вправо.</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="stage-msg" id="msg">Загружаем 3D…</div>
+    <div class="toggle" role="group" aria-label="Время суток">
+      <button type="button" id="btn-day" aria-pressed="false">День</button>
+      <button type="button" id="btn-night" aria-pressed="true">Ночь</button>
+    </div>
+    <div class="hint">Листай пальцем · щипок — приблизить · двойной тап — вернуть вид</div>
+  </div>
+
+  <section class="env" aria-label="Окружение">
+    <div class="env-row">
+      <span class="env-label">Район</span>
+      <div class="seg" role="group" aria-label="Район">
+        <button type="button" id="dist-0" aria-pressed="false">Окраина</button>
+        <button type="button" id="dist-1" aria-pressed="true">Район</button>
+        <button type="button" id="dist-2" aria-pressed="false">Центр</button>
+      </div>
+    </div>
+    <div class="env-row">
+      <span class="env-label">Погода</span>
+      <div class="seg" role="group" aria-label="Погода">
+        <button type="button" id="wx-clear" aria-pressed="true">Ясно</button>
+        <button type="button" id="wx-rain" aria-pressed="false">Дождь</button>
+        <button type="button" id="wx-snow" aria-pressed="false">Снег</button>
+      </div>
+    </div>
+    <p class="env-note">В игре район меняется сам: улица благоустраивается по мере роста капитала. Фургон привозит товар, когда пополняешь склад, а щит у дороги показывает твою рекламу.</p>
+  </section>
+
+  <section class="slots" id="slots" aria-label="Бизнесы на улице"></section>
+
+  <p class="note">Это макет: здания собраны из простых фигур. В игре их заменят готовые low-poly модели в том же стиле, а облик каждого бизнеса, уровни, стройка, дым из труб, монетки и прохожие останутся такими же.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="street-mockup.js"></script>
+</body>
+</html>
