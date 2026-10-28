@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Info } from 'lucide-react';
+import { Info, Megaphone } from 'lucide-react';
 import type { BusinessLot, BusinessType, GameState, GoodsPrice, Lot, Product, Source } from '../api';
-import { PRODUCTS, SELL_SOURCES } from '../content';
+import { ADVERTISABLE, PRODUCTS, SELL_SOURCES } from '../content';
+import { activeAds } from './Ads';
 import { count, money } from '../format';
 import { FEE, available, freeSpace, marketplaceSpace, priceCorridor, vsMarket } from '../market';
 import { selectionTick } from '../telegram';
@@ -55,6 +56,23 @@ export function BuySheet({
   market: GoodsPrice | undefined;
   toMarketplace?: boolean;
   busy: boolean;
+  onBuy: (qty: number, dest?: string) => void;
+  onClose: () => void;
+}) {
+  if (lot.product === 'campaign') {
+    return <BuyCampaignSheet lot={lot} game={game} market={market} busy={busy} onBuy={onBuy} onClose={onClose} />;
+  }
+  return <BuyGoodsSheet lot={lot} game={game} market={market} toMarketplace={toMarketplace} busy={busy} onBuy={onBuy} onClose={onClose} />;
+}
+
+function BuyGoodsSheet({
+  lot, game, market, toMarketplace, busy, onBuy, onClose,
+}: {
+  lot: Lot;
+  game: GameState;
+  market: GoodsPrice | undefined;
+  toMarketplace: boolean;
+  busy: boolean;
   onBuy: (qty: number) => void;
   onClose: () => void;
 }) {
@@ -99,6 +117,76 @@ export function BuySheet({
           <button className="button" disabled={busy} onClick={() => onBuy(qty)}>
             Купить {count(qty)} шт. за {money(qty * lot.price)}
           </button>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/** Кампания с рынка сразу запускается на выбранный бизнес — на склад она не ложится. */
+function BuyCampaignSheet({
+  lot, game, market, busy, onBuy, onClose,
+}: {
+  lot: Lot;
+  game: GameState;
+  market: GoodsPrice | undefined;
+  busy: boolean;
+  onBuy: (qty: number, dest: string) => void;
+  onClose: () => void;
+}) {
+  const maxAds = game.ads?.max ?? 2;
+  const targets = game.businesses.filter((b) => ADVERTISABLE.includes(b.type) && !b.listed);
+  const [type, setType] = useState(targets[0]?.type);
+  const target = targets.find((b) => b.type === type);
+  const slots = target ? Math.max(0, maxAds - activeAds(target, 0).length) : 0;
+  const affordable = Math.floor(game.player.cash / lot.price);
+  const max = Math.max(0, Math.min(lot.qty_left, slots, affordable));
+  const [qty, setQty] = useState(1);
+  const q = Math.max(1, Math.min(qty, max));
+  const cmp = market ? vsMarket(lot.price, market.price) : null;
+
+  return (
+    <Sheet onClose={onClose}>
+      <h2>
+        <Megaphone size={22} /> Реклама · {money(lot.price)} за шт.
+      </h2>
+      <div className="lot-seller">
+        {lot.seller.icon ? <CompanyLogo icon={lot.seller.icon} color={lot.seller.color ?? 'gold'} size={28} /> : null}
+        <span>
+          {lot.seller.name}
+          {lot.seller.dev && <DevBadge />}
+        </span>
+        <span className="stat-label">· в лоте {count(lot.qty_left)} шт.</span>
+      </div>
+      {cmp && cmp.pct > 0 && (
+        <p className={`small ${cmp.cheaper ? 'up' : 'warn'}`} style={{ margin: 0 }}>
+          {cmp.cheaper ? '▼' : '▲'} на {cmp.pct}% {cmp.cheaper ? 'дешевле' : 'дороже'} базовой цены
+        </p>
+      )}
+      <p className="hint small" style={{ margin: 0 }}>
+        <Info size={13} /> Кампания запустится сразу на выбранный бизнес.
+      </p>
+      {targets.length === 0 ? (
+        <p className="warning">Рекламировать нечего: открой кофейню, магазин, маркетплейс или ПВЗ.</p>
+      ) : (
+        <>
+          <div className="dev-row">
+            {targets.map((b) => (
+              <button key={b.type} className={`chip ${b.type === type ? 'chip-active' : ''}`} onClick={() => setType(b.type)}>
+                {game.catalog.find((c) => c.type === b.type)?.name} · {activeAds(b, 0).length}/{maxAds}
+              </button>
+            ))}
+          </div>
+          {max <= 0 ? (
+            <p className="warning">{slots <= 0 ? `На этом бизнесе уже ${maxAds} кампании` : 'Не хватает денег'}</p>
+          ) : (
+            <>
+              {max > 1 && <Qty value={q} max={max} onChange={setQty} />}
+              <button className="button" disabled={busy || !type} onClick={() => type && onBuy(q, type)}>
+                Купить и запустить {q > 1 ? `${q} шт. ` : ''}за {money(q * lot.price)}
+              </button>
+            </>
+          )}
         </>
       )}
     </Sheet>
@@ -227,7 +315,7 @@ export function SellSheet({
                 <div className="calc-total"><span>Получишь сразу</span><b>{money(q * market.wholesale)}</b></div>
               </div>
               <p className="hint small">
-                <Info size={13} /> Оптовик берёт всё и сразу, но дёшево — 70% рыночной цены. Без комиссии.
+                <Info size={13} /> Оптовик берёт всё и сразу, но дёшево. Без комиссии.
               </p>
               <button
                 className="button secondary"

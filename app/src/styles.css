@@ -2092,7 +2092,7 @@ h2.section-title {
 
 .price-tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 
@@ -2432,4 +2432,73 @@ h2.section-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- Реклама ---------- */
+
+.ad-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.ad-strip.ad-off {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+}
+
+.ad-strip.ad-on {
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  background: rgba(244, 114, 182, 0.12);
+  color: #f472b6;
+}
+
+.ad-strip:disabled {
+  opacity: 0.5;
+}
+
+.ad-timer {
+  margin-left: auto;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ad-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ad-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.ad-option .grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ad-option:disabled {
+  opacity: 0.45;
 }

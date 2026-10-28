@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ArrowRightLeft, PackageCheck, ShoppingCart } from 'lucide-react';
 import type { Business, CatalogItem } from '../api';
 import { PRODUCTS } from '../content';
@@ -6,8 +7,9 @@ import { BizIcon } from './BizIcon';
 
 /** Магазин на маркетплейсе: товары на складе, продажи и выручка после комиссии. */
 export function MarketplaceCard({
-  item, business, busy, onTransfer, onBuyOnMarket,
+  item, business, busy, onTransfer, onBuyOnMarket, extra,
 }: {
+  extra?: ReactNode;
   item: CatalogItem;
   business: Business;
   busy: boolean;
@@ -30,6 +32,7 @@ export function MarketplaceCard({
           <div className="kassa">{money(business.last_revenue ?? 0)}</div>
         </div>
       </div>
+      {extra}
       <div className="goods-row">
         {(['coffee', 'bread', 'flour'] as const).map((p) => {
           const Icon = PRODUCTS[p].icon;
@@ -67,7 +70,7 @@ export function MarketplaceCard({
 }
 
 /** Пункт выдачи заказов: посылки за 5 минут, заполненность полки, доход. */
-export function PvzCard({ item, business }: { item: CatalogItem; business: Business }) {
+export function PvzCard({ item, business, extra }: { item: CatalogItem; business: Business; extra?: ReactNode }) {
   const pct = Math.min(100, (business.stock / item.capacity) * 100);
   return (
     <section className="card biz">
@@ -84,6 +87,7 @@ export function PvzCard({ item, business }: { item: CatalogItem; business: Busin
           <div className="kassa">{money(business.pending_revenue)}</div>
         </div>
       </div>
+      {extra}
       <div>
         <div className="bar-text">
           <span>Полка</span>

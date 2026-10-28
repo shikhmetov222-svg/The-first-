@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Lock, Moon, Store, Tag, TriangleAlert, Truck, Upload } from 'lucide-react';
 import type { Business, CatalogItem, Market } from '../api';
 import { BUSINESS_INFO, demandLabel } from '../content';
@@ -16,6 +17,8 @@ interface Props {
   busy: boolean;
   onOpen: () => void;
   onAction: (kind: CardAction) => void;
+  /** Полоска рекламы под заголовком. */
+  extra?: ReactNode;
 }
 
 export function BusinessCard(props: Props) {
@@ -65,7 +68,7 @@ function LockedCard({ item, cash, busy, onOpen }: Props) {
   );
 }
 
-function OpenCard({ item, business, market, hasBakery, hasShop, busy: anyBusy, onAction }: Props & { business: Business }) {
+function OpenCard({ item, business, market, hasBakery, hasShop, busy: anyBusy, onAction, extra }: Props & { business: Business }) {
   const isFactory = item.production_rate > 0;
   // Бизнес на продаже заморожен: кнопки неактивны, пока лот не снят.
   const busy = anyBusy || Boolean(business.listed);
@@ -84,6 +87,7 @@ function OpenCard({ item, business, market, hasBakery, hasShop, busy: anyBusy, o
         </div>
         {!isFactory && market && business.price ? <PriceBadge price={business.price} market={market.market_price} /> : null}
       </div>
+      {extra}
 
       {!isFactory && market && business.price ? (
         <div className="price-line">

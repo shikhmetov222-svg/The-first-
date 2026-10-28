@@ -106,6 +106,18 @@ export interface Business {
   listed?: boolean; // выставлен на продажу — заморожен
   goods?: Partial<Record<'coffee' | 'bread' | 'flour', number>> | null; // склад маркетплейса
   last_revenue?: number; // выручка за последние 5 минут (после комиссий)
+  progress?: number; // агентство: готовность следующей кампании, 0…1
+  ads?: string[]; // окончания активных рекламных кампаний
+}
+
+/** Настройки рекламы с сервера (числа берутся из конфига баланса). */
+export interface AdsConfig {
+  boost: number; // 0.25 = +25% спроса
+  minutes: number; // сколько действует одна кампания
+  max: number; // кампаний на один бизнес одновременно
+  npc_price: number; // цена у NPC-агентства, коп.
+  npc_name: string;
+  minutes_per_campaign: number; // агентство делает одну кампанию за столько минут
 }
 
 export interface SummaryItem {
@@ -189,6 +201,7 @@ export interface GameState {
   is_admin?: boolean; // решает сервер по секрету ADMIN_TELEGRAM_IDS
   notifications?: { id: number; text: string; at: string; read: boolean }[];
   unread?: number;
+  ads?: AdsConfig;
 }
 
 export interface DevInfo {
@@ -227,8 +240,8 @@ export interface LoginResult extends GameState {
   season_result: SeasonResult | null;
 }
 
-export type Product = 'coffee' | 'bread' | 'flour';
-export type Source = 'coffee' | 'shop' | 'bakery';
+export type Product = 'coffee' | 'bread' | 'flour' | 'campaign';
+export type Source = 'coffee' | 'shop' | 'bakery' | 'agency';
 
 export interface GoodsPrice {
   product: Product;
@@ -347,8 +360,11 @@ export const api = {
   createLot: (p: { product: Product; source: Source; qty: number; price: number }) =>
     call<WithResult<string> & { market: MarketView }>('create_lot', p),
   cancelLot: (lot: number) => call<WithResult<string> & { market: MarketView }>('cancel_lot', { lot }),
-  buyLot: (lot: number, qty: number, dest?: 'marketplace') =>
+  /** dest: 'marketplace' — на склад маркетплейса; для кампании — бизнес, которому нужна реклама. */
+  buyLot: (lot: number, qty: number, dest?: string) =>
     call<WithResult<string> & { market: MarketView }>('buy_lot', { lot, qty, dest }),
+  applyCampaign: (type: BusinessType) => call<WithResult<string>>('apply_campaign', { type }),
+  buyNpcCampaign: (type: BusinessType) => call<WithResult<string>>('buy_npc_campaign', { type }),
   marketplaceTransfer: (p: { product: Product; source: Source; qty: number }) =>
     call<WithResult<string>>('marketplace_transfer', p),
   sellWholesale: (p: { product: Product; source: Source; qty: number }) =>

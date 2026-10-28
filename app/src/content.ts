@@ -7,7 +7,7 @@ import {
   Building2, CalendarCheck, Coffee, Croissant, Gem, Medal, Package, Scale, ShieldAlert, Store, Trophy,
   UserPlus, type LucideIcon,
 } from 'lucide-react';
-import type { BusinessType } from './api';
+import type { BusinessType, Product, Source } from './api';
 
 // Тексты и иконки для экрана. Только оформление — все числа приходят с сервера.
 export const BUSINESS_INFO: Record<BusinessType, { icon: LucideIcon; about: string }> = {
@@ -65,16 +65,21 @@ export const ACHIEVEMENTS: { code: string; title: string; hint: string; icon: Lu
   { code: 'crisis', title: 'Антикризисный', hint: 'Доиграй сезон «Кризис», сохранив больше половины стартового капитала.', icon: ShieldAlert },
 ];
 
-export const PRODUCTS: Record<'coffee' | 'bread' | 'flour', { name: string; icon: LucideIcon; color: string }> = {
+export const PRODUCTS: Record<Product, { name: string; icon: LucideIcon; color: string }> = {
   coffee: { name: 'Кофе', icon: Coffee, color: 'coffee' },
   bread: { name: 'Хлеб', icon: Croissant, color: 'bakery' },
   flour: { name: 'Мука', icon: Wheat, color: 'shop' },
+  campaign: { name: 'Реклама', icon: Megaphone, color: 'agency' },
 };
 
+/** Каким бизнесам можно запустить рекламу (у них есть покупатели). */
+export const ADVERTISABLE: BusinessType[] = ['coffee', 'shop', 'marketplace', 'pvz'];
+
 /** Откуда можно выставить товар: товар + склад бизнеса. */
-export const SELL_SOURCES: { product: 'coffee' | 'bread' | 'flour'; source: 'coffee' | 'shop' | 'bakery'; label: string }[] = [
+export const SELL_SOURCES: { product: Product; source: Source; label: string }[] = [
   { product: 'coffee', source: 'coffee', label: 'Кофе · кофейня' },
   { product: 'bread', source: 'shop', label: 'Хлеб · магазин' },
   { product: 'bread', source: 'bakery', label: 'Хлеб · пекарня' },
   { product: 'flour', source: 'bakery', label: 'Мука · пекарня' },
+  { product: 'campaign', source: 'agency', label: 'Кампании · агентство' },
 ];

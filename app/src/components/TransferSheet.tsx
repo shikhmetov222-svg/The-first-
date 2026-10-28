@@ -18,7 +18,7 @@ export function TransferSheet({
   const cap = game.catalog.find((c) => c.type === 'marketplace')?.capacity ?? 0;
   const goods = mp?.goods ?? {};
   const free = Math.max(0, cap - ((goods.coffee ?? 0) + (goods.bread ?? 0) + (goods.flour ?? 0)));
-  const options = SELL_SOURCES.filter((o) => game.businesses.some((b) => b.type === o.source));
+  const options = SELL_SOURCES.filter((o) => o.product !== 'campaign' && game.businesses.some((b) => b.type === o.source));
   const [pick, setPick] = useState(options.find((o) => available(game, o.product, o.source) > 0) ?? options[0]);
   const have = pick ? available(game, pick.product, pick.source) : 0;
   const max = Math.min(have, free);

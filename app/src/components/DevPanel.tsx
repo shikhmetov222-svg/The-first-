@@ -36,6 +36,7 @@ const ACTIONS: Record<string, string> = {
   stock_clear: 'Склады очищены',
   stock_add: 'Товар добавлен',
   open_business: 'Бизнес бесплатно',
+  campaigns_add: 'Выданы кампании',
   ticks: 'Тики рынка',
   new_decision: 'Новое решение дня',
   test_player_create: 'Создан тестовый игрок',
@@ -180,6 +181,11 @@ export function DevPanel({ game, onState, onToast }: Props) {
             </button>
           ))}
         </div>
+        {owned.has('agency') && (
+          <button className="button small secondary" disabled={busy} onClick={() => run('campaigns', { n: 10 })}>
+            Выдать 10 кампаний в агентство
+          </button>
+        )}
         <p className="hint small">Уровней у бизнесов в игре пока нет — когда появятся, здесь будет выбор уровня.</p>
       </DevSection>
 

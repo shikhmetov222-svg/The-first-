@@ -202,9 +202,12 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       p_buyer: id,
       p_lot: int(b, 'lot'),
       p_qty: int(b, 'qty'),
-      // «Куда положить» передаём только для маркетплейса — так работают и старая, и новая версия функции.
-      ...(b.dest === 'marketplace' ? { p_dest: 'marketplace' } : {}),
+      // «Куда»: склад маркетплейса или бизнес, которому нужна реклама. Без него — обычная покупка
+      // (так работают и старая, и новая версия функции в базе).
+      ...(typeof b.dest === 'string' && b.dest ? { p_dest: str(b, 'dest') } : {}),
     })),
+  apply_campaign: action((id, b) => rpc('apply_campaign', { p_player: id, p_type: str(b, 'type') })),
+  buy_npc_campaign: action((id, b) => rpc('buy_npc_campaign', { p_player: id, p_type: str(b, 'type') })),
   marketplace_transfer: action((id, b) =>
     rpc('marketplace_transfer', {
       p_player: id,
@@ -240,6 +243,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       stock_add: () =>
         rpc('dev_stock', { p_admin: id, p_mode: 'add', p_product: str(b, 'product'), p_qty: int(b, 'qty') }),
       open_business: () => rpc('dev_open_business', { p_admin: id, p_type: str(b, 'type') }),
+      campaigns: () => rpc('dev_campaigns', { p_admin: id, p_n: int(b, 'n') }),
       ticks: () => rpc('dev_ticks', { p_admin: id, p_n: int(b, 'n') }),
       new_decision: () => rpc('dev_new_decision', { p_admin: id }),
       test_create: () => rpc('dev_test_players', { p_admin: id, p_mode: 'create' }),

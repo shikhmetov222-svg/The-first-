@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type BusinessType, type GameState, type LoginResult, type SeasonResult } from './api';
+import { api, type Business, type BusinessType, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
 import { AwaySummary } from './components/AwaySummary';
@@ -17,6 +17,7 @@ import { NotificationsSheet } from './components/NotificationsSheet';
 import { CatalogSheet } from './components/CatalogSheet';
 import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
+import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
@@ -49,8 +50,12 @@ function Game() {
   const [transferring, setTransferring] = useState(false);
   const [buyToMarketplace, setBuyToMarketplace] = useState(false);
 
-  const [sellPreset, setSellPreset] = useState<'coffee' | 'shop' | 'bakery' | null>(null);
+  const [sellPreset, setSellPreset] = useState<Source | null>(null);
   const clearSellPreset = useCallback(() => setSellPreset(null), []);
+  const [productPreset, setProductPreset] = useState<Product | null>(null);
+  const clearProductPreset = useCallback(() => setProductPreset(null), []);
+  // Окно запуска рекламы: undefined — закрыто; null — без выбранного бизнеса.
+  const [adFor, setAdFor] = useState<BusinessType | null | undefined>(undefined);
 
   // Настройка вибрации хранится на сервере.
   const hapticsSetting = game?.player.haptics;
@@ -246,6 +251,8 @@ function Game() {
           onSellPresetUsed={clearSellPreset}
           buyToMarketplace={buyToMarketplace}
           onBuyToMarketplaceOff={() => setBuyToMarketplace(false)}
+          productPreset={productPreset}
+          onProductPresetUsed={clearProductPreset}
         />
       )}
       {tab === 'dev' && isAdmin && <DevPanel game={game} onState={setGame} onToast={showToast} />}
@@ -293,12 +300,32 @@ function Game() {
         .filter((item) => owned.has(item.type) || (game.businesses.length === 0 && (item.category ?? 'classic') === 'classic'))
         .map((item) => {
           const business = game.businesses.find((b) => b.type === item.type);
+          const adStrip = (b: Business) => (
+            <AdStrip business={b} ads={game.ads} serverOffset={serverOffset} busy={busy} onOpen={() => setAdFor(b.type)} />
+          );
+          if (business && item.type === 'agency') {
+            return (
+              <AgencyCard
+                key={item.type}
+                item={item}
+                business={business}
+                ads={game.ads}
+                busy={busy}
+                onLaunch={() => setAdFor(null)}
+                onSell={() => {
+                  setSellPreset('agency');
+                  setTab('market');
+                }}
+              />
+            );
+          }
           if (business && item.type === 'marketplace') {
             return (
               <MarketplaceCard
                 key={item.type}
                 item={item}
                 business={business}
+                extra={adStrip(business)}
                 busy={busy}
                 onTransfer={() => setTransferring(true)}
                 onBuyOnMarket={() => {
@@ -308,7 +335,9 @@ function Game() {
               />
             );
           }
-          if (business && item.type === 'pvz') return <PvzCard key={item.type} item={item} business={business} />;
+          if (business && item.type === 'pvz') {
+            return <PvzCard key={item.type} item={item} business={business} extra={adStrip(business)} />;
+          }
           return (
             <BusinessCard
               key={item.type}
@@ -318,11 +347,12 @@ function Game() {
               cash={game.player.cash}
               hasBakery={owned.has('bakery')}
               hasShop={owned.has('shop')}
+              extra={business ? adStrip(business) : undefined}
               busy={busy}
               onOpen={() => setSheet({ kind: 'open', type: item.type })}
               onAction={(kind) => {
                 if (kind === 'sell') {
-                  setSellPreset(item.type as 'coffee' | 'shop' | 'bakery');
+                  setSellPreset(item.type as Source);
                   setTab('market');
                   return;
                 }
@@ -346,7 +376,7 @@ function Game() {
           onClose={() => setSheet(null)}
           onOpenBusiness={async (type: BusinessType) => {
             const name = game.catalog.find((c) => c.type === type)?.name;
-            if (await run(() => api.openBusiness(type), () => `${name} открыта!`, 'purchase')) setSheet(null);
+            if (await run(() => api.openBusiness(type), () => `Бизнес «${name}» открыт!`, 'purchase')) setSheet(null);
           }}
           onRestock={async (type, qty) => {
             if (await run(() => api.restock(type, qty), () => 'Склад пополнен', 'purchase')) setSheet(null);
@@ -409,6 +439,28 @@ function Game() {
           onClose={() => setTransferring(false)}
           onTransfer={async (p) => {
             if (await run(() => api.marketplaceTransfer(p), (r) => r, 'purchase')) setTransferring(false);
+          }}
+        />
+      )}
+
+      {adFor !== undefined && game.ads && (
+        <CampaignSheet
+          game={game}
+          ads={game.ads}
+          preset={adFor ?? undefined}
+          serverOffset={serverOffset}
+          busy={busy}
+          onClose={() => setAdFor(undefined)}
+          onOwn={async (type) => {
+            if (await run(() => api.applyCampaign(type), (r) => r, 'purchase')) setAdFor(undefined);
+          }}
+          onNpc={async (type) => {
+            if (await run(() => api.buyNpcCampaign(type), (r) => r, 'purchase')) setAdFor(undefined);
+          }}
+          onMarket={() => {
+            setAdFor(undefined);
+            setProductPreset('campaign');
+            setTab('market');
           }}
         />
       )}

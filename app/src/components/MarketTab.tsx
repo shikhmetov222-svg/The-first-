@@ -23,9 +23,14 @@ interface Props {
   /** Пришли с карточки маркетплейса: покупки идут на его склад. */
   buyToMarketplace?: boolean;
   onBuyToMarketplaceOff?: () => void;
+  /** Открыть сразу нужный товар (например, «Реклама» из окна запуска рекламы). */
+  productPreset?: Product | null;
+  onProductPresetUsed?: () => void;
 }
 
-export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed, buyToMarketplace, onBuyToMarketplaceOff }: Props) {
+export function MarketTab({
+  game, onState, onToast, sellPreset, onSellPresetUsed, buyToMarketplace, onBuyToMarketplaceOff, productPreset, onProductPresetUsed,
+}: Props) {
   const [view, setView] = useState<MarketView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<Section>('goods');
@@ -51,6 +56,14 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
     const id = window.setInterval(() => document.visibilityState === 'visible' && load(), 30_000);
     return () => window.clearInterval(id);
   }, [load]);
+
+  useEffect(() => {
+    if (productPreset) {
+      setSection('goods');
+      setProduct(productPreset);
+      onProductPresetUsed?.();
+    }
+  }, [productPreset, onProductPresetUsed]);
 
   useEffect(() => {
     if (sellPreset) {
@@ -126,7 +139,7 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
 
       {section === 'goods' && (
         <>
-          {buyToMarketplace && (
+          {buyToMarketplace && product !== 'campaign' && (
             <div className="listed-note">
               <ShoppingBag size={15} /> Покупки идут на склад маркетплейса
               <button className="link-button" onClick={onBuyToMarketplaceOff}>
@@ -135,7 +148,7 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
             </div>
           )}
           <div className="dev-row">
-            {(['coffee', 'bread', 'flour'] as Product[]).map((p) => {
+            {(Object.keys(PRODUCTS) as Product[]).map((p) => {
               const n = view.lots.filter((l) => l.product === p).length;
               return (
                 <button key={p} className={`chip ${product === p ? 'chip-active' : ''}`} onClick={() => setProduct(p)}>
@@ -150,7 +163,11 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
                 <PackageOpen size={26} />
               </div>
               <h2>Лотов пока нет</h2>
-              <p className="hint">Выставь свой товар первым — другие игроки его увидят.</p>
+              <p className="hint">
+                {product === 'campaign'
+                  ? 'Кампании продают игроки с рекламным агентством. А NPC-агентство продаёт их всегда — кнопка «Реклама» на карточке бизнеса.'
+                  : 'Выставь свой товар первым — другие игроки его увидят.'}
+              </p>
             </section>
           ) : (
             <section className="card lots">
@@ -364,8 +381,9 @@ export function MarketTab({ game, onState, onToast, sellPreset, onSellPresetUsed
           toMarketplace={Boolean(buyToMarketplace)}
           busy={busy}
           onClose={() => setBuying(null)}
-          onBuy={async (qty) => {
-            if (await deal(() => api.buyLot(buying.id, qty, buyToMarketplace ? 'marketplace' : undefined))) setBuying(null);
+          onBuy={async (qty, dest) => {
+            const to = buying.product === 'campaign' ? dest : buyToMarketplace ? 'marketplace' : undefined;
+            if (await deal(() => api.buyLot(buying.id, qty, to))) setBuying(null);
           }}
         />
       )}
