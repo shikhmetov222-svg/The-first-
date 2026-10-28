@@ -42,10 +42,14 @@ app/src/
   market.ts          подсказки для рынка и складов (окончательно проверяет сервер)
   telegram.ts        Telegram WebApp: вибрация, initData
   components/        карточки, листы (sheets), рынок, профиль, DevPanel
-  street/            3D-улица: Street.tsx (R3F), world.ts (свет, день/ночь, погода),
+  graphics.ts        режим графики улицы на устройстве: auto / 3d / 2d (localStorage), проверка WebGL
+  street/            3D-улица: Street.tsx (R3F, пауза, FPS и снижение чёткости), world.ts (свет, день/ночь, погода),
                      slots.ts (здания и стройка), life.ts (прохожие, машины, фургон, монетки),
-                     views.ts (данные игры → что показать; без three.js)
+                     merge.ts (ускорение: склейка неподвижных мешей, свечения одним мешем, прохожие инстансами),
+                     views.ts (данные игры → что показать, подмены разработчика, чужая улица; без three.js),
+                     Street2D.tsx + street2d.json (простая графика из картинок; без three.js)
   street/gen/        СГЕНЕРИРОВАНО из docs/street-mockup.js скриптом app/scripts/port-street.py — руками не править
+app/public/street2d/ СГЕНЕРИРОВАНО: PNG каждого бизнеса на каждом уровне — node scripts/render-street2d.mjs (из app/)
 supabase/
   migrations/        0001…0018, по порядку; каждая следующая переопределяет функции целиком (create or replace)
   functions/api/     Edge Function: проверка initData, вызов SQL-функций через rpc

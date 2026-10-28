@@ -110,5 +110,5 @@ export function createDecor(k, scene, env, types) {
     scene.add(decor);
   }
 
-  return { buildDecor, billboard, getFountainJet: () => fountainJet };
+  return { buildDecor, billboard, getFountainJet: () => fountainJet, getDecor: () => decor };
 }

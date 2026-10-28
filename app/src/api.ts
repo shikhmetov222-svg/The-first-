@@ -23,6 +23,8 @@ export interface PublicProfile {
   capital: number;
   place: number | null;
   achievements: { code: string; earned_at: string }[];
+  /** Улица компании (только просмотр); у старого сервера её нет. */
+  street?: { businesses: { type: string; level: number | null }[]; ad: string | null };
 }
 
 export interface SeasonHistoryItem {

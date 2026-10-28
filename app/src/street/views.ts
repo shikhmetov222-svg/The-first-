@@ -14,10 +14,10 @@ export const SLOT_TYPES = [
 
 export type GameType = (typeof SLOT_TYPES)[number]['game'];
 
-/** Уровень здания (0 — участок «Продаётся») и сколько денег собрано на открытие, %. */
+/** Уровень здания (0 — участок «Продаётся») и сколько денег собрано на открытие, % (null — не показывать). */
 export interface SlotView {
   level: number;
-  lotPct: number;
+  lotPct: number | null;
 }
 
 export type StreetViews = Record<GameType, SlotView>;
@@ -95,4 +95,93 @@ export function streetLife(game: GameState, now = Date.now()): StreetLife {
 export const streetBus = new EventTarget();
 export function streetVan(type: GameType) {
   streetBus.dispatchEvent(new CustomEvent('van', { detail: type }));
+}
+export function streetCoin(type: GameType, amount: number) {
+  streetBus.dispatchEvent(new CustomEvent('coin', { detail: { type, amount } }));
+}
+
+/** День — с 7:00 до 19:00 по часам телефона. */
+export function isDaytime(date = new Date()): boolean {
+  const h = date.getHours();
+  return h >= 7 && h < 19;
+}
+
+// ---------- Панель разработчика: что показать на улице вместо данных сервера (только вид, игра не меняется) ----------
+
+export interface StreetDev {
+  day?: boolean;
+  district?: 0 | 1 | 2;
+  weather?: Weather;
+  /** Уровни зданий вместо серверных (0 — участок). */
+  levels?: Partial<Record<GameType, number>>;
+  /** Менять уровень без анимации стройки. */
+  instant?: boolean;
+}
+
+let dev: StreetDev = {};
+const devListeners = new Set<() => void>();
+export const streetDev = {
+  get: () => dev,
+  set(patch: Partial<StreetDev>) {
+    dev = { ...dev, ...patch };
+    devListeners.forEach((f) => f());
+  },
+  reset() {
+    dev = { instant: dev.instant };
+    devListeners.forEach((f) => f());
+  },
+  subscribe(f: () => void) {
+    devListeners.add(f);
+    return () => {
+      devListeners.delete(f);
+    };
+  },
+};
+
+/** Данные сервера с подменами из панели разработчика. */
+export function withDev(views: StreetViews, life: StreetLife, d: StreetDev): { views: StreetViews; life: StreetLife } {
+  const v = { ...views };
+  for (const [type, level] of Object.entries(d.levels ?? {}) as [GameType, number][]) v[type] = { ...v[type], level };
+  return {
+    views: v,
+    life: { ...life, district: d.district ?? life.district, weather: d.weather ?? life.weather },
+  };
+}
+
+// ---------- Улица другого игрока (только просмотр) ----------
+
+export interface CompanyStreetData {
+  businesses: { type: string; level: number | null }[];
+  ad: string | null;
+}
+
+/** Что показать на чужой улице: её здания и щит, район по её капиталу, погода и спрос — общие для города. */
+export function companyStreet(data: CompanyStreetData, capital: number, game: GameState) {
+  const views = {} as StreetViews;
+  const crowd = {} as StreetLife['crowd'];
+  const sales = {} as StreetLife['sales'];
+  const demand = (m: 'coffee' | 'bread') => game.markets.find((x) => x.market === m)?.demand_level ?? 1;
+  for (const s of SLOT_TYPES) {
+    const b = data.businesses.find((x) => x.type === s.game);
+    views[s.game] = { level: b ? Math.max(1, Math.min(5, b.level ?? 1)) : 0, lotPct: null };
+    sales[s.game] = { at: null, amount: 0 };
+    const level = !b ? 0
+      : s.game === 'coffee' ? demand('coffee') * 2
+      : s.game === 'shop' || s.game === 'bakery' ? demand('bread') * 2
+      : 1;
+    crowd[s.game] = Math.max(0, Math.min(3, Math.round(level)));
+  }
+  const [d1, d2] = game.street?.district ?? [30_000_000, 150_000_000];
+  const adType = SLOT_TYPES.find((s) => s.game === data.ad)?.game;
+  const name = adType ? game.catalog.find((c) => c.type === adType)?.name ?? '' : '';
+  const life: StreetLife = {
+    district: capital >= d2 ? 2 : capital >= d1 ? 1 : 0,
+    weather: (game.street?.weather?.kind ?? 'clear') as Weather,
+    billboard: adType
+      ? { lines: [name.toUpperCase(), 'реклама · +25% спроса'], color: ACCENT[adType] }
+      : { lines: ['РЕКЛАМА', 'место свободно'], color: '#9EA3AD' },
+    crowd,
+    sales,
+  };
+  return { views, life };
 }

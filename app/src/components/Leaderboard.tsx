@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type LeaderKind, type Leaderboard as Board, type Season } from '../api';
+import { api, type GameState, type LeaderKind, type Leaderboard as Board, type Season } from '../api';
 import { duration, money } from '../format';
 import { ChevronRight, Medal } from 'lucide-react';
 import type { LeaderRow } from '../api';
@@ -9,7 +9,7 @@ import { DevBadge } from './DevBadge';
 
 const PODIUM = ['gold', 'silver', 'bronze'];
 
-export function Leaderboard({ season, serverOffset }: { season: Season | null; serverOffset: number }) {
+export function Leaderboard({ season, serverOffset, game }: { season: Season | null; serverOffset: number; game: GameState }) {
   const [kind, setKind] = useState<LeaderKind>('capital');
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function Leaderboard({ season, serverOffset }: { season: Season | null; s
         )}
       </section>
 
-      {openId && <CompanySheet id={openId} onClose={() => setOpenId(null)} />}
+      {openId && <CompanySheet id={openId} game={game} onClose={() => setOpenId(null)} />}
     </>
   );
 }

@@ -142,6 +142,6 @@ open(os.path.join(OUT, 'decor.js'), 'w', encoding='utf-8').write(
     "export function createDecor(k, scene, env, types) {\n"
     "  const { dashes, curbMesh, LAMPS } = env;\n  const { disposeGroup } = types;\n"
     + destructure(decor) + dedent(decor, 2)
-    + "  return { buildDecor, billboard, getFountainJet: () => fountainJet };\n}\n")
+    + "  return { buildDecor, billboard, getFountainJet: () => fountainJet, getDecor: () => decor };\n}\n")
 
 print('ok:', len(KIT_NAMES), 'kit names')

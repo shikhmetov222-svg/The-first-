@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, Copy, Flame, Send, Vibrate } from 'lucide-react';
+import { Bell, Box, Copy, Flame, Send, Vibrate } from 'lucide-react';
 import { api, type GameState, type MyProfile } from '../api';
 import { count, money } from '../format';
 import { notify, requestWriteAccess, setHapticsEnabled, shareLink } from '../telegram';
 import { Achievements } from './Achievements';
 import { CompanyCard } from './CompanyCard';
+import { hasWebGL, setGraphics, useGraphics } from '../graphics';
 
 interface Props {
   game: GameState;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ProfileTab({ game, onEditCompany, onToast }: Props) {
+  const graphics = useGraphics();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [bot, setBot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +179,41 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
           checked={profile.settings.haptics}
           onChange={(v) => changeSetting('haptics', v)}
         />
+        <div className="toggle-row">
+          <span className="toggle-icon">
+            <Box size={20} />
+          </span>
+          <span className="grow">
+            <b>Графика улицы</b>
+            <span className="stat-label">
+              {hasWebGL()
+                ? 'Простая — картинки вместо 3D: для слабых телефонов, меньше тратит батарею'
+                : 'Телефон не поддерживает 3D — работает простая графика'}
+            </span>
+          </span>
+        </div>
+        <div className="segmented" role="radiogroup" aria-label="Графика улицы">
+          {(
+            [
+              ['3d', '3D'],
+              ['2d', 'Простая'],
+            ] as const
+          ).map(([m, label]) => {
+            const on = m === '2d' ? graphics === '2d' || !hasWebGL() : graphics !== '2d' && hasWebGL();
+            return (
+              <button
+                key={m}
+                role="radio"
+                aria-checked={on}
+                className={on ? 'active' : ''}
+                disabled={!hasWebGL()}
+                onClick={() => setGraphics(m)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </section>
     </>
   );

@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { createKit } from './gen/kit.js';
 import { createEnvironment } from './gen/environment.js';
+import { isDaytime } from './views';
+import { findMutable, mergeSprites, mergeStatic } from './merge';
 
 // Макет написан для r128: там цвета не переводились из sRGB в линейное пространство.
 THREE.ColorManagement.enabled = false;
@@ -22,10 +24,7 @@ export const OFFSET = new THREE.Vector3(7, 11, 17);
 export const HOME = new THREE.Vector3(0, 2.4, 1);
 const LIGHT_OFF = new THREE.Vector3(8, 14, 10);
 
-export function isDaytime(date = new Date()): boolean {
-  const h = date.getHours();
-  return h >= 7 && h < 19;
-}
+export { isDaytime } from './views';
 
 export type World = ReturnType<typeof createWorld>;
 
@@ -46,6 +45,10 @@ export function createWorld(scene: THREE.Scene) {
 
   const k = createKit(scene);
   const env = createEnvironment(k, scene);
+  // Разметка прячется на окраине — держим её отдельной группой, чтобы склеить и прятать целиком.
+  const dashGroup = new THREE.Group();
+  env.dashes.forEach((m: THREE.Object3D) => dashGroup.add(m));
+  scene.add(dashGroup);
   const state: EnvState = { day: isDaytime(), district: 1, weather: 'clear' };
   /** Что ещё перекрасить при смене дня/района/погоды (прохожие, облака, дождь — см. life.ts). */
   const envHooks: Array<(s: EnvState) => void> = [];
@@ -91,12 +94,46 @@ export function createWorld(scene: THREE.Scene) {
     env.bgWinOff.color.set(day ? 0x8fa7bd : 0x2b3140);
     env.farWins.visible = !day;
     // Разметка и бордюр: на окраине их нет (в макете это делает buildDecor).
-    env.dashes.forEach((m: THREE.Object3D) => {
-      m.visible = dk > 0;
-    });
+    dashGroup.visible = dk > 0;
     env.curbMesh.visible = dk > 0;
     envHooks.forEach((h) => h(state));
   }
+  applyEnv();
+
+  /** Материалы, которые меняются днём/ночью, по погоде и району: их склеиваем только сами с собой. */
+  const mutable = new Set<THREE.Material>();
+  function probe() {
+    const saved = { ...state };
+    const steps: Array<() => void> = [];
+    for (const day of [true, false])
+      for (const weather of ['clear', 'rain', 'snow'] as Weather[])
+        for (const district of [0, 1, 2] as const)
+          steps.push(() => {
+            Object.assign(state, { day, weather, district });
+            applyEnv();
+          });
+    findMutable(scene, steps, mutable, [...Object.values(k), ...Object.values(env)]);
+    Object.assign(state, saved);
+    applyEnv();
+  }
+  probe();
+
+  // Окружение неподвижно: сотни деталей задних домов, кустов и фонарей → несколько мешей по материалам.
+  const keep = [dashGroup, env.curbMesh, env.farWins, env.ground];
+  mergeStatic(scene, mutable, keep);
+  mergeStatic(dashGroup, mutable);
+  mergeStatic(env.farWins, mutable);
+  const facing = new THREE.Quaternion();
+  {
+    const c = new THREE.PerspectiveCamera();
+    c.position.copy(OFFSET);
+    c.lookAt(0, 0, 0);
+    facing.copy(c.quaternion);
+  }
+  const glows = mergeSprites(scene, k.glowMat, facing);
+  if (glows) envHooks.push(() => {
+    glows.visible = k.glowMat.visible;
+  });
   applyEnv();
 
   /** Камера смотрит на target, солнце и его тени ходят вместе с ней. */
@@ -108,7 +145,7 @@ export function createWorld(scene: THREE.Scene) {
     dir.target.updateMatrixWorld();
   }
 
-  return { k, env, hemi, dir, state, envHooks, applyEnv, placeCamera };
+  return { k, env, hemi, dir, state, envHooks, applyEnv, placeCamera, mutable, probe };
 }
 
 /** Рамка ортокамеры как в макете: на узком экране ширина 18 единиц, на широком — высота 14. */

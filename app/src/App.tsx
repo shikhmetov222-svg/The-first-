@@ -20,6 +20,8 @@ import { TransferSheet } from './components/TransferSheet';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
 import { streetLife, streetVan, streetViews } from './street/views';
+import Street2D from './street/Street2D';
+import { setGraphics, useGraphics, useSimpleStreet } from './graphics';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
@@ -62,6 +64,8 @@ function Game() {
   // Окно запуска рекламы: undefined — закрыто; null — без выбранного бизнеса.
   const [adFor, setAdFor] = useState<BusinessType | null | undefined>(undefined);
   const [upgradeFor, setUpgradeFor] = useState<BusinessType | null>(null);
+  const graphics = useGraphics();
+  const simpleStreet = useSimpleStreet();
 
   // Настройка вибрации хранится на сервере.
   const hapticsSetting = game?.player.haptics;
@@ -226,6 +230,29 @@ function Game() {
   const pending = game.businesses.reduce((s, b) => s + b.pending_revenue, 0);
   const isAdmin = game.is_admin === true;
   const owned = new Set(game.businesses.map((b) => b.type));
+  const bizNames = Object.fromEntries(game.catalog.map((c) => [c.type, c.name]));
+
+  /** Тап по зданию на улице: своё → прокрутить к карточке и подсветить её, участок → открыть бизнес. */
+  const selectOnStreet = (type: BusinessType, has: boolean) => {
+    if (has) {
+      const el = document.getElementById(`biz-${type}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.remove('biz-flash');
+      void el.offsetWidth;
+      el.classList.add('biz-flash');
+    } else if (game.catalog.some((c) => c.type === type)) {
+      setSheet({ kind: 'open', type });
+    } else {
+      setCatalogOpen(true);
+    }
+  };
+
+  /** 3D тормозит на этом телефоне (FPS ниже 25 дольше 5 секунд) — переходим на простую графику. */
+  const onSlowStreet = () => {
+    setGraphics('2d');
+    showToast('Включили простую графику: 3D на этом телефоне тормозит. Вернуть можно в профиле');
+  };
 
   const collect = async () => {
     if (await run(api.collect, (sum) => `+${money(sum)} в капитал`, 'collect')) {
@@ -353,36 +380,31 @@ function Game() {
         />
       )}
       {tab === 'dev' && isAdmin && <DevPanel game={game} onState={setGame} onToast={showToast} />}
-      {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} />}
+      {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} game={game} />}
       {tab === 'profile' && (
         <ProfileTab game={game} onEditCompany={() => setEditingCompany(true)} onToast={showToast} />
       )}
 
+      {/* Улица живёт, пока открыта игра: на других вкладках она скрыта и не рисуется, но и не строится заново. */}
+      <div hidden={tab !== 'empire'}>
+        {simpleStreet ? (
+          <Street2D views={streetViews(game)} life={streetLife(game)} names={bizNames} onSelect={selectOnStreet} />
+        ) : (
+          <Suspense fallback={<StreetPlaceholder />}>
+            <Street
+              views={streetViews(game)}
+              life={streetLife(game)}
+              showFps={isAdmin}
+              active={tab === 'empire'}
+              onSlow={graphics === 'auto' ? onSlowStreet : undefined}
+              onSelect={selectOnStreet}
+            />
+          </Suspense>
+        )}
+      </div>
+
       {tab === 'empire' && (
       <>
-      <Suspense fallback={<StreetPlaceholder />}>
-        <Street
-          views={streetViews(game)}
-          life={streetLife(game)}
-          showFps={isAdmin}
-          onSelect={(type, has) => {
-            if (has) {
-              // Тап по зданию → прокрутить к карточке бизнеса и подсветить её.
-              const el = document.getElementById(`biz-${type}`);
-              if (!el) return;
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              el.classList.remove('biz-flash');
-              void el.offsetWidth;
-              el.classList.add('biz-flash');
-            } else if (game.catalog.some((c) => c.type === type)) {
-              setSheet({ kind: 'open', type });
-            } else {
-              setCatalogOpen(true);
-            }
-          }}
-        />
-      </Suspense>
-
       <CapitalCard game={game} serverOffset={serverOffset} pending={pending} busy={busy} onCollect={collect} />
 
       {game.effects.length > 0 && (

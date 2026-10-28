@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Trophy } from 'lucide-react';
-import { api, type PublicProfile } from '../api';
+import { Map as MapIcon, Trophy } from 'lucide-react';
+import { api, type GameState, type PublicProfile } from '../api';
 import { money } from '../format';
 import { Achievements } from './Achievements';
 import { CompanyCard } from './CompanyCard';
+import { CompanyStreet } from './CompanyStreet';
 
 /** Карточка чужой (или своей) компании из рейтинга. */
-export function CompanySheet({ id, onClose }: { id: string; onClose: () => void }) {
+export function CompanySheet({ id, game, onClose }: { id: string; game: GameState; onClose: () => void }) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [street, setStreet] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,12 +49,18 @@ export function CompanySheet({ id, onClose }: { id: string; onClose: () => void 
               <span className="stat-label">{profile.achievements.length} из 10</span>
             </div>
             <Achievements earned={profile.achievements} />
+            {profile.street && (
+              <button className="button secondary" onClick={() => setStreet(true)}>
+                <MapIcon size={18} /> Смотреть улицу
+              </button>
+            )}
           </>
         )}
         <button className="button ghost" onClick={onClose}>
           Закрыть
         </button>
       </div>
+      {street && profile && <CompanyStreet profile={profile} game={game} onClose={() => setStreet(false)} />}
     </div>
   );
 }

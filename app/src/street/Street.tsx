@@ -1,11 +1,11 @@
 // 3D-улица игрока на экране «Империя»: сцена, окружение и здания бизнесов — как в docs/street-mockup.js.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { HOME, createWorld, frameCamera, isDaytime, type World } from './world';
 import { createSlots, type Slots } from './slots';
-import { streetBus, type GameType, type StreetLife, type StreetViews } from './views';
+import { streetBus, streetDev, withDev, type GameType, type StreetLife, type StreetViews } from './views';
 import { createLifeController, type LifeController } from './life';
 import { feel } from '../telegram';
 
@@ -18,12 +18,17 @@ interface WorldProps {
   life: StreetLife;
   onWorld: (w: World) => void;
   onSelect: (type: GameType, owned: boolean) => void;
+  /** Чужая улица: без фургона, монеток и подмен разработчика. */
+  readOnly: boolean;
+  /** День/ночь из панели разработчика (undefined — по часам). */
+  day?: boolean;
+  instant: boolean;
 }
 
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Сцена: собирает мир один раз, ставит здания, камеру и управление жестами. */
-function StreetWorld({ views, life, onWorld, onSelect }: WorldProps) {
+function StreetWorld({ views, life, onWorld, onSelect, readOnly, day, instant }: WorldProps) {
   const { scene, gl, size, camera } = useThree();
   const target = useRef(HOME.clone());
   const world = useRef<World | null>(null);
@@ -49,6 +54,7 @@ function StreetWorld({ views, life, onWorld, onSelect }: WorldProps) {
 
   // Фургон после пополнения склада и монетки из панели разработчика.
   useEffect(() => {
+    if (readOnly) return;
     const onVan = (e: Event) => lifeCtl.current!.van((e as CustomEvent<GameType>).detail);
     const onCoin = (e: Event) => {
       const d = (e as CustomEvent<{ type: GameType; amount: number }>).detail;
@@ -60,12 +66,12 @@ function StreetWorld({ views, life, onWorld, onSelect }: WorldProps) {
       streetBus.removeEventListener('van', onVan);
       streetBus.removeEventListener('coin', onCoin);
     };
-  }, []);
+  }, [readOnly]);
 
   // Уровни зданий — с сервера. При первом показе без анимации, дальше улучшение — со стройкой и вибрацией.
   const viewsKey = JSON.stringify(views);
   useEffect(() => {
-    const animate = !first.current;
+    const animate = !first.current && !instant;
     first.current = false;
     slots.current!.apply(views, animate, () => feel('purchase'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,17 +79,22 @@ function StreetWorld({ views, life, onWorld, onSelect }: WorldProps) {
 
   useEffect(() => {
     onWorld(world.current!);
-    // День и ночь — по часам игрока; проверяем раз в минуту.
-    const id = window.setInterval(() => {
+  }, [onWorld]);
+
+  // День и ночь — по часам игрока (проверяем раз в минуту) или как задал разработчик.
+  useEffect(() => {
+    const check = () => {
       const w = world.current!;
-      const day = isDaytime();
-      if (w.state.day !== day) {
-        w.state.day = day;
+      const d = day ?? isDaytime();
+      if (w.state.day !== d) {
+        w.state.day = d;
         w.applyEnv();
       }
-    }, 60_000);
+    };
+    check();
+    const id = window.setInterval(check, 60_000);
     return () => window.clearInterval(id);
-  }, [onWorld]);
+  }, [day]);
 
   useEffect(() => {
     frameCamera(camera as THREE.OrthographicCamera, size.width, size.height);
@@ -177,15 +188,47 @@ function StreetWorld({ views, life, onWorld, onSelect }: WorldProps) {
   return null;
 }
 
-/** Счётчик кадров в секунду (виден администратору). */
-function FpsMeter({ el }: { el: React.RefObject<HTMLDivElement> }) {
-  const acc = useRef({ frames: 0, since: performance.now() });
+/**
+ * Счётчик кадров: показывает FPS администратору и следит, тянет ли телефон 3D.
+ * FPS ниже 25 три секунды подряд — сначала снижаем чёткость (2 → 1,5 → 1): это вдвое легче для видеокарты.
+ * Если и на чёткости 1 FPS ниже 25 дольше 5 секунд — onSlow (игра переключится на простую графику).
+ * Первые 3 секунды после запуска, после паузы и после смены чёткости не считаем.
+ */
+function FpsWatch({ el, dpr, setDpr, onSlow }: {
+  el: React.RefObject<HTMLDivElement>;
+  dpr: number;
+  setDpr: (d: number) => void;
+  onSlow?: () => void;
+}) {
+  const acc = useRef({ frames: 0, since: performance.now(), last: performance.now(), warm: performance.now() + 3000, slow: 0, fired: false });
+  const slowRef = useRef(onSlow);
+  slowRef.current = onSlow;
   useFrame(() => {
     const a = acc.current;
-    a.frames++;
     const now = performance.now();
+    if (now - a.last > 1000) {
+      // Рендер стоял на паузе (улица не видна) — начинаем отсчёт заново.
+      a.frames = 0;
+      a.since = now;
+      a.warm = now + 3000;
+      a.slow = 0;
+    }
+    a.last = now;
+    a.frames++;
     if (now - a.since >= 1000) {
-      if (el.current) el.current.textContent = `${Math.round((a.frames * 1000) / (now - a.since))} FPS`;
+      const fps = Math.round((a.frames * 1000) / (now - a.since));
+      if (el.current) el.current.textContent = `${fps} FPS${dpr < 1.9 ? ` · ×${dpr}` : ''}`;
+      if (now > a.warm) {
+        a.slow = fps < 25 ? a.slow + 1 : 0;
+        if (dpr > 1 && a.slow >= 3) {
+          setDpr(Math.max(1, Math.round((dpr - 0.5) * 2) / 2));
+          a.slow = 0;
+          a.warm = now + 3000;
+        } else if (dpr <= 1 && a.slow >= 5 && !a.fired && slowRef.current) {
+          a.fired = true;
+          slowRef.current();
+        }
+      }
       a.frames = 0;
       a.since = now;
     }
@@ -194,40 +237,76 @@ function FpsMeter({ el }: { el: React.RefObject<HTMLDivElement> }) {
 }
 
 export default function Street({
-  views, life, onSelect, onWorld, showFps = false,
+  views, life, onSelect, onWorld, showFps = false, active = true, readOnly = false, onSlow,
 }: {
   views: StreetViews;
   life: StreetLife;
   onSelect: (type: GameType, owned: boolean) => void;
   onWorld?: (w: World) => void;
   showFps?: boolean;
+  /** Видна ли улица (вкладка «Империя» открыта). Скрытая улица не рисуется, но и не пересобирается. */
+  active?: boolean;
+  readOnly?: boolean;
+  onSlow?: () => void;
 }) {
   const [hint, setHint] = useState(true);
   const fpsEl = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(true);
+  const [shown, setShown] = useState(() => document.visibilityState === 'visible');
+  const dev = useSyncExternalStore(streetDev.subscribe, streetDev.get);
+  // Чёткость: как у экрана, но не больше 2; на медленном телефоне FpsWatch снижает её до 1.
+  const [dpr, setDpr] = useState(() => Math.min(2, Math.max(1, window.devicePixelRatio || 1)));
+  const data = readOnly ? { views, life } : withDev(views, life, dev);
+
   useEffect(() => {
     const id = window.setTimeout(() => setHint(false), 5000);
     return () => window.clearTimeout(id);
   }, []);
 
+  // Рендер останавливается, когда улица прокручена за экран или приложение свёрнуто.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const io = new IntersectionObserver((e) => setInView(e[0].isIntersecting));
+    io.observe(el);
+    const onVis = () => setShown(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      io.disconnect();
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+  const running = active && inView && shown;
+
   return (
-    <div className="street-stage" onPointerDown={() => setHint(false)}>
+    <div className="street-stage" ref={box} onPointerDown={() => setHint(false)}>
       <Canvas
         shadows
         flat
         linear
         legacy
-        dpr={[1, 2]}
-        gl={{ antialias: true }}
+        dpr={dpr}
+        frameloop={running ? 'always' : 'never'}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
           // Как в r128: без перевода цветов из sRGB (иначе всё темнее макета).
           THREE.ColorManagement.enabled = false;
           gl.outputColorSpace = THREE.LinearSRGBColorSpace;
-          gl.domElement.setAttribute('aria-label', '3D-улица с твоими бизнесами');
+          gl.domElement.setAttribute('aria-label', readOnly ? '3D-улица компании' : '3D-улица с твоими бизнесами');
         }}
       >
         <OrthographicCamera makeDefault manual near={0.1} far={200} />
-        <StreetWorld views={views} life={life} onSelect={onSelect} onWorld={onWorld ?? noop} />
-        {showFps && <FpsMeter el={fpsEl} />}
+        <StreetWorld
+          views={data.views}
+          life={data.life}
+          onSelect={onSelect}
+          onWorld={onWorld ?? noop}
+          readOnly={readOnly}
+          day={readOnly ? undefined : dev.day}
+          instant={!readOnly && !!dev.instant}
+        />
+        <FpsWatch el={fpsEl} dpr={dpr} setDpr={setDpr} onSlow={onSlow} />
       </Canvas>
       {showFps && <div className="street-fps" ref={fpsEl} />}
       {hint && <div className="street-hint">Листай пальцем · щипок — приблизить · двойной тап — вернуть вид</div>}

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { createTypes } from './gen/types.js';
 import { createAnim } from './gen/anim.js';
 import type { World } from './world';
+import { mergeStatic } from './merge';
 
 import { SLOT_TYPES, type GameType, type SlotView } from './views';
 
@@ -14,7 +15,7 @@ interface Slot {
   street: string;
   x: number;
   level: number;
-  lotPct: number;
+  lotPct: number | null;
   group: THREE.Group;
   busy: boolean;
   pending: SlotView | null; // пришло новое, пока шла стройка
@@ -23,16 +24,28 @@ interface Slot {
 export function createSlots(world: World, scene: THREE.Scene, reduce: boolean) {
   const types = createTypes(world.k);
   const anim = createAnim(world.k, scene);
+  /** Здание из макета; его неподвижные детали склеиваются в несколько мешей. */
+  const make = (street: string, L: number, pct: number | null): THREE.Group => {
+    const g = types.makeFor(street, L, pct ?? 0);
+    // Чужой участок: на табличке только «ПРОДАЁТСЯ», без чужих денег.
+    if (L === 0 && pct === null)
+      g.traverse((o: THREE.Object3D) => {
+        const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (m?.type === 'MeshBasicMaterial' && m.map) m.map = world.k.signTex(['ПРОДАЁТСЯ'], '#D4A73A', 512, 220);
+      });
+    mergeStatic(g, world.mutable);
+    return g;
+  };
 
   const slots: Slot[] = SLOT_TYPES.map((t) => {
-    const group = types.makeFor(t.street, 0, 0);
+    const group = make(t.street, 0, 0);
     group.position.x = t.x;
     scene.add(group);
     return { game: t.game, street: t.street, x: t.x, level: 0, lotPct: 0, group, busy: false, pending: null };
   });
 
-  function swap(slot: Slot, L: number, pct: number) {
-    const ng = types.makeFor(slot.street, L, pct);
+  function swap(slot: Slot, L: number, pct: number | null) {
+    const ng = make(slot.street, L, pct);
     ng.position.x = slot.x;
     scene.add(ng);
     slot.group = ng;

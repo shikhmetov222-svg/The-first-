@@ -2621,3 +2621,242 @@ h2.section-title {
     box-shadow: none;
   }
 }
+
+/* ---------- Простая графика улицы (2D) ---------- */
+
+.street2d-scroll {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.street2d {
+  background: linear-gradient(180deg, #9cc8ea 0%, #cfe3f2 100%);
+}
+
+.street2d-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.street2d.night {
+  background: linear-gradient(180deg, #10131d 0%, #161a28 100%);
+}
+
+.street2d.w-rain.day {
+  background: linear-gradient(180deg, #7f8e9e 0%, #9aa7b4 100%);
+}
+
+.street2d.w-snow {
+  background: linear-gradient(180deg, #c9d5e0 0%, #e2e9f0 100%);
+}
+
+.street2d.w-snow.night {
+  background: linear-gradient(180deg, #161a24 0%, #22283a 100%);
+}
+
+/* Газон между задними домами и тротуаром. */
+.street2d-grass {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #6f8f57;
+}
+
+.street2d.night .street2d-grass {
+  background: #1b2620;
+}
+
+.street2d.w-snow .street2d-grass {
+  background: #e9eef3;
+}
+
+.street2d.w-snow.night .street2d-grass {
+  background: #5b6272;
+}
+
+.street2d-lane {
+  position: relative;
+  height: 100%;
+}
+
+/* Задние дома — силуэты, как задний ряд 3D-улицы. */
+.street2d-houses {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(255, 255, 255, 0.35) 18px 30px, transparent 30px 46px) 0 30% / 100% 22% no-repeat,
+    repeating-linear-gradient(90deg, #d9a38f 0 120px, #e3cf9e 120px 210px, #9fb7c9 210px 330px, #b9c9a7 330px 420px, #e6ddd0 420px 530px);
+  border-radius: 6px 6px 0 0;
+  opacity: 0.9;
+}
+
+.street2d.night .street2d-houses {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(232, 180, 94, 0.75) 18px 30px, transparent 30px 46px) 0 30% / 100% 22% no-repeat,
+    repeating-linear-gradient(90deg, #2a2d38 0 120px, #333442 120px 210px, #262c3a 210px 330px, #2c3530 330px 420px, #34313a 420px 530px);
+}
+
+.street2d-walk {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, #b7bac0 0 34%, #5a5f6b 34% 38%, #4a4d55 38% 100%);
+}
+
+.street2d.d0 .street2d-walk {
+  background: linear-gradient(180deg, #8a8478 0 34%, #7a6650 34% 100%);
+}
+
+.street2d.d2 .street2d-walk {
+  background: linear-gradient(180deg, #cfc4b2 0 34%, #5a5f6b 34% 38%, #4a4d55 38% 100%);
+}
+
+.street2d.night .street2d-walk {
+  filter: brightness(0.45);
+}
+
+/* Разметка на дороге; на окраине её нет. */
+.street2d-road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 20px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, #8d929b 0 26px, transparent 26px 52px);
+}
+
+.street2d.d0 .street2d-road {
+  display: none;
+}
+
+.street2d-slot {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.street2d-slot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.street2d-slot:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.street2d.night .street2d-slot img {
+  filter: brightness(0.55) saturate(0.85);
+}
+
+.street2d-tag {
+  position: absolute;
+  bottom: 30px;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(11, 12, 15, 0.82);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.street2d-board {
+  position: absolute;
+  bottom: 74px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 96px;
+  padding: 6px 8px;
+  border: 2px solid;
+  border-radius: 8px;
+  background: #0b0c0f;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.street2d-board b {
+  font-family: var(--font-display);
+  font-size: 10px;
+}
+
+.street2d-float {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(11, 12, 15, 0.88);
+  border: 2px solid var(--gold);
+  color: #f7d774;
+  font-weight: 800;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: street2d-rise 1.6s ease-out forwards;
+}
+
+.street2d-float.van {
+  border-color: #6cb4ee;
+  color: var(--text);
+  animation-duration: 2.4s;
+}
+
+@keyframes street2d-rise {
+  0% { opacity: 0; translate: 0 8px; }
+  15% { opacity: 1; translate: 0 0; }
+  70% { opacity: 1; }
+  100% { opacity: 0; translate: 0 -36px; }
+}
+
+.street2d-weather {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.street2d-weather.rain {
+  background: repeating-linear-gradient(105deg, transparent 0 22px, rgba(174, 198, 232, 0.16) 22px 23px);
+  animation: street2d-rain 0.6s linear infinite;
+}
+
+.street2d-weather.snow {
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(244, 248, 255, 0.9) 1.5px, transparent 2px),
+    radial-gradient(circle at 70% 60%, rgba(244, 248, 255, 0.7) 1px, transparent 1.5px),
+    radial-gradient(circle at 50% 85%, rgba(244, 248, 255, 0.8) 2px, transparent 2.5px);
+  background-size: 41px 47px, 29px 31px, 67px 59px;
+  animation: street2d-snow 9s linear infinite;
+}
+
+@keyframes street2d-rain {
+  to { background-position: -8px 30px; }
+}
+
+@keyframes street2d-snow {
+  to { background-position: 41px 470px, -29px 310px, 67px 590px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .street2d-weather,
+  .street2d-float {
+    animation: none;
+  }
+}

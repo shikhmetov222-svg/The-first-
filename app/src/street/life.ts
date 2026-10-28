@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { createLife } from './gen/life.js';
 import { createDecor } from './gen/decor.js';
 import type { World, EnvState } from './world';
+import { instancePeople, mergeStatic } from './merge';
 import type { Slots } from './slots';
 import { SLOT_TYPES, type GameType, type StreetLife } from './views';
 
@@ -75,6 +76,15 @@ export function createLifeController(world: World, slots: Slots, scene: THREE.Sc
     });
   });
 
+  // Облака перекрашиваются в дождь — заново смотрим, какие материалы меняются, и только потом склеиваем.
+  world.probe();
+  // Ускорение: машины, фургон, собака и облака склеиваются внутри себя, прохожие рисуются инстансами.
+  life.cars.forEach((c: { g: THREE.Object3D }) => mergeStatic(c.g, world.mutable));
+  life.clouds.forEach((c: THREE.Object3D) => mergeStatic(c, world.mutable));
+  mergeStatic(life.dv, world.mutable);
+  mergeStatic(life.dog, world.mutable);
+  const people = instancePeople(scene, [...ambient, ...crowd].map((w) => w.g));
+
   // Район: декор строится заново только при смене.
   let builtDistrict = -1;
   let billboard: THREE.Group | null = null;
@@ -88,6 +98,8 @@ export function createLifeController(world: World, slots: Slots, scene: THREE.Sc
     if (data.district !== builtDistrict) {
       builtDistrict = data.district;
       decor.buildDecor(data.district);
+      const jet = decor.getFountainJet();
+      mergeStatic(decor.getDecor(), world.mutable, jet ? [jet] : []);
       st.district = data.district;
       changed = true;
     }
@@ -106,6 +118,7 @@ export function createLifeController(world: World, slots: Slots, scene: THREE.Sc
         slots.types.disposeGroup(billboard);
       }
       billboard = decor.billboard(data.billboard.lines, data.billboard.color, -22.6, 1.0) as THREE.Group;
+      mergeStatic(billboard, world.mutable);
       scene.add(billboard);
     }
 
@@ -124,6 +137,7 @@ export function createLifeController(world: World, slots: Slots, scene: THREE.Sc
       lastSale[s.game] = sale.at;
     });
     firstData = false;
+    people.sync();
   }
 
   /** Монетка «+X ₽» над зданием (сумма в копейках). */
@@ -164,7 +178,11 @@ export function createLifeController(world: World, slots: Slots, scene: THREE.Sc
 
   let smokeT = 0;
   function update(clock: number, dt: number) {
-    if (reduce) return;
+    if (!reduce) move(clock, dt);
+    people.sync();
+  }
+
+  function move(clock: number, dt: number) {
     [...ambient, ...crowd].forEach((w) => {
       if (!w.g.visible) return;
       w.g.position.x += w.dir * w.speed * dt;
