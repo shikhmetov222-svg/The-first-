@@ -66,13 +66,15 @@ interface Props {
   low?: boolean;
   /** События в городе: отметка на названии района. */
   events?: { district: string; text: string; bad: boolean }[];
+  /** Чужой город: на метках бизнесов вместо «Я» — эта буква, цвет — цвет компании. */
+  pin?: { label: string; color: string };
 }
 
 const slotKey = (plots: CityPlot[]) => plots.map((p) => `${p.i}:${p.j}:${p.k}`).sort().join('|');
 /** Облик участка на карте сейчас (у объекта из gen/city.js те же поля). */
 const plotKey = (p: CityPlot) => `${p.type ?? ''}:${p.level ?? 0}:${p.lot ? 1 : 0}:${p.owner?.name ?? ''}:${p.owner?.me ? 1 : 0}:${p.price ?? 0}`;
 
-function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished, low = false, events }: Props) {
+function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished, low = false, events, pin }: Props) {
   const { scene, camera, gl, size } = useThree();
   const cam = camera as THREE.OrthographicCamera;
   const world = useRef<CityWorld | null>(null);
@@ -375,6 +377,21 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
 
   // Цикл кадра — как frameLoop() в макете.
   const tmpV = useRef(new THREE.Vector3());
+  // Метки бизнесов в чужом городе: перерисовываем «Я» на букву компании (метки появляются и после стройки).
+  const pinTex = useRef<THREE.Texture | null>(null);
+  useFrame(() => {
+    if (!pin) return;
+    if (!pinTex.current) pinTex.current = pinTexture(pin.color, pin.label);
+    (city.myPins as { pin: THREE.Sprite }[]).forEach(({ pin: s }) => {
+      const m = s.material as THREE.SpriteMaterial;
+      if (m.map !== pinTex.current) {
+        m.map?.dispose();
+        m.map = pinTex.current;
+        m.needsUpdate = true;
+      }
+    });
+  });
+
   useFrame((_, delta) => {
     const dt = Math.min(0.05, delta);
     const clock = world.current!.tick(dt);
@@ -463,6 +480,33 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
   });
 
   return <DistrictLabels city={city} stage={stage} caps={caps} cam={cam} events={events} />;
+}
+
+/** Метка над бизнесом — как pinSprite в макете, но со своей буквой и цветом. */
+function pinTexture(color: string, label: string) {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 160;
+  const g = c.getContext('2d')!;
+  g.fillStyle = color;
+  g.beginPath();
+  g.arc(64, 58, 50, Math.PI * 0.82, Math.PI * 2.18);
+  g.lineTo(64, 152);
+  g.closePath();
+  g.fill();
+  g.lineWidth = 6;
+  g.strokeStyle = 'rgba(11,12,15,.85)';
+  g.stroke();
+  g.fillStyle = '#0B0C0F';
+  g.beginPath();
+  g.arc(64, 58, 34, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = color;
+  g.font = '800 40px Manrope, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(label, 64, 60);
+  return new THREE.CanvasTexture(c);
 }
 
 /**

@@ -25,6 +25,15 @@ export interface PublicProfile {
   achievements: { code: string; earned_at: string }[];
   /** Улица компании (только просмотр); у старого сервера её нет. */
   street?: { businesses: { type: string; level: number | null }[]; ad: string | null };
+  /** Город компании (только просмотр); у старого сервера его нет. */
+  city?: {
+    seed: number;
+    stage: number;
+    caps: number[];
+    plots: { type: string; i: number; j: number; k: number }[];
+    businesses: { type: string; level: number | null }[];
+    builds: (Omit<Build, 'brigade'> & { brigade?: string })[];
+  };
 }
 
 export interface SeasonHistoryItem {

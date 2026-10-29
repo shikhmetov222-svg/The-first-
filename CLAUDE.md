@@ -44,8 +44,8 @@ app/src/
   telegram.ts        Telegram WebApp: вибрация, initData
   components/        карточки, листы (sheets), рынок, профиль, DevPanel
   graphics.ts        режим графики улицы на устройстве: auto / 3d / 2d (localStorage), проверка WebGL
-  street/            3D-улица (во вкладке «Империя» её больше нет; показывается только улица другой компании из
-                     рейтинга — «Смотреть улицу»). Street.tsx (R3F, пауза, FPS и снижение чёткости), world.ts (свет, день/ночь, погода),
+  street/            3D-улица (в игре её больше не видно: чужие компании показываются городом — «Смотреть город»,
+                     components/CompanyCity.tsx; улица осталась только для старого сервера без city в company_card). Street.tsx (R3F, пауза, FPS и снижение чёткости), world.ts (свет, день/ночь, погода),
                      slots.ts (здания и стройка), life.ts (прохожие, машины, фургон, монетки),
                      merge.ts (ускорение: склейка неподвижных мешей, свечения одним мешем, прохожие инстансами),
                      views.ts (данные игры → что показать, подмены разработчика, чужая улица; без three.js),
@@ -57,8 +57,9 @@ app/src/
                      здания бизнесов и детали берёт из street/gen
 app/public/street2d/ СГЕНЕРИРОВАНО: PNG каждого бизнеса на каждом уровне — node scripts/render-street2d.mjs (из app/)
 supabase/
-  migrations/        0001…0022, по порядку; каждая следующая переопределяет функции целиком (create or replace).
-                     get_state — обёртка (0022): основное состояние в get_state_base, обёртка добавляет daily, events, rival
+  migrations/        0001…0023, по порядку; каждая следующая переопределяет функции целиком (create or replace).
+                     get_state — обёртка (0022): основное состояние в get_state_base, обёртка добавляет daily, events, rival;
+                     company_card — обёртка (0023): company_card_base + city (город компании для просмотра)
   functions/api/     Edge Function: проверка initData, вызов SQL-функций через rpc
   sim/               симуляция баланса (локальная копия базы, настоящие функции тика)
 docs/                эталоны 3D-улицы (street-mockup.html/.js) и карты города (city-mockup.html), скриншоты сравнения

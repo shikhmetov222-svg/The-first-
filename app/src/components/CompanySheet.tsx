@@ -5,6 +5,7 @@ import { money } from '../format';
 import { Achievements } from './Achievements';
 import { CompanyCard } from './CompanyCard';
 import { CompanyStreet } from './CompanyStreet';
+import { CompanyCity } from './CompanyCity';
 
 /** Карточка чужой (или своей) компании из рейтинга. */
 export function CompanySheet({ id, game, onClose }: { id: string; game: GameState; onClose: () => void }) {
@@ -49,9 +50,9 @@ export function CompanySheet({ id, game, onClose }: { id: string; game: GameStat
               <span className="stat-label">{profile.achievements.length} из 10</span>
             </div>
             <Achievements earned={profile.achievements} />
-            {profile.street && (
+            {(profile.city || profile.street) && (
               <button className="button secondary" onClick={() => setStreet(true)}>
-                <MapIcon size={18} /> Смотреть улицу
+                <MapIcon size={18} /> {profile.city ? 'Смотреть город' : 'Смотреть улицу'}
               </button>
             )}
           </>
@@ -60,7 +61,9 @@ export function CompanySheet({ id, game, onClose }: { id: string; game: GameStat
           Закрыть
         </button>
       </div>
-      {street && profile && <CompanyStreet profile={profile} game={game} onClose={() => setStreet(false)} />}
+      {street && profile?.city && <CompanyCity profile={profile} game={game} onClose={() => setStreet(false)} />}
+      {/* Старый сервер без городов — по-прежнему улица. */}
+      {street && profile && !profile.city && <CompanyStreet profile={profile} game={game} onClose={() => setStreet(false)} />}
     </div>
   );
 }
