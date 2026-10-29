@@ -385,6 +385,17 @@ export interface DevInfo {
     buyer: string;
   }[];
   flagged_24h?: number;
+  /** Статистика настоящих игроков (без тестовых и администраторов). */
+  players_stats?: {
+    total: number;
+    online: number;
+    dau: number;
+    wau: number;
+    new_7d: number;
+    days: { day: string; active: number; new: number }[];
+    cohorts: { day: string; size: number; d1: number | null; d3: number | null; d7: number | null }[] | null;
+    funnel: { step: string; n: number }[];
+  };
   analytics?: {
     type: BusinessType;
     name: string;

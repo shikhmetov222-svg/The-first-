@@ -393,6 +393,8 @@ export function DevPanel({ game, onState, onToast }: Props) {
         )}
       </DevSection>
 
+      {info.players_stats && <PlayerStats s={info.players_stats} />}
+
       {info.analytics && (
         <DevSection icon={<BarChart3 size={18} />} title="Аналитика бизнесов">
           <ul className="list">
@@ -619,4 +621,96 @@ function describe(d: Record<string, unknown>): string {
   if (d.count !== undefined && !d.market) parts.push(String(d.count));
   if (d.show !== undefined) parts.push(d.show ? 'вкл' : 'выкл');
   return parts.join(' · ');
+}
+
+/** Игроки: сколько пришло, сколько вернулось и на каком шаге новички уходят. */
+function PlayerStats({ s }: { s: NonNullable<DevInfo['players_stats']> }) {
+  const max = Math.max(1, ...s.days.map((d) => d.active));
+  const pct = (n: number | null, of: number) => (n === null ? '—' : of ? `${Math.round((n / of) * 100)}%` : '0%');
+  const first = s.funnel[0]?.n ?? 0;
+  const dd = (iso: string) => iso.slice(8, 10) + '.' + iso.slice(5, 7);
+  return (
+    <DevSection icon={<Users size={18} />} title="Игроки">
+      <div className="stats-grid">
+        <div className="stat-tile">
+          <span className="stat-label">Всего</span>
+          <b>{count(s.total)}</b>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-label">Сегодня</span>
+          <b>{count(s.dau)}</b>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-label">За 7 дней</span>
+          <b>{count(s.wau)}</b>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-label">Новых за 7 дней</span>
+          <b>{count(s.new_7d)}</b>
+        </div>
+      </div>
+      <p className="hint small">Сейчас в игре: {count(s.online)}. Без тестовых игроков и администраторов.</p>
+
+      <h4 className="dev-sub">Заходили по дням</h4>
+      <div className="dev-bars" role="img" aria-label="Игроки по дням за 14 дней">
+        {s.days.map((d) => (
+          <div key={d.day} className="dev-bar" title={`${dd(d.day)}: ${d.active}, новых ${d.new}`}>
+            <span className="dev-bar-n">{d.active || ''}</span>
+            <span className="dev-bar-col" style={{ height: `${(d.active / max) * 100}%` }}>
+              <span className="dev-bar-new" style={{ height: d.active ? `${(d.new / d.active) * 100}%` : 0 }} />
+            </span>
+            <span className="dev-bar-day">{dd(d.day).slice(0, 2)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="hint small">Столбик — сколько игроков зашли в этот день, золотая часть — из них новые.</p>
+
+      <h4 className="dev-sub">Возвращаются ли</h4>
+      {s.cohorts?.length ? (
+        <table className="dev-table">
+          <thead>
+            <tr>
+              <th>Пришли</th>
+              <th>Чел.</th>
+              <th>Через 1 д.</th>
+              <th>3 д.</th>
+              <th>7 д.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.cohorts.map((c) => (
+              <tr key={c.day}>
+                <td>{dd(c.day)}</td>
+                <td>{c.size}</td>
+                <td>{pct(c.d1, c.size)}</td>
+                <td>{pct(c.d3, c.size)}</td>
+                <td>{pct(c.d7, c.size)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="hint small">Новых игроков за 14 дней не было.</p>
+      )}
+      <p className="hint small">
+        Из пришедших в этот день — какая доля зашла снова через 1, 3 и 7 дней. «—» — этот день ещё не наступил. Хорошо, если
+        через день возвращается больше 30%, а через неделю — больше 10%.
+      </p>
+
+      <h4 className="dev-sub">Путь новичка (за 30 дней)</h4>
+      <ul className="dev-funnel">
+        {s.funnel.map((f) => (
+          <li key={f.step}>
+            <span className="grow">{f.step}</span>
+            <b>{count(f.n)}</b>
+            <span className="stat-label">{pct(f.n, first)}</span>
+            <span className="bar-track" aria-hidden>
+              <span className="bar-fill" style={{ width: first ? `${(f.n / first) * 100}%` : 0 }} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="hint small">Где число резко падает — там новички бросают игру. Это место и стоит улучшать первым.</p>
+    </DevSection>
+  );
 }

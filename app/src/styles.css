@@ -3312,3 +3312,87 @@ h2.section-title {
 .rival-line.down {
   color: var(--down);
 }
+
+/* DEV: статистика игроков. */
+.dev-sub {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.dev-bars {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 4px;
+  height: 120px;
+  align-items: end;
+}
+.dev-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 3px;
+}
+.dev-bar-n {
+  font-size: 10px;
+  color: var(--muted);
+  min-height: 12px;
+}
+.dev-bar-col {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: #3a3f4b;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.dev-bar-new {
+  width: 100%;
+  background: var(--gold);
+}
+.dev-bar-day {
+  font-size: 10px;
+  color: var(--muted);
+}
+.dev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.dev-table th,
+.dev-table td {
+  padding: 6px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.dev-table th:first-child,
+.dev-table td:first-child {
+  text-align: left;
+}
+.dev-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.dev-funnel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dev-funnel li {
+  display: grid;
+  grid-template-columns: 1fr auto 44px;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.dev-funnel li .bar-track {
+  grid-column: 1 / -1;
+}
+.dev-funnel li .stat-label {
+  text-align: right;
+}
