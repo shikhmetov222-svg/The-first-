@@ -1,8 +1,11 @@
 // Режим графики улицы на этом телефоне: 3D или простая (картинки зданий). Хранится только на устройстве.
 import { useSyncExternalStore } from 'react';
 
-/** auto — 3D, но если телефон не тянет, игра сама переключит на простую; 3d — всегда 3D; 2d — простая. */
-export type GraphicsMode = 'auto' | '3d' | '2d';
+/**
+ * auto — 3D, но если телефон не тянет, игра сама переключит на простую; 3d — всегда 3D;
+ * low — 3D без теней, велосипедистов, конфетти и с половиной машин; 2d — простая (картинки).
+ */
+export type GraphicsMode = 'auto' | '3d' | 'low' | '2d';
 
 const KEY = 'capital.graphics';
 const listeners = new Set<() => void>();
@@ -10,7 +13,7 @@ const listeners = new Set<() => void>();
 function read(): GraphicsMode {
   try {
     const v = localStorage.getItem(KEY);
-    return v === '3d' || v === '2d' ? v : 'auto';
+    return v === '3d' || v === '2d' || v === 'low' ? v : 'auto';
   } catch {
     return 'auto';
   }
@@ -56,4 +59,9 @@ export function hasWebGL(): boolean {
 export function useSimpleStreet(): boolean {
   const m = useGraphics();
   return m === '2d' || !hasWebGL();
+}
+
+/** «Графика: низкая» — 3D полегче. */
+export function useLowGraphics(): boolean {
+  return useGraphics() === 'low';
 }

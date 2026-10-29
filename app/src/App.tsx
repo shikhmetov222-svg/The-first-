@@ -446,6 +446,7 @@ function Game() {
               showFps={isAdmin}
               active={tab === 'empire'}
               onSlow={graphics === 'auto' ? onSlowStreet : undefined}
+              low={graphics === 'low'}
               onSelect={selectOnStreet}
             />
           </Suspense>

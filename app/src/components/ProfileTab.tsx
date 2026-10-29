@@ -187,7 +187,7 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
             <b>Графика улицы</b>
             <span className="stat-label">
               {hasWebGL()
-                ? 'Простая — картинки вместо 3D: для слабых телефонов, меньше тратит батарею'
+                ? 'Низкая — 3D без теней, велосипедистов и конфетти. Простая — картинки вместо 3D. Обе меньше тратят батарею'
                 : 'Телефон не поддерживает 3D — работает простая графика'}
             </span>
           </span>
@@ -196,10 +196,14 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
           {(
             [
               ['3d', '3D'],
+              ['low', 'Низкая'],
               ['2d', 'Простая'],
             ] as const
           ).map(([m, label]) => {
-            const on = m === '2d' ? graphics === '2d' || !hasWebGL() : graphics !== '2d' && hasWebGL();
+            const on =
+              m === '2d' ? graphics === '2d' || !hasWebGL()
+              : m === 'low' ? graphics === 'low' && hasWebGL()
+              : (graphics === '3d' || graphics === 'auto') && hasWebGL();
             return (
               <button
                 key={m}

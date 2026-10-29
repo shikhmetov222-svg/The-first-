@@ -82,8 +82,8 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
 
   // Склейка как на улице; для кварталов (pairs) у каждого квартала свои копии материалов — чтобы он мог стать
   // прозрачным, когда закрывает твой бизнес.
-  const merge = (g: THREE.Object3D, pairs?: [THREE.Material, THREE.Material][]) => {
-    mergeStatic(g, mutable, [], undefined, SHADOW_LAYER);
+  const merge = (g: THREE.Object3D, pairs?: [THREE.Material, THREE.Material][] | null, keep: THREE.Object3D[] = []) => {
+    mergeStatic(g, mutable, keep, undefined, SHADOW_LAYER);
     if (!pairs) return;
     const clones = new Map<THREE.Material, THREE.Material>();
     g.traverse((o) => {
@@ -170,6 +170,19 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
   });
   // Тени у машин и прохожих на общем виде размером в пиксель — не рисуем их.
   const fleets = [...models.values()].map((gs) => instancePeople(scene, gs, false, true));
+  // Велосипеды — модель с колёсами-торами; их и половину машин прячет «Графика: низкая».
+  const isBike = (key: string) => key.includes('TorusGeometry');
+  function setLow(low: boolean) {
+    [...models.entries()].forEach(([key, gs]) => {
+      const vehicles = new Set(city.cars.map((c: { g: THREE.Object3D }) => c.g));
+      gs.forEach((g, i) => {
+        if (!vehicles.has(g)) return; // прохожие остаются
+        g.visible = !low || (!isBike(key) && i % 2 === 0);
+      });
+    });
+    particles.setConfetti(!low);
+    dir.castShadow = !low;
+  }
 
   /** Камера смотрит на target. */
   function placeCamera(camera: THREE.Camera, target: THREE.Vector3) {
@@ -204,6 +217,7 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
       shadowsDirty = true;
     },
     particles,
+    setLow,
     tick: (dt: number) => {
       clock += dt;
       particles.update(dt);

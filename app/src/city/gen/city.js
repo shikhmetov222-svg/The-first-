@@ -615,7 +615,8 @@ export function createCity(k, types, ctx) {
   for (let i = 0; i <= COLS; i++) for (let j = 0; j <= ROWS; j++) {
     if (srand() < .55) continue;
     const x = (i - 1.5) * SX + (srand() < .5 ? -3.2 : 3.2), z = (j - 2) * SZ + 3.1 + rand(-.2, .2);
-    if (Math.abs(x) < cityW / 2 && Math.abs(z) < cityD / 2) roadSign(x, z, Math.floor(srand() * 3));
+    const nearLocked = blocks.some(b => (b.i === i - 1 || b.i === i) && (b.j === j - 1 || b.j === j) && isLocked(b));
+    if (Math.abs(x) < cityW / 2 && Math.abs(z) < cityD / 2 && !nearLocked) roadSign(x, z, Math.floor(srand() * 3));
   }
   // roadside stop on the highway: gas station, car wash and an all-night cafe
   (function roadside(){
@@ -714,7 +715,7 @@ export function createCity(k, types, ctx) {
     seed = ctx.slotSeed(b.i, b.j, 9, 0);
     // courtyard between the two rows
     const cz = b.z;
-    if ((b.d === 'sleep' || b.d === 'newres') && (b.i + b.j) % 2 === 1) {
+    if ((b.d === 'sleep' || b.d === 'newres') && srand() < .5) {
       add(G, box(5.6, .04, 3.0, M(0xd9813b)), b.x + 6, .14, cz); add(G, box(5.2, .02, .05, whiteMat), b.x + 6, .17, cz);
       add(G, box(.05, .02, 2.8, whiteMat), b.x + 6, .17, cz);
       [-2.6, 2.6].forEach(dx => { add(G, cyl(.04, .04, 1.6, RAIL, 5), b.x + 6 + dx, .8, cz); add(G, box(.06, .45, .6, whiteMat), b.x + 6 + dx * .95, 1.5, cz); add(G, new THREE.Mesh(new THREE.TorusGeometry(.14, .02, 5, 10), M(0xd63c3c)), b.x + 6 + dx * .88, 1.32, cz); });
@@ -982,6 +983,7 @@ export function createCity(k, types, ctx) {
     prog.sprite.position.set(p.cx, 5.6, p.cz);
     for (let i = 0; i < 10; i++) puff(p.x + rand(-2.4, 2.4), .3, p.z - rand(.5, 3.5), 0xb5a68a, .4, 1.2, 1.2);
   }
+  const SITE_LINE = new THREE.LineBasicMaterial({ color: 0xfb923c });
   function stageVisual(p, idx){
     const B = p.build;
     if (B.sg) { B.site.remove(B.sg); disposeGroup(B.sg); }
@@ -1005,7 +1007,7 @@ export function createCity(k, types, ctx) {
       towerCrane(g, w / 2 + .9, -d + .3, h + 2.5, 0xf97316);
     } else if (idx === 3) {
       const fb = makeFor(B.type, B.level); g.add(fb); B.fb = fb; fb.scale.y = .3;
-      const lines = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + .3, h, d + .3)), new THREE.LineBasicMaterial({ color: 0xfb923c }));
+      const lines = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + .3, h, d + .3)), SITE_LINE);
       lines.position.set(0, h / 2, -d / 2); g.add(lines);
       for (let y = .8; y < h; y += .8) add(g, box(w + .4, .05, .25, woodMat), 0, y, .2);
       towerCrane(g, w / 2 + .9, -d + .3, h + 2.5, 0xf97316);
@@ -1014,6 +1016,7 @@ export function createCity(k, types, ctx) {
       for (let k = 0; k < 3; k++) { const pr = person(); pr.position.set(-2 + k * 1.6, 0, .9); g.add(pr); }
       add(g, cone(.35, .5, M(0x5a4636), 8), 2.3, .25, .8);
     }
+    mergeStatic(g, null, B.fb ? [B.fb] : []); if (B.fb) mergeStatic(B.fb);
   }
   function confetti(x, y, z){ ctx.particles.confetti(x, y, z); }
   function finishConstruction(p){

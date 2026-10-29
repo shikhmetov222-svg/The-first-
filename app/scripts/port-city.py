@@ -141,6 +141,20 @@ city = city[:i] + '    function puff(x, y, z, color, size, rise, life){ ctx.part
 i = city.index('    function confetti(x, y, z){')
 j = city.index('    function finishConstruction(p){', i)
 city = city[:i] + '    function confetti(x, y, z){ ctx.particles.confetti(x, y, z); }\n' + city[j:]
+# Мелкие детали — только в открытых районах: дорожный знак ставим, если все кварталы у перекрёстка открыты.
+city = sub(city, "      if (Math.abs(x) < cityW / 2 && Math.abs(z) < cityD / 2) roadSign(x, z, Math.floor(srand() * 3));",
+           "      const nearLocked = blocks.some(b => (b.i === i - 1 || b.i === i) && (b.j === j - 1 || b.j === j) && isLocked(b));\n"
+           "      if (Math.abs(x) < cityW / 2 && Math.abs(z) < cityD / 2 && !nearLocked) roadSign(x, z, Math.floor(srand() * 3));")
+# Баскетбольные площадки — в части дворов спальных и новых районов, по seed города (а не по номеру квартала).
+city = sub(city, "(b.d === 'sleep' || b.d === 'newres') && (b.i + b.j) % 2 === 1", "(b.d === 'sleep' || b.d === 'newres') && srand() < .5")
+# Площадка этапа: неподвижные детали (техника, леса, плита) склеиваем; будущее здание (растёт) и плиты
+# перекрытий (появляются по одной, пока скрыты — не склеиваются) остаются отдельными. Контур — один материал на всё.
+city = sub(city, "        add(g, cone(.35, .5, M(0x5a4636), 8), 2.3, .25, .8);\n      }\n    }\n",
+           "        add(g, cone(.35, .5, M(0x5a4636), 8), 2.3, .25, .8);\n      }\n"
+           "      mergeStatic(g, null, B.fb ? [B.fb] : []); if (B.fb) mergeStatic(B.fb);\n    }\n")
+city = sub(city, "new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + .3, h, d + .3)), new THREE.LineBasicMaterial({ color: 0xfb923c }))",
+           "new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + .3, h, d + .3)), SITE_LINE)")
+city = sub(city, "    function stageVisual(p, idx){", "    const SITE_LINE = new THREE.LineBasicMaterial({ color: 0xfb923c });\n    function stageVisual(p, idx){")
 assert 'document.getElementById' not in city and 'document.querySelector' not in city, 'в модуле города остался DOM макета'
 
 # Имена набора деталей (kit) — берём из готового модуля улицы.

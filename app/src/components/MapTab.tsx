@@ -6,7 +6,7 @@ import {
 } from '../city/views';
 import type { CityRequest, MapPick } from '../city/City';
 import { duration, money } from '../format';
-import { useSimpleStreet } from '../graphics';
+import { useLowGraphics, useSimpleStreet } from '../graphics';
 import { BizIcon } from './BizIcon';
 import { BrigadePicker, brigadeOffer, buildProgress } from './Builds';
 import { useNow } from './useTick';
@@ -33,6 +33,7 @@ const demandWord = (d: number) => (d > 0.66 ? 'высокий' : d > 0.38 ? 'с�
 /** Вкладка «Карта»: город игрока, районы по капиталу, свои бизнесы, конкуренты и свободные участки. */
 export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, onBuy, onUpgrade, onOpenCard, onSlow }: Props) {
   const simple = useSimpleStreet();
+  const low = useLowGraphics();
   const [data, setData] = useState<CityData | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [pick, setPick] = useState<MapPick | null>(null);
@@ -152,6 +153,7 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
             serverOffset={serverOffset}
             onFinished={onFinished}
             coin={coin}
+            low={low}
             active={active}
             showFps={isAdmin}
             onSlow={onSlow}
@@ -493,7 +495,11 @@ function MapList({ game, plots, names, onPick }: { game: GameState; plots: CityP
                     className={`chip ${p.owner?.me ? 'chip-active' : ''}`}
                     onClick={() => onPick({ kind: 'plot', plot: p, district: d, demand: 0.5 })}
                   >
-                    {p.lot ? 'Свободный участок' : `${names[p.game ?? ''] ?? p.game} · ур. ${p.level}${p.owner?.me ? ' · твой' : ''}`}
+                    {p.srv
+                      ? `Стройка: ${names[p.srv.game] ?? p.srv.game}, ур. ${p.srv.level}${p.srv.owner ? '' : ' · твоя'}`
+                      : p.lot
+                        ? 'Свободный участок'
+                        : `${names[p.game ?? ''] ?? p.game} · ур. ${p.level}${p.owner?.me ? ' · твой' : ''}`}
                   </button>
                 ))}
               </div>

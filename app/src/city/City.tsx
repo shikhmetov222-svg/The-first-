@@ -59,13 +59,15 @@ interface Props {
   serverOffset: number;
   /** Стройка на участке закончилась на карте (конфетти уже показаны). */
   onFinished?: (p: CityPlot, wasLot: boolean) => void;
+  /** «Графика: низкая»: без теней, велосипедистов, конфетти и с половиной машин. */
+  low?: boolean;
 }
 
 const slotKey = (plots: CityPlot[]) => plots.map((p) => `${p.i}:${p.j}:${p.k}`).sort().join('|');
 /** Облик участка на карте сейчас (у объекта из gen/city.js те же поля). */
 const plotKey = (p: CityPlot) => `${p.type ?? ''}:${p.level ?? 0}:${p.lot ? 1 : 0}:${p.owner?.name ?? ''}:${p.owner?.me ? 1 : 0}:${p.price ?? 0}`;
 
-function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished }: Props) {
+function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished, low = false }: Props) {
   const { scene, camera, gl, size } = useThree();
   const cam = camera as THREE.OrthographicCamera;
   const world = useRef<CityWorld | null>(null);
@@ -102,6 +104,7 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
       },
     });
     world.current.applyTime(dev.day ?? isDaytime());
+    world.current.setLow(low);
     // Для замеров на стенде (только в режиме разработки, в игру не попадает).
     if (import.meta.env.DEV) (window as unknown as { __city: unknown }).__city = { world: world.current, scene, gl, cam, THREE };
   }
@@ -501,7 +504,7 @@ export default function City(props: Props & { active?: boolean; showFps?: boolea
   const box = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(true);
   const [shown, setShown] = useState(() => document.visibilityState === 'visible');
-  const [dpr, setDpr] = useState(() => Math.min(2, Math.max(1, window.devicePixelRatio || 1)));
+  const [dpr, setDpr] = useState(() => (props.low ? 1 : Math.min(2, Math.max(1, window.devicePixelRatio || 1))));
   const [hint, setHint] = useState(true);
   // Город пересобирается, только когда меняется набор мест под участки (новый конкурент) или seed —
   // и только пока карта не на экране, чтобы ничего не прыгало на глазах.
@@ -530,8 +533,8 @@ export default function City(props: Props & { active?: boolean; showFps?: boolea
   return (
     <div className="city-stage" ref={box} onPointerDown={() => setHint(false)}>
       <Canvas
-        key={built.n}
-        shadows
+        key={`${built.n}${props.low ? 'low' : ''}`}
+        shadows={!props.low}
         flat
         linear
         legacy

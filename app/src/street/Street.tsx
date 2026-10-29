@@ -237,7 +237,7 @@ function FpsWatch({ el, dpr, setDpr, onSlow }: {
 }
 
 export default function Street({
-  views, life, onSelect, onWorld, showFps = false, active = true, readOnly = false, onSlow,
+  views, life, onSelect, onWorld, showFps = false, active = true, readOnly = false, onSlow, low = false,
 }: {
   views: StreetViews;
   life: StreetLife;
@@ -248,6 +248,8 @@ export default function Street({
   active?: boolean;
   readOnly?: boolean;
   onSlow?: () => void;
+  /** «Графика: низкая»: без теней и с обычной чёткостью. */
+  low?: boolean;
 }) {
   const [hint, setHint] = useState(true);
   const fpsEl = useRef<HTMLDivElement>(null);
@@ -256,7 +258,7 @@ export default function Street({
   const [shown, setShown] = useState(() => document.visibilityState === 'visible');
   const dev = useSyncExternalStore(streetDev.subscribe, streetDev.get);
   // Чёткость: как у экрана, но не больше 2; на медленном телефоне FpsWatch снижает её до 1.
-  const [dpr, setDpr] = useState(() => Math.min(2, Math.max(1, window.devicePixelRatio || 1)));
+  const [dpr, setDpr] = useState(() => (low ? 1 : Math.min(2, Math.max(1, window.devicePixelRatio || 1))));
   const data = readOnly ? { views, life } : withDev(views, life, dev);
 
   useEffect(() => {
@@ -282,7 +284,8 @@ export default function Street({
   return (
     <div className="street-stage" ref={box} onPointerDown={() => setHint(false)}>
       <Canvas
-        shadows
+        key={low ? 'low' : 'full'}
+        shadows={!low}
         flat
         linear
         legacy
