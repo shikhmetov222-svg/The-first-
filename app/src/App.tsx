@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type BrigadeId, type Business, type BusinessType, type CatalogItem, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
@@ -21,9 +21,7 @@ import { MapTab } from './components/MapTab';
 import { BuildsCard } from './components/Builds';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
-import { streetLife, streetVan, streetViews } from './street/views';
-import Street2D from './street/Street2D';
-import { setGraphics, useGraphics, useSimpleStreet } from './graphics';
+import { setGraphics, useGraphics } from './graphics';
 import { duration, money } from './format';
 import { feel, isInTelegram, notify, setHapticsEnabled, type Feel } from './telegram';
 import { CircleAlert, CircleCheck, Plus } from 'lucide-react';
@@ -31,8 +29,6 @@ import { CompanyForm } from './components/CompanyForm';
 import { Tutorial, type TutorialStep } from './components/Tutorial';
 import type { CompanyInput } from './api';
 
-// 3D-улица грузится отдельным файлом, уже после основного интерфейса.
-const Street = lazy(() => import('./street/Street'));
 
 const POLL_MS = 60_000;
 const MIN_LOADING_MS = 1200; // чтобы экран загрузки не мелькал
@@ -76,7 +72,6 @@ function Game() {
   useEffect(() => {
     if (tab === 'map') setMapOpened(true);
   }, [tab]);
-  const simpleStreet = useSimpleStreet();
 
   // Настройка вибрации хранится на сервере.
   const hapticsSetting = game?.player.haptics;
@@ -256,8 +251,8 @@ function Game() {
   const owned = new Set(game.businesses.map((b) => b.type));
   const bizNames = Object.fromEntries(game.catalog.map((c) => [c.type, c.name]));
 
-  /** Тап по зданию на улице: своё → прокрутить к карточке и подсветить её, участок → открыть бизнес. */
-  const selectOnStreet = (type: BusinessType, has: boolean) => {
+  /** Свой бизнес → прокрутить к карточке и подсветить её, нет бизнеса → открыть его. */
+  const showBusinessCard = (type: BusinessType, has: boolean) => {
     if (has) {
       const el = document.getElementById(`biz-${type}`);
       if (!el) return;
@@ -273,7 +268,7 @@ function Game() {
   };
 
   /** 3D тормозит на этом телефоне (FPS ниже 25 дольше 5 секунд) — переходим на простую графику. */
-  const onSlowStreet = () => {
+  const onSlow3D = () => {
     setGraphics('2d');
     showToast('Включили простую графику: 3D на этом телефоне тормозит. Вернуть можно в профиле');
   };
@@ -413,7 +408,7 @@ function Game() {
             focus={mapFocus}
             onToast={showToast}
             serverOffset={serverOffset}
-            onSlow={graphics === 'auto' ? onSlowStreet : undefined}
+            onSlow={graphics === 'auto' ? onSlow3D : undefined}
             onBuy={(type, plot, brigade) =>
               run(
                 () => api.openBusiness(type, plot, brigade),
@@ -424,7 +419,7 @@ function Game() {
             onUpgrade={(type) => setUpgradeFor(type)}
             onOpenCard={(type) => {
               setTab('empire');
-              window.setTimeout(() => selectOnStreet(type, true), 80);
+              window.setTimeout(() => showBusinessCard(type, true), 80);
             }}
           />
         </div>
@@ -433,25 +428,6 @@ function Game() {
       {tab === 'profile' && (
         <ProfileTab game={game} onEditCompany={() => setEditingCompany(true)} onToast={showToast} />
       )}
-
-      {/* Улица живёт, пока открыта игра: на других вкладках она скрыта и не рисуется, но и не строится заново. */}
-      <div hidden={tab !== 'empire'}>
-        {simpleStreet ? (
-          <Street2D views={streetViews(game)} life={streetLife(game)} names={bizNames} onSelect={selectOnStreet} />
-        ) : (
-          <Suspense fallback={<StreetPlaceholder />}>
-            <Street
-              views={streetViews(game)}
-              life={streetLife(game)}
-              showFps={isAdmin}
-              active={tab === 'empire'}
-              onSlow={graphics === 'auto' ? onSlowStreet : undefined}
-              low={graphics === 'low'}
-              onSelect={selectOnStreet}
-            />
-          </Suspense>
-        )}
-      </div>
 
       {tab === 'empire' && (
       <>
@@ -529,13 +505,11 @@ function Game() {
           onRestock={async (type, qty) => {
             if (await run(() => api.restock(type, qty), () => 'Склад пополнен', 'purchase')) {
               setSheet(null);
-              streetVan(type as Parameters<typeof streetVan>[0]);
             }
           }}
           onTransfer={async (qty) => {
             if (await run(() => api.transferBread(qty), () => 'Хлеб доставлен в магазин', 'purchase')) {
               setSheet(null);
-              streetVan('shop');
             }
           }}
           onSetPrice={async (type, price) => {
@@ -592,7 +566,6 @@ function Game() {
           onTransfer={async (p) => {
             if (await run(() => api.marketplaceTransfer(p), (r) => r, 'purchase')) {
               setTransferring(false);
-              streetVan('marketplace');
             }
           }}
         />
@@ -679,15 +652,6 @@ function tutorialSteps(game: GameState, pending: number): TutorialStep[] {
     },
     third,
   ];
-}
-
-/** 2D-заглушка, пока грузится 3D-улица. */
-function StreetPlaceholder() {
-  return (
-    <div className="street-stage street-placeholder">
-      <span>Строим улицу…</span>
-    </div>
-  );
 }
 
 function wait(ms: number) {

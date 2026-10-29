@@ -184,7 +184,7 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
             <Box size={20} />
           </span>
           <span className="grow">
-            <b>Графика улицы</b>
+            <b>Графика</b>
             <span className="stat-label">
               {hasWebGL()
                 ? 'Низкая — 3D без теней, велосипедистов и конфетти. Простая — картинки вместо 3D. Обе меньше тратят батарею'
@@ -192,7 +192,7 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
             </span>
           </span>
         </div>
-        <div className="segmented" role="radiogroup" aria-label="Графика улицы">
+        <div className="segmented" role="radiogroup" aria-label="Графика">
           {(
             [
               ['3d', '3D'],

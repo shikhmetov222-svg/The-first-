@@ -9,7 +9,7 @@ import { count, duration, money } from '../format';
 import { feel, notify } from '../telegram';
 import { CompanyLogo } from './CompanyLogo';
 import { DevBadge } from './DevBadge';
-import { SLOT_TYPES, streetCoin, streetDev, streetVan, type GameType, type StreetDev } from '../street/views';
+import { streetDev } from '../street/views';
 import { setGraphics, useGraphics } from '../graphics';
 
 interface Props {
@@ -237,7 +237,7 @@ export function DevPanel({ game, onState, onToast }: Props) {
         </div>
       </DevSection>
 
-      <DevStreet game={game} />
+      <DevStreet />
 
       <DevSection icon={<Clock size={18} />} title="Время">
         <div className="actions">
@@ -522,104 +522,31 @@ export function DevPanel({ game, onState, onToast }: Props) {
   );
 }
 
-/** Улица: только вид на этом телефоне — сервер и игра не меняются. */
-function DevStreet({ game }: { game: GameState }) {
+/** Вид: только на этом телефоне — сервер и игра не меняются. */
+function DevStreet() {
   const dev = useSyncExternalStore(streetDev.subscribe, streetDev.get);
   const graphics = useGraphics();
-  const [target, setTarget] = useState<GameType>('coffee');
-  const name = (t: string) => game.catalog.find((c) => c.type === t)?.name ?? t;
-  const server = (t: GameType) => {
-    const b = game.businesses.find((x) => x.type === t);
-    return b ? b.level ?? 1 : 0;
-  };
-  const choice = <K extends keyof StreetDev>(key: K, value: StreetDev[K], label: string) => (
+  const choice = (value: boolean | undefined, label: string) => (
     <button
       key={label}
-      className={`chip ${dev[key] === value ? 'chip-active' : ''}`}
-      onClick={() => streetDev.set({ [key]: value } as Partial<StreetDev>)}
+      className={`chip ${dev.day === value ? 'chip-active' : ''}`}
+      onClick={() => streetDev.set({ day: value })}
     >
       {label}
     </button>
   );
 
   return (
-    <DevSection icon={<MapIcon size={18} />} title="Улица">
+    <DevSection icon={<MapIcon size={18} />} title="Вид">
       <p className="hint small">
-        Только вид на этом телефоне: игра и сервер не меняются. Счётчик FPS — в левом верхнем углу улицы.
+        Только вид на этом телефоне: игра и сервер не меняются. Счётчик FPS и вызовов отрисовки — в углу карты.
       </p>
-      <span className="stat-label">Время суток</span>
+      <span className="stat-label">Время суток на карте</span>
       <div className="dev-row">
-        {choice('day', undefined, 'По часам')}
-        {choice('day', true, 'День')}
-        {choice('day', false, 'Ночь')}
+        {choice(undefined, 'По часам')}
+        {choice(true, 'День')}
+        {choice(false, 'Ночь')}
       </div>
-      <span className="stat-label">Район</span>
-      <div className="dev-row">
-        {choice('district', undefined, 'По капиталу')}
-        {choice('district', 0, 'Окраина')}
-        {choice('district', 1, 'Район')}
-        {choice('district', 2, 'Центр')}
-      </div>
-      <span className="stat-label">Погода</span>
-      <div className="dev-row">
-        {choice('weather', undefined, 'Как в городе')}
-        {choice('weather', 'clear', 'Ясно')}
-        {choice('weather', 'rain', 'Дождь')}
-        {choice('weather', 'snow', 'Снег')}
-      </div>
-
-      <span className="stat-label">Здание</span>
-      <div className="dev-row">
-        {SLOT_TYPES.map((s) => (
-          <button
-            key={s.game}
-            className={`chip ${target === s.game ? 'chip-active' : ''}`}
-            onClick={() => setTarget(s.game)}
-          >
-            {name(s.game)}
-          </button>
-        ))}
-      </div>
-      <span className="stat-label">
-        Уровень на улице (0 — участок) · на сервере: {server(target)}
-      </span>
-      <div className="dev-row">
-        {[0, 1, 2, 3, 4, 5].map((lvl) => (
-          <button
-            key={lvl}
-            className={`chip ${(dev.levels?.[target] ?? server(target)) === lvl ? 'chip-active' : ''}`}
-            onClick={() => {
-              streetDev.set({ levels: { ...dev.levels, [target]: lvl } });
-              feel('purchase');
-            }}
-          >
-            {lvl}
-          </button>
-        ))}
-      </div>
-      <label className="toggle-row">
-        <span className="grow">
-          <b>Без анимации стройки</b>
-          <span className="stat-label">Уровень меняется мгновенно</span>
-        </span>
-        <input
-          type="checkbox"
-          role="switch"
-          className="switch"
-          checked={!!dev.instant}
-          onChange={(e) => streetDev.set({ instant: e.target.checked })}
-        />
-      </label>
-      <div className="actions">
-        <button className="button small" onClick={() => streetVan(target)}>
-          Фургон
-        </button>
-        <button className="button small" onClick={() => streetCoin(target, 125_000)}>
-          Монетка
-        </button>
-      </div>
-      <p className="hint small">Фургон и монетка появляются только у открытого здания (уровень 1–5).</p>
-
       <label className="toggle-row">
         <span className="grow">
           <b>Простая графика (2D)</b>
@@ -633,9 +560,6 @@ function DevStreet({ game }: { game: GameState }) {
           onChange={(e) => setGraphics(e.target.checked ? '2d' : 'auto')}
         />
       </label>
-      <button className="button small secondary" onClick={() => streetDev.reset()}>
-        Вернуть улицу как на сервере
-      </button>
     </DevSection>
   );
 }
