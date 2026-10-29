@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, Box, Copy, Flame, Send, Trophy, Vibrate } from 'lucide-react';
+import { setSoundEnabled, soundEnabled } from '../sound';
+import { Bell, Box, Copy, Flame, Send, Trophy, Vibrate, Volume2 } from 'lucide-react';
 import { api, type GameState, type MyProfile } from '../api';
 import { count, money } from '../format';
 import { notify, requestWriteAccess, setHapticsEnabled, shareLink } from '../telegram';
@@ -17,6 +18,7 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
   const graphics = useGraphics();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [bot, setBot] = useState<string | null>(null);
+  const [sound, setSound] = useState(soundEnabled);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -197,6 +199,16 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
           hint="Отклик при покупках и сборе выручки"
           checked={profile.settings.haptics}
           onChange={(v) => changeSetting('haptics', v)}
+        />
+        <Toggle
+          icon={<Volume2 size={20} />}
+          title="Звуки"
+          hint="Звон монет, покупки, готовые стройки. Только на этом устройстве"
+          checked={sound}
+          onChange={(v) => {
+            setSoundEnabled(v);
+            setSound(v);
+          }}
         />
         <div className="toggle-row">
           <span className="toggle-icon">

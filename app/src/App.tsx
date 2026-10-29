@@ -21,6 +21,7 @@ import { MapTab } from './components/MapTab';
 import { BuildsCard } from './components/Builds';
 import { DailyCard, EventCard } from './components/Daily';
 import { DMAP } from './city/views';
+import { play } from './sound';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
 import { setGraphics, useGraphics } from './graphics';
@@ -129,6 +130,17 @@ function Game() {
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [game !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Стройка закончилась не на карте — короткий праздничный звук (на карте его играет сама карта).
+  const buildIds = (game?.builds ?? []).map((b) => b.id).join(',');
+  const prevBuilds = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevBuilds.current;
+    prevBuilds.current = buildIds;
+    if (prev === null || tab === 'map') return;
+    const now = new Set(buildIds.split(','));
+    if (prev.split(',').some((id) => id && !now.has(id))) play('fanfare');
+  }, [buildIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Стройка подошла к концу — обновляем состояние сразу, не дожидаясь минутного опроса.
   const nextBuildEnd = game?.builds?.reduce((m, b) => Math.min(m, new Date(b.ends_at).getTime()), Infinity) ?? Infinity;

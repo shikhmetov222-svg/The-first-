@@ -10,6 +10,7 @@ import { useLowGraphics, useSimpleStreet } from '../graphics';
 import { BizIcon } from './BizIcon';
 import { BrigadePicker, brigadeOffer, buildProgress } from './Builds';
 import { useNow } from './useTick';
+import { play } from '../sound';
 
 const City = lazy(() => import('../city/City'));
 const REFRESH_MS = 120_000;
@@ -95,10 +96,13 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
   }, [focus]);
 
   // Стройка закончилась у тебя на глазах: здание выпрыгивает, конфетти — и тост.
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const names0 = Object.fromEntries(game.catalog.map((c) => [c.type, c.name])) as Record<string, string>;
   const onFinished = useCallback(
     (p: CityPlot, wasLot: boolean) => {
       if (!p.owner?.me) return;
+      if (activeRef.current) play('fanfare');
       onToast(`${wasLot ? 'Открыт новый бизнес' : 'Готово'}: ${names0[p.game ?? ''] ?? ''}, ур. ${p.level}`);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,3 +1,4 @@
+import { play, type Sound } from './sound';
 // Тонкая обёртка над Telegram WebApp SDK.
 // Вне Telegram (обычный браузер) объект тоже существует, но initData пустая.
 
@@ -77,6 +78,7 @@ export function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 }
 
 export function notify(type: 'success' | 'error' | 'warning') {
+  play(type === 'success' ? 'success' : type === 'error' ? 'error' : 'bad');
   if (hapticsOn) tg?.HapticFeedback?.notificationOccurred(type);
 }
 
@@ -102,7 +104,12 @@ export function requestWriteAccess(): Promise<boolean> {
 /** Тактильный отклик под событие игры. */
 export type Feel = 'collect' | 'purchase' | 'decision' | 'decision-bad' | 'default';
 
+const FEEL_SOUND: Record<Feel, Sound> = {
+  collect: 'coin', purchase: 'buy', decision: 'success', 'decision-bad': 'bad', default: 'success',
+};
+
 export function feel(kind: Feel) {
+  play(FEEL_SOUND[kind]);
   if (!hapticsOn || !tg?.HapticFeedback) return;
   const h = tg.HapticFeedback;
   switch (kind) {
