@@ -1,0 +1,2628 @@
+<title>CAPITAL Твой город</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Unbounded:wght@600;700&display=swap">
+<style>
+/* Layout: a one-screen game tab — top bar, filter chips, the shared city map filling the rest, bottom tab bar. Dark only, like the game. */
+:root{
+  --bg:#0B0C0F; --surface:#15171C; --sunk:#0F1014; --line:#23262E;
+  --fg:#F2F2F4; --muted:#9EA3AD; --gold:#D4A73A; --gold-soft:#2A2312; --gold-ink:#0B0C0F;
+  --up:#5FD39A; --down:#F07167; --lot:#3FBF8F;
+  --display:'Unbounded','Manrope',system-ui,sans-serif;
+  --body:'Manrope',system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidden}
+.app{height:100%;max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.me{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:40px;height:40px;border-radius:12px;background:var(--gold);color:var(--gold-ink);display:grid;place-items:center;font:700 14px var(--display);flex:none}
+.co{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub b{color:var(--fg)}
+.tog{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--sunk);border:1px solid var(--line);flex:none}
+.tog button{min-height:36px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:700 13px var(--body);cursor:pointer}
+.tog button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:700 13px var(--body);cursor:pointer;display:flex;align-items:center;gap:6px}
+.chips button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
+.chips .dot{width:8px;height:8px;border-radius:50%}
+.stage{position:relative;flex:1;min-height:300px;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#10131d}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.stage-msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+.legend{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:12px;background:rgba(11,12,15,.8);font-size:11px;color:#C9CCD3;pointer-events:none}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend .heat-scale{display:none;align-items:center;gap:6px}
+.legend.heat-on .heat-scale{display:flex}
+.heat-scale em{font-style:normal}
+.heat-scale i{width:56px;height:8px;border-radius:4px;background:linear-gradient(90deg,#3b82f6,#facc15,#ef4444)}
+.card{position:absolute;left:10px;right:10px;bottom:10px;padding:14px;border-radius:18px;background:rgba(21,23,28,.97);border:1px solid var(--line);display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.card-head{display:flex;align-items:flex-start;gap:10px}
+.card-dot{width:12px;height:12px;border-radius:4px;margin-top:4px;flex:none}
+.card-title{flex:1;min-width:0}
+.card-name{font-weight:800;font-size:16px}
+.card-owner{font-size:12px;color:var(--muted);margin-top:2px}
+.tag{font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px;white-space:nowrap}
+.tag.mine{background:var(--gold-soft);color:var(--gold)}
+.tag.rival{background:#2a1515;color:var(--down)}
+.tag.bot{background:#22252b;color:var(--muted)}
+.tag.lot{background:#10261c;color:var(--lot)}
+.tag.build{background:#2b1a0c;color:#FB923C}
+.card-desc{font-size:13px;color:#C9CCD3;line-height:1.45}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{flex:1 1 110px;padding:8px 10px;border-radius:12px;background:var(--sunk)}
+.stat small{display:block;font-size:11px;color:var(--muted)}
+.stat b{font-size:15px;font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:8px}
+.actions button{flex:1;height:44px;border-radius:12px;font:800 14px var(--body);cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--fg)}
+.actions button.primary{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}
+.close{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 16px var(--body);cursor:pointer;flex:none}
+.toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);max-width:calc(100% - 24px);padding:8px 12px;border-radius:10px;background:rgba(11,12,15,.92);border:1px solid var(--line);font-size:13px;color:var(--fg);pointer-events:none;text-align:center}
+.tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+.tabs button{height:52px;border:0;background:transparent;color:var(--muted);font:600 11px var(--body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.tabs button[aria-current="page"]{color:var(--gold);font-weight:800}
+.tabs svg{width:22px;height:22px}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="me">
+      <div class="logo" aria-hidden="true">ИГ</div>
+      <div style="min-width:0">
+        <div class="co">Иванов Групп</div>
+        <div class="sub">Капитал <b>412 300 ₽</b> · 4 бизнеса · 6 районов</div>
+      </div>
+    </div>
+    <div class="tog" role="group" aria-label="Время суток">
+      <button type="button" id="btn-day" aria-pressed="true">День</button>
+      <button type="button" id="btn-night" aria-pressed="false">Ночь</button>
+    </div>
+  </header>
+
+  <div class="chips" role="group" aria-label="Что показать на карте">
+    <button type="button" id="f-all" aria-pressed="true">Все</button>
+    <button type="button" id="f-mine" aria-pressed="false"><span class="dot" style="background:var(--gold)"></span>Мои</button>
+    <button type="button" id="f-lots" aria-pressed="false"><span class="dot" style="background:var(--lot)"></span>Свободные участки</button>
+    <button type="button" id="f-rivals" aria-pressed="false"><span class="dot" style="background:var(--down)"></span>Конкуренты</button>
+    <button type="button" id="f-heat" aria-pressed="false">Спрос</button>
+    <button type="button" id="f-grow"><span class="dot" style="background:#FB923C"></span>Рост города ▸</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="stage-msg" id="msg">Строим твой город…</div>
+    <div class="legend" id="legend">
+      <span><i style="background:var(--gold)"></i>Твои бизнесы</span>
+      <span><i style="background:#8A8F98"></i>Флажок — конкурент</span>
+      <span><i style="background:var(--lot)"></i>Свободный участок</span>
+      <span><i style="background:#FB923C"></i>Стройка — район скоро откроется</span>
+      <span class="heat-scale"><em>Спрос</em><i></i></span>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+    <div class="card" id="card" hidden aria-live="polite">
+      <div class="card-head">
+        <span class="card-dot" id="c-dot"></span>
+        <div class="card-title"><div class="card-name" id="c-name"></div><div class="card-owner" id="c-owner"></div></div>
+        <span class="tag" id="c-tag"></span>
+        <button type="button" class="close" id="c-close" aria-label="Закрыть">×</button>
+      </div>
+      <div class="card-desc" id="c-desc"></div>
+      <div class="stats" id="c-stats"></div>
+      <div class="actions"><button type="button" class="primary" id="c-a1"></button><button type="button" id="c-a2"></button></div>
+    </div>
+  </div>
+
+  <nav class="tabs" aria-label="Разделы игры">
+    <button type="button" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"></path><path d="M9 4v14M15 6v14"></path></svg>Карта</button>
+    <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"></path><path d="M5 21V9l7-5 7 5v12"></path><path d="M9 21v-6h6v6"></path></svg>Империя</button>
+    <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 4 4 8-9"></path><path d="M15 6h5v5"></path></svg>Рынок</button>
+    <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3"></path><path d="M7 5H4v2a3 3 0 0 0 3 3"></path></svg>Рейтинг</button>
+    <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Профиль</button>
+  </nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const msg = document.getElementById('msg');
+  if (!window.THREE) { msg.textContent = '3D-библиотека не загрузилась. Обнови страницу.'; return; }
+
+  const ready = document.fonts && document.fonts.ready
+    ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))])
+    : Promise.resolve();
+  ready.then(init);
+
+  function init(){
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+    catch (e) { msg.textContent = 'Это устройство не поддерживает 3D. В игре здесь включится простой 2D-режим.'; return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const canvas = renderer.domElement;
+    canvas.setAttribute('aria-label', '3D-улица с твоими бизнесами');
+    stage.prepend(canvas);
+    msg.remove();
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    /* ---------- scene, camera, light ---------- */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x10131d);
+    scene.fog = new THREE.Fog(0x10131d, 25, 48);
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+    const OFFSET = new THREE.Vector3(7, 11, 17);
+    const HOME = new THREE.Vector3(0, 2.4, 1);
+    const target = HOME.clone();
+    const LIGHT_OFF = new THREE.Vector3(8, 14, 10);
+    function placeCamera(){
+      camera.position.copy(target).add(OFFSET); camera.lookAt(target);
+      dir.position.copy(target).add(LIGHT_OFF); dir.target.position.copy(target); dir.target.updateMatrixWorld();
+    }
+
+    function resize(){
+      const w = stage.clientWidth, h = stage.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      const a = w / h; let hw, hh;
+      if (a < 1.3) { hw = 9; hh = hw / a; } else { hh = 7; hw = hh * a; }
+      camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh;
+      camera.updateProjectionMatrix();
+    }
+    new ResizeObserver(resize).observe(stage);
+    resize();
+
+    const hemi = new THREE.HemisphereLight(0x6f7fb0, 0x1a1a22, 0.32);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0x9fb0ff, 0.22);
+    dir.position.set(8, 14, 10);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    Object.assign(dir.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 0.5, far: 60 });
+    dir.shadow.bias = -0.0006;
+    scene.add(dir); scene.add(dir.target);
+
+    /* ---------- materials & helpers ---------- */
+    const MCACHE = new Map();
+    const M = (c, o) => { const k = c + (o ? JSON.stringify(o) : ''); let m = MCACHE.get(k); if (!m) { m = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .85, metalness: 0, flatShading: true }, o || {})); MCACHE.set(k, m); } return m; };
+    const winMat = M(0x2a2a30, { emissive: 0xffc66b, emissiveIntensity: 1, roughness: .3, flatShading: false });
+    const doorMat = M(0x1a1410);
+    const whiteMat = M(0xf0ece4);
+    const darkMat = M(0x14161b);
+    const woodMat = M(0x8a6a45);
+    const leafMat = M(0x3f8f5a);
+    const brickMat = M(0x8c4a32);
+    const roofMat = M(0xa8492f);
+    const steelMat = M(0x9aa0aa);
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0xa9d4f5, transparent: true, opacity: .3, roughness: .1, metalness: .2 });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffe08a });
+    // night lighting: soft glows around bulbs and warm light pools on the ground (no real lights, cheap on phones)
+    const glowTex = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d');
+      const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      gr.addColorStop(0, 'rgba(255,214,140,1)'); gr.addColorStop(.35, 'rgba(255,190,100,.42)'); gr.addColorStop(1, 'rgba(255,170,80,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    })();
+    const glowMat = new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+    const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .5 });
+    function glow(x, y, z, s){ const sp = new THREE.Sprite(glowMat); sp.scale.set(s, s, 1); sp.position.set(x, y, z); scene.add(sp); return sp; }
+    function pool(x, z, s, y){ const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), poolMat); m.rotation.x = -Math.PI / 2; m.position.set(x, y || .13, z); scene.add(m); return m; }
+
+    function box(w, h, d, m){ const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.castShadow = true; me.receiveShadow = true; return me; }
+    function cyl(r1, r2, h, m, s){ const me = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, s || 10), m); me.castShadow = true; me.receiveShadow = true; return me; }
+    function cone(r, h, m, s){ const me = new THREE.Mesh(new THREE.ConeGeometry(r, h, s || 10), m); me.castShadow = true; return me; }
+    function panel(w, h, m){ return new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); }
+    function add(parent, mesh, x, y, z){ mesh.position.set(x, y, z); parent.add(mesh); return mesh; }
+    function body(g, w, h, d, m, x){ return add(g, box(w, h, d, m), x || 0, h / 2, -d / 2); }
+    function front(g, w, h, m, x, y, z){ return add(g, panel(w, h, m), x, y, z === undefined ? .012 : z); }
+
+    // gable roof, triangle facing the street, ridge running back
+    function gable(w, d, rh, m){
+      const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(0, rh); s.closePath();
+      const geo = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false }); geo.translate(0, 0, -d);
+      const me = new THREE.Mesh(geo, m); me.castShadow = true; me.receiveShadow = true; return me;
+    }
+    // pitched roof with the ridge running along the street
+    function eaveRoof(w, d, rh, m){
+      const s = new THREE.Shape(); s.moveTo(-d / 2, 0); s.lineTo(d / 2, 0); s.lineTo(0, rh); s.closePath();
+      const geo = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(Math.PI / 2);
+      const me = new THREE.Mesh(geo, m); me.castShadow = true; me.receiveShadow = true; return me;
+    }
+
+    function rr(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+    const texCache = {};
+    function signTex(lines, color, w, h){
+      const key = lines.join('|') + color + w + 'x' + h;
+      if (texCache[key]) return texCache[key];
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#0B0C0F'; g.fillRect(0, 0, w, h);
+      g.strokeStyle = color; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12);
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = color;
+      if (lines.length === 1) {
+        const size = Math.min(Math.round(h * 0.46), Math.round((w - 40) / Math.max(3, lines[0].length) * 1.25));
+        g.font = '700 ' + size + 'px Unbounded, Manrope, sans-serif';
+        g.fillText(lines[0], w / 2, h / 2 + 2);
+      } else {
+        g.font = '700 ' + Math.round(h * 0.28) + 'px Unbounded, Manrope, sans-serif';
+        g.fillText(lines[0], w / 2, h * 0.36);
+        g.font = '800 ' + Math.round(h * 0.2) + 'px Manrope, sans-serif';
+        g.fillStyle = '#F2F2F4';
+        g.fillText(lines[1], w / 2, h * 0.7);
+      }
+      const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+      texCache[key] = t; return t;
+    }
+    function sign(lines, color, w, h){
+      const t = signTex(lines, color, 512, Math.max(64, Math.round(512 * h / w)));
+      return panel(w, h, new THREE.MeshBasicMaterial({ map: t }));
+    }
+    function frontSign(g, text, color, w, y, x, z){
+      x = x || 0; z = z === undefined ? .03 : z;
+      add(g, box(w + .06, .48, .06, darkMat), x, y, z);
+      add(g, sign([text], color, w, .42), x, y, z + .035);
+    }
+    function vSignTex(text, color){
+      const key = 'v' + text + color;
+      if (texCache[key]) return texCache[key];
+      const c = document.createElement('canvas'); c.width = 128; c.height = 512;
+      const g = c.getContext('2d');
+      g.fillStyle = '#120d1a'; g.fillRect(0, 0, 128, 512);
+      g.strokeStyle = color; g.lineWidth = 6; g.strokeRect(5, 5, 118, 502);
+      g.fillStyle = color; g.shadowColor = color; g.shadowBlur = 16;
+      g.font = '700 50px Unbounded, Manrope, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const chars = Array.from(text), step = 490 / chars.length;
+      chars.forEach((ch, i) => g.fillText(ch, 64, 11 + step * (i + .5)));
+      const t = new THREE.CanvasTexture(c); texCache[key] = t; return t;
+    }
+    function bladeSign(g, text, color, x, y, z){
+      add(g, box(.06, 2.16, .48, darkMat), x, y, z);
+      const b = panel(.42, 2.1, new THREE.MeshBasicMaterial({ map: vSignTex(text, color) }));
+      b.rotation.y = Math.PI / 2; add(g, b, x + .04, y, z);
+    }
+
+    function awning(width, accentHex, depth){
+      depth = depth || .75;
+      const g = new THREE.Group();
+      const accent = M(accentHex);
+      const n = Math.max(4, Math.round(width / 0.32)), sw = width / n;
+      for (let i = 0; i < n; i++) {
+        const s = box(sw, .05, depth, i % 2 ? whiteMat : accent);
+        s.position.set(-width / 2 + sw * (i + .5), 0, depth / 2); g.add(s);
+      }
+      g.rotation.x = .42;
+      return g;
+    }
+
+    const skins = [0xe9c9a5, 0xc99a6b, 0x8d5a3b, 0xf1d3b3];
+    const shirts = [0xb5543c, 0x3fbf8f, 0x6c7bd9, 0xd4a73a, 0xc9ccd3, 0xe07a9a, 0x56a3c9];
+    function person(){
+      const g = new THREE.Group();
+      add(g, box(.22, .14, .14, darkMat), 0, .07, 0);
+      add(g, cyl(.13, .17, .55, M(pick(shirts)), 8), 0, .41, 0);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), M(pick(skins), { flatShading: false }));
+      head.castShadow = true; add(g, head, 0, .8, 0);
+      return g;
+    }
+    function queue(g, x, n){
+      for (let i = 0; i < n; i++) { const p = person(); p.rotation.y = Math.PI; add(g, p, x + rand(-.08, .08), 0, .55 + i * .5); }
+    }
+    function cafeTable(accentHex){
+      const g = new THREE.Group();
+      add(g, cyl(.32, .32, .05, whiteMat, 12), 0, .55, 0);
+      add(g, cyl(.04, .05, .55, darkMat, 6), 0, .27, 0);
+      add(g, box(.24, .32, .24, M(0x5a4636)), -.48, .16, 0);
+      add(g, box(.24, .32, .24, M(0x5a4636)), .48, .16, 0);
+      add(g, cyl(.02, .02, 1.45, darkMat, 6), 0, .72, 0);
+      add(g, cone(.72, .32, M(accentHex)), 0, 1.5, 0);
+      return g;
+    }
+    function cup(scale, m){
+      const g = new THREE.Group();
+      add(g, cyl(.5, .5, .04, whiteMat, 16), 0, .02, 0);
+      add(g, cyl(.36, .28, .5, m, 14), 0, .29, 0);
+      add(g, cyl(.31, .31, .02, M(0x3a2316), 14), 0, .53, 0);
+      const h = new THREE.Mesh(new THREE.TorusGeometry(.15, .045, 8, 16), m); h.castShadow = true;
+      add(g, h, .38, .3, 0);
+      g.scale.setScalar(scale);
+      return g;
+    }
+    function loaf(len, col){
+      const me = new THREE.Mesh(new THREE.SphereGeometry(.5, 12, 8), M(col || 0xc98a45, { flatShading: false }));
+      me.scale.set(len, .22, .24); me.castShadow = true; return me;
+    }
+    function flowerBox(g, len, x, y, z){
+      add(g, box(len, .14, .16, M(0x2f5a3a)), x, y, z);
+      for (let i = 0; i < 3; i++) {
+        const f = new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 5), M(pick([0xe07a9a, 0xf2c46b, 0xffffff])));
+        add(g, f, x - len / 2 + len * (i + .5) / 3, y + .1, z);
+      }
+    }
+    function crate(g, x, y, z, fruit){
+      add(g, box(.42, .2, .32, woodMat), x, y + .1, z);
+      for (let i = 0; i < 3; i++) {
+        const f = new THREE.Mesh(new THREE.SphereGeometry(.075, 7, 5), M(fruit));
+        add(g, f, x - .12 + i * .12, y + .25, z + rand(-.05, .05));
+      }
+    }
+    function cart(){
+      const g = new THREE.Group();
+      add(g, box(.42, .26, .3, steelMat), 0, .45, 0);
+      add(g, box(.04, .04, .3, darkMat), -.25, .62, 0);
+      [[.15, .12], [.15, -.12], [-.15, .12], [-.15, -.12]].forEach(([x, z]) => add(g, box(.06, .06, .04, darkMat), x, .05, z));
+      add(g, box(.04, .3, .04, steelMat), .18, .2, 0);
+      return g;
+    }
+    function van(color, accHex){
+      const g = new THREE.Group();
+      add(g, box(1.6, .8, .78, M(color)), -.1, .55, 0);
+      add(g, box(.5, .55, .76, M(color)), .85, .42, 0);
+      add(g, box(.04, .28, .6, M(0x1d2230)), 1.1, .56, 0);
+      add(g, box(1.62, .14, .8, M(accHex)), -.1, .62, 0);
+      [[.55, .36], [.55, -.36], [-.55, .36], [-.55, -.36]].forEach(([x, z]) => {
+        const wh = cyl(.15, .15, .1, darkMat, 10); wh.rotation.x = Math.PI / 2; add(g, wh, x, .15, z);
+      });
+      return g;
+    }
+    function tree(){
+      const g = new THREE.Group();
+      add(g, cyl(.08, .11, .9, M(0x5a4030), 6), 0, .45, 0);
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(.5, .7), 0), leafMat);
+      crown.castShadow = true; add(g, crown, 0, 1.25, 0);
+      return g;
+    }
+    function emit(g, x, y, z, kind){ (g.userData.smoke = g.userData.smoke || []).push({ x, y, z, kind }); }
+    function neonEdge(g, w, d, h, neonMat, sideToo){
+      add(g, box(w + .14, .06, .06, neonMat), 0, h + .19, .07);
+      if (sideToo) add(g, box(.06, .06, d + .14, neonMat), w / 2 + .07, h + .19, -d / 2);
+    }
+
+    /* ---------- КОФЕЙНЯ: киоск → кафе → кафе с террасой → угловая → обжарка ---------- */
+    function buildCoffee(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      const neon = new THREE.MeshBasicMaterial({ color: T.neonHex });
+
+      if (L === 1) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .3, .12, d + .3, acc), 0, h + .06, -d / 2);
+        front(g, w * .72, .55, winMat, 0, .95);
+        add(g, box(w * .82, .08, .35, whiteMat), 0, .64, .17);
+        add(g, cup(.9, acc), 0, h + .12, -d / 2);
+        emit(g, 0, h + .62, -d / 2, 'steam');
+        const board = box(.42, .6, .06, darkMat); board.rotation.x = -.18; add(g, board, -w / 2 - .35, .3, .45);
+        const t = cafeTable(T.accentHex); t.position.set(w / 2 + .8, 0, .8); g.add(t);
+        g.userData.top = h + 1.0; return g;
+      }
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .12, .14, d + .12, trim), 0, h + .07, -d / 2);
+        front(g, w * .5, 1.0, winMat, -w * .18, .75);
+        front(g, .6, 1.15, doorMat, w * .32, .58);
+        const aw = awning(w * .62, T.accentHex); aw.position.set(-w * .18, 1.42, 0); g.add(aw);
+        frontSign(g, T.sign, T.accent, w * .68, 1.76);
+        flowerBox(g, w * .5, -w * .18, .18, .12);
+        add(g, cup(1.1, acc), 0, h + .14, -d / 2);
+        emit(g, 0, h + .74, -d / 2, 'steam');
+        const t = cafeTable(T.accentHex); t.position.set(-w * .18, 0, 1.15); g.add(t);
+        g.userData.top = h + 1.1; return g;
+      }
+      if (L === 3) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .12, .14, d + .12, trim), 0, h + .07, -d / 2);
+        front(g, w * .5, 1.0, winMat, -w * .18, .75);
+        front(g, .6, 1.15, doorMat, w * .32, .58);
+        const aw = awning(w * .62, T.accentHex); aw.position.set(-w * .18, 1.42, 0); g.add(aw);
+        frontSign(g, T.sign, T.accent, w * .7, 1.95);
+        for (let i = 0; i < 3; i++) {
+          const x = -w / 2 + (i + .5) * w / 3;
+          front(g, .55, .6, winMat, x, 2.62);
+          flowerBox(g, .62, x, 2.24, .1);
+        }
+        add(g, box(w, .05, .05, trim), 0, h + .45, -.08);
+        for (let x = -w / 2; x <= w / 2 + .01; x += w / 4) add(g, box(.05, .45, .05, trim), x, h + .22, -.08);
+        add(g, cup(.8, acc), -w / 2 + .6, h + .14, -d / 2 - .2);
+        emit(g, -w / 2 + .6, h + .6, -d / 2 - .2, 'steam');
+        const t1 = cafeTable(T.accentHex); t1.position.set(-1.05, 0, .95); g.add(t1);
+        const t2 = cafeTable(T.accentHex); t2.position.set(.25, 0, 1.05); g.add(t2);
+        g.userData.top = h + 1.0; return g;
+      }
+      if (L === 4) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .12, .14, d + .12, trim), 0, h + .07, -d / 2);
+        front(g, w * .86, 1.2, winMat, 0, .75);
+        const sp = panel(d * .7, 1.2, winMat); sp.rotation.y = Math.PI / 2; add(g, sp, w / 2 + .012, .75, -d * .4);
+        front(g, .6, 1.2, doorMat, -w / 2 + .55, .6, .02);
+        const aw = awning(w * .9, T.accentHex); aw.position.set(0, 1.5, 0); g.add(aw);
+        frontSign(g, T.sign, T.accent, w * .6, 2.08, -w * .12);
+        for (let i = 0; i < 4; i++) {
+          const x = -w / 2 + (i + .5) * w / 4;
+          front(g, .5, .6, winMat, x, 2.95);
+          flowerBox(g, .58, x, 2.58, .1);
+        }
+        neonEdge(g, w, d, h, neon, true);
+        add(g, box(.5, .06, .06, darkMat), w / 2 + .25, 2.35, .1);
+        add(g, cup(.75, neon), w / 2 + .5, 1.98, .1);
+        emit(g, w / 2 + .5, 2.45, .1, 'steam');
+        queue(g, -w / 2 + .55, 3);
+        const t = cafeTable(T.accentHex); t.position.set(w * .2, 0, 1.0); g.add(t);
+        g.userData.top = h + .6; return g;
+      }
+      // L5 — обжарка
+      body(g, w, h, d, wall);
+      add(g, box(w + .14, .18, d + .14, acc), 0, h + .09, -d / 2);
+      front(g, w * .78, 1.3, winMat, -.2, .8);
+      front(g, .7, 1.25, doorMat, w * .36, .63, .02);
+      frontSign(g, T.sign, T.accent, w * .72, 1.95);
+      [2.75, 3.65, 4.55].forEach(y => { for (let i = 0; i < 4; i++) front(g, .5, .6, winMat, -w / 2 + (i + .5) * w / 4, y); });
+      [-w / 2, -w / 6, w / 6, w / 2].forEach(x => add(g, box(.12, h - 2.3, .12, acc), x, 2.3 + (h - 2.3) / 2, .04));
+      const copper = M(0xb87333, { metalness: .45, roughness: .4, flatShading: false });
+      [0, 1].forEach(k => {
+        const x = -w / 2 - .45, z = -.55 - k * .95;
+        add(g, cyl(.36, .36, 2.6, copper, 14), x, 1.3, z);
+        add(g, cone(.38, .45, copper, 14), x, 2.83, z);
+        add(g, box(.08, .08, .5, copper), x + .3, 2.2, z);
+      });
+      add(g, cup(2.0, acc), w * .14, h + .18, -d / 2);
+      emit(g, w * .14, h + 1.3, -d / 2, 'steam');
+      const r1 = cafeTable(T.accentHex); r1.scale.setScalar(.8); r1.position.set(-w / 2 + .6, h + .18, -.5); g.add(r1);
+      const r2 = cafeTable(T.accentHex); r2.scale.setScalar(.8); r2.position.set(-w / 2 + .6, h + .18, -2.2); g.add(r2);
+      queue(g, w * .36, 4);
+      g.userData.top = h + 2.6; return g;
+    }
+
+    /* ---------- МАГАЗИН: ларёк → у дома → супермаркет → сетевой → ТЦ ---------- */
+    function buildShop(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      const neon = new THREE.MeshBasicMaterial({ color: T.neonHex });
+
+      if (L === 1) {
+        add(g, box(w, .85, .8, wall), 0, .425, -.4);
+        add(g, box(w, 1.7, .12, wall), 0, .85, -d + .06);
+        [[-w / 2, -.05], [w / 2, -.05], [-w / 2, -d + .1], [w / 2, -d + .1]].forEach(([x, z]) => add(g, cyl(.04, .04, 1.75, darkMat, 6), x, .87, z));
+        const aw = awning(w + .3, T.accentHex, d + .5); aw.rotation.x = .18; aw.position.set(0, 1.85, -d - .1); g.add(aw);
+        add(g, box(w * .95 + .06, .44, .05, darkMat), 0, 2.27, -d + .08);
+        add(g, sign(['ПРОДУКТЫ'], T.accent, w * .95, .38), 0, 2.27, -d + .11);
+        add(g, cyl(.03, .03, .3, darkMat, 6), -w * .38, 1.95, -d + .08); add(g, cyl(.03, .03, .3, darkMat, 6), w * .38, 1.95, -d + .08);
+        crate(g, -.55, .85, -.38, 0xf28c28); crate(g, 0, .85, -.38, 0x6bbf4a); crate(g, .55, .85, -.38, 0xd63c3c);
+        crate(g, -.5, 0, .38, 0xf2c94c); crate(g, .35, 0, .42, 0x6bbf4a);
+        g.userData.top = 2.8; return g;
+      }
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .12, .14, d + .12, trim), 0, h + .07, -d / 2);
+        const sx = -w * .15, sw = w * .55;
+        front(g, sw, 1.1, winMat, sx, .8);
+        [.55, .95].forEach(y => {
+          add(g, box(sw, .04, .06, whiteMat), sx, y, .04);
+          for (let i = 0; i < 6; i++) add(g, box(.1, .14, .05, M(pick([0xd63c3c, 0xf2c94c, 0x6bbf4a, 0x56a3c9, 0xf0ece4]))), sx - sw / 2 + .15 + i * (sw - .3) / 5, y + .09, .05);
+        });
+        front(g, .7, 1.25, M(0x1c2a3a), w * .33, .63);
+        add(g, box(w + .04, .5, .1, acc), 0, 1.72, .05);
+        add(g, sign([T.sign], T.accent, w * .7, .4), 0, 1.72, .105);
+        const c1 = cart(); c1.rotation.y = .3; add(g, c1, -w * .35, 0, .9);
+        const c2 = cart(); c2.rotation.y = .1; add(g, c2, -w * .35 + .55, 0, 1.0);
+        crate(g, w / 2 - .2, 0, .45, 0xf28c28);
+        g.userData.top = h + .6; return g;
+      }
+      if (L === 3) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .25, d + .1, trim), 0, h + .12, -d / 2);
+        front(g, w * .84, 1.5, winMat, 0, .85);
+        front(g, .55, 1.4, M(0x1c2a3a), -.3, .72, .02);
+        front(g, .55, 1.4, M(0x1c2a3a), .3, .72, .02);
+        add(g, box(1.8, .08, .9, acc), 0, 1.75, .45);
+        add(g, box(w + .04, .5, .1, acc), 0, 2.05, .05);
+        add(g, sign(['СУПЕРМАРКЕТ'], T.accent, w * .7, .4), 0, 2.05, .105);
+        [[-1, -1], [.2, -1.9], [1.1, -1.2]].forEach(([x, z]) => { add(g, box(.5, .35, .5, steelMat), x, h + .42, z); add(g, cyl(.16, .16, .03, darkMat, 10), x, h + .61, z); });
+        const cx = w / 2 - .45;
+        add(g, box(.05, .5, .05, steelMat), cx - .3, .25, .55); add(g, box(.05, .5, .05, steelMat), cx - .3, .25, 1.45);
+        add(g, box(.05, .05, .9, steelMat), cx - .3, .5, 1.0);
+        for (let i = 0; i < 3; i++) { const c = cart(); c.rotation.y = Math.PI / 2; add(g, c, cx, 0, .7 + i * .25); }
+        queue(g, -.9, 2);
+        g.userData.top = h + .9; return g;
+      }
+      if (L === 4) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .12, .14, d + .12, trim), 0, h + .07, -d / 2);
+        front(g, w * .86, 1.4, winMat, 0, .8);
+        front(g, .8, 1.35, M(0x1c2a3a), .4, .7, .02);
+        add(g, box(w + .04, 1.3, .08, acc), 0, 2.4, .04);
+        add(g, sign([T.sign], T.accent, w * .6, .5), -w * .1, 2.4, .085);
+        neonEdge(g, w, d, h, neon, true);
+        add(g, box(.95, .95, .95, acc), w / 2 - .65, h + .55, -.75);
+        add(g, box(.97, .08, .97, neon), w / 2 - .65, h + .14, -.75);
+        add(g, sign(['М'], T.neon, .82, .82), w / 2 - .65, h + .55, -.75 + .48);
+        bladeSign(g, T.sign, T.neon, w / 2 + .03, 2.3, -.4);
+        const v = van(0xf0ece4, T.accentHex); add(g, v, -w * .22, 0, 1.3);
+        const c1 = cart(); add(g, c1, w * .32, 0, .7);
+        queue(g, .4, 2);
+        g.userData.top = h + 1.6; return g;
+      }
+      // L5 — торговый центр
+      add(g, box(w, 2.4, d, wall), 0, 1.2, -d / 2);
+      front(g, w * .9, 1.8, winMat, 0, 1.05);
+      const d2 = d - .4, w2 = w - .6;
+      add(g, box(w2, 1.8, d2, wall), 0, 2.4 + .9, -d2 / 2 - .2);
+      for (let i = 0; i < 5; i++) front(g, .45, .7, winMat, -w2 / 2 + (i + .5) * w2 / 5, 3.3, -.2 + .012);
+      const d3 = d - .9, w3 = w - 1.4;
+      add(g, box(w3, 1.4, d3, trim), 0, 4.2 + .7, -d3 / 2 - .45);
+      add(g, box(w + .1, .07, .07, neon), 0, 2.43, .05);
+      add(g, box(w2 + .1, .07, .07, neon), 0, 4.23, -.15);
+      const atrium = cyl(.85, .85, 3.4, glassMat, 20); atrium.castShadow = false; add(g, atrium, 0, 1.7, .25);
+      add(g, cyl(.7, .7, 3.3, winMat, 20), 0, 1.65, .25);
+      add(g, cyl(.92, .92, .12, acc, 20), 0, 3.46, .25);
+      const sy = 5.6 + .65, sz = -d3 / 2 - .45;
+      add(g, cyl(.04, .04, .6, darkMat, 6), -1.1, 5.9, sz); add(g, cyl(.04, .04, .6, darkMat, 6), 1.1, 5.9, sz);
+      add(g, box(3.06, .76, .06, darkMat), 0, sy, sz - .03);
+      add(g, sign(['ТЦ МАГАЗИН'], T.neon, 3.0, .7), 0, sy, sz + .005);
+      [[-w / 2 + .25, 0xd63c3c], [-w / 2 + .75, 0xf2c94c], [w / 2 - .25, 0x6cb4ee]].forEach(([x, col]) => {
+        add(g, cyl(.03, .03, 2.3, steelMat, 6), x, 1.15, .6);
+        add(g, box(.02, .32, .5, M(col)), x, 2.1, .85);
+      });
+      queue(g, 1.3, 4);
+      g.userData.top = 7.2; return g;
+    }
+
+    /* ---------- ПЕКАРНЯ: прилавок → домик → дом с террасой → кафе с печью → хлебозавод ---------- */
+    function buildBakery(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      const neon = new THREE.MeshBasicMaterial({ color: T.neonHex });
+      const doorWood = M(0x5a3a22);
+
+      if (L === 1) {
+        add(g, box(w, .85, .8, woodMat), 0, .425, -.4);
+        add(g, box(w, 1.5, .1, wall), 0, .75, -d + .05);
+        [[-w / 2, -.05], [w / 2, -.05], [-w / 2, -d + .1], [w / 2, -d + .1]].forEach(([x, z]) => add(g, cyl(.05, .05, 1.6, woodMat, 6), x, .8, z));
+        add(g, gable(w + .3, d + .3, .55, roofMat), 0, 1.6, .15);
+        add(g, sign(['ХЛЕБ · ВЫПЕЧКА'], T.accent, 1.5, .32), 0, .5, .012);
+        [-.55, .05, .6].forEach(x => {
+          add(g, cyl(.22, .17, .14, woodMat, 10), x, .92, -.38);
+          const l1 = loaf(.36); l1.rotation.y = rand(-.6, .6); add(g, l1, x, 1.02, -.38);
+        });
+        const big = loaf(.5, 0xb4733a); add(g, big, -.3, .95, -.12);
+        g.userData.top = 2.6; return g;
+      }
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        add(g, box(.12, h, .12, trim), -w / 2, h / 2, .0); add(g, box(.12, h, .12, trim), w / 2, h / 2, .0);
+        add(g, box(w + .04, .1, .1, trim), 0, h, .02);
+        add(g, gable(w + .3, d + .3, 1.0, roofMat), 0, h, .15);
+        add(g, new THREE.Mesh(new THREE.CircleGeometry(.22, 16), winMat), 0, h + .38, .16);
+        add(g, box(.32, .9, .32, brickMat), w * .28, h + .75, -d * .6);
+        emit(g, w * .28, h + 1.25, -d * .6, 'smoke');
+        front(g, w * .5, .9, winMat, -w * .18, .8);
+        add(g, box(w * .55, .06, .25, woodMat), -w * .18, .38, .12);
+        for (let i = 0; i < 3; i++) { const l = loaf(.3); l.rotation.y = .3; add(g, l, -w * .18 - .4 + i * .4, .45, .14); }
+        front(g, .6, 1.2, doorWood, w * .3, .6);
+        frontSign(g, T.sign, T.accent, w * .6, 1.72, -w * .05);
+        add(g, box(.5, .05, .05, darkMat), w / 2 + .25, 1.6, .08);
+        const hs = sign(['ХЛЕБ'], T.accent, .55, .3); hs.rotation.y = Math.PI / 2; add(g, hs, w / 2 + .38, 1.38, .08);
+        g.userData.top = h + 1.7; return g;
+      }
+      if (L === 3) {
+        body(g, w, h, d, wall);
+        add(g, box(.12, h, .12, trim), -w / 2, h / 2, .0); add(g, box(.12, h, .12, trim), w / 2, h / 2, .0);
+        add(g, box(w + .04, .1, .1, trim), 0, 1.5, .03);
+        add(g, eaveRoof(w + .3, d + .3, 1.1, roofMat), 0, h, -d / 2);
+        add(g, box(.34, 1.0, .34, brickMat), w * .3, h + .8, -d * .55);
+        emit(g, w * .3, h + 1.35, -d * .55, 'smoke');
+        front(g, w * .45, .8, winMat, -w * .2, .72);
+        front(g, .6, 1.2, doorWood, w * .3, .6);
+        frontSign(g, T.sign, T.accent, w * .62, 1.82, 0);
+        [-w * .22, w * .22].forEach(x => {
+          front(g, .55, .6, winMat, x, 2.6);
+          add(g, box(.14, .6, .04, trim), x - .36, 2.6, .03); add(g, box(.14, .6, .04, trim), x + .36, 2.6, .03);
+          flowerBox(g, .62, x, 2.23, .1);
+        });
+        add(g, box(w + .2, .1, 1.5, woodMat), 0, .15, .85);
+        add(g, box(w + .2, .05, .05, woodMat), 0, .55, 1.58);
+        for (let x = -w / 2 - .1; x <= w / 2 + .11; x += (w + .2) / 4) add(g, box(.05, .4, .05, woodMat), x, .35, 1.58);
+        const t1 = cafeTable(T.accentHex); t1.position.set(-.9, .2, .85); g.add(t1);
+        const t2 = cafeTable(T.accentHex); t2.position.set(.45, .2, .95); g.add(t2);
+        add(g, box(.45, .05, .05, darkMat), w / 2 + .22, 1.95, .08);
+        const pz = new THREE.Mesh(new THREE.TorusGeometry(.2, .06, 8, 18), acc); pz.castShadow = true; add(g, pz, w / 2 + .42, 1.72, .08);
+        g.userData.top = h + 1.7; return g;
+      }
+      if (L === 4) {
+        const mx = .4, mw = 3.0, mh = 2.8, md = 2.6;
+        body(g, mw, mh, md, wall, mx);
+        add(g, box(.12, mh, .12, trim), mx - mw / 2, mh / 2, .0); add(g, box(.12, mh, .12, trim), mx + mw / 2, mh / 2, .0);
+        add(g, gable(mw + .3, md + .3, 1.2, roofMat), mx, mh, .15);
+        const pz = new THREE.Mesh(new THREE.TorusGeometry(.28, .07, 8, 20), neon); add(g, pz, mx, mh + .45, .17);
+        front(g, mw * .5, 1.0, winMat, mx - .45, .75);
+        add(g, box(mw * .55, .06, .25, woodMat), mx - .45, .23, .12);
+        for (let i = 0; i < 3; i++) { const l = loaf(.3); add(g, l, mx - .85 + i * .4, .3, .14); }
+        front(g, .6, 1.2, doorWood, mx + 1.0, .6);
+        frontSign(g, 'ПЕКАРНЯ·КАФЕ', T.accent, mw * .72, 1.72, mx - .25);
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(.8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), brickMat);
+        dome.castShadow = true; dome.receiveShadow = true; add(g, dome, -1.45, 0, -.9);
+        const fireMat = new THREE.MeshBasicMaterial({ color: 0xff7a2a, side: THREE.DoubleSide });
+        add(g, new THREE.Mesh(new THREE.CircleGeometry(.32, 16, 0, Math.PI), fireMat), -1.45, .01, -.08);
+        g.userData.flicker = [fireMat];
+        add(g, cyl(.1, .1, 1.0, brickMat, 8), -1.45, 1.1, -1.05);
+        emit(g, -1.45, 1.65, -1.05, 'smoke');
+        add(g, box(.5, .4, .3, woodMat), -1.9, .2, .2);
+        queue(g, mx + 1.0, 3);
+        const t = cafeTable(T.accentHex); t.position.set(mx - .45, 0, 1.15); g.add(t);
+        g.userData.top = mh + 1.8; return g;
+      }
+      // L5 — хлебозавод
+      add(g, box(w, 1.2, d, brickMat), 0, .6, -d / 2);
+      add(g, box(w, h - 1.2, d, wall), 0, 1.2 + (h - 1.2) / 2, -d / 2);
+      for (let i = 0; i < 3; i++) add(g, gable(1.4, d + .2, .8, roofMat), -w / 2 + .7 + i * 1.4, h, .1);
+      for (let i = 0; i < 4; i++) {
+        const x = -w / 2 + (i + .5) * w / 4;
+        front(g, .75, .7, winMat, x, 2.35);
+        add(g, box(.04, .7, .03, darkMat), x, 2.35, .03);
+      }
+      front(g, 1.3, 1.1, M(0x3a3e48), w * .25, .55);
+      for (let i = 0; i < 4; i++) add(g, box(1.3, .03, .02, M(0x5a5f6b)), w * .25, .15 + i * .27, .03);
+      front(g, .55, 1.0, doorWood, -w * .12, .5);
+      add(g, cyl(.04, .04, .7, darkMat, 6), -1.2, h + 1.0, .2); add(g, cyl(.04, .04, .7, darkMat, 6), 1.2, h + 1.0, .2);
+      add(g, box(2.96, .66, .06, darkMat), 0, h + 1.2, .17);
+      add(g, sign(['ХЛЕБОЗАВОД'], T.accent, 2.9, .6), 0, h + 1.2, .205);
+      const giant = loaf(2.6, 0xc98a45); giant.scale.set(2.6, .45, .5); add(g, giant, 0, h + 1.82, .2);
+      for (let i = 0; i < 4; i++) add(g, box(.08, .1, .52, M(0xe8c38a)), -.9 + i * .6, h + 1.95, .2);
+      [[-w / 2 + .5, -d + .6], [-w / 2 + 1.15, -d + .5]].forEach(([x, z]) => {
+        add(g, cyl(.22, .26, 2.8, brickMat, 12), x, h + 1.4, z);
+        add(g, cyl(.235, .235, .12, whiteMat, 12), x, h + 2.2, z);
+        emit(g, x, h + 2.9, z, 'smoke');
+      });
+      const gold = M(0xd9b56a);
+      add(g, cyl(.55, .55, 3.6, gold, 16), w / 2 + .4, 1.8, -1.6);
+      add(g, cone(.6, .5, gold, 16), w / 2 + .4, 3.85, -1.6);
+      add(g, box(.06, 3.4, .14, darkMat), w / 2 + .4, 1.8, -1.0);
+      const v = van(0xf0ece4, T.accentHex); add(g, v, -w * .22, 0, 1.3);
+      g.userData.top = h + 2.6; return g;
+    }
+
+    /* ---------- props for the new businesses ---------- */
+    const cardMat = M(0xc8a06a), tapeMat = M(0xe8d7b0), concreteMat = M(0x9a9a96), ribMat = M(0xa3a9b3);
+    function addAnim(g, fn){ (g.userData.anims = g.userData.anims || []).push(fn); }
+    function parcel(g, x, y, z, s){
+      s = s || .3;
+      add(g, box(s, s * .7, s * .8, cardMat), x, y + s * .35, z);
+      add(g, box(s + .01, .03, s * .2, tapeMat), x, y + s * .7 + .005, z);
+    }
+    function parcelStack(g, x, z, n, s){ s = s || .3; for (let i = 0; i < n; i++) parcel(g, x + rand(-.03, .03), i * s * .7, z, s); }
+    function pallet(g, x, z){ add(g, box(.8, .1, .8, woodMat), x, .05, z); }
+    function ribs(g, w, h, z, m, step){ for (let x = -w / 2 + .15; x < w / 2 - .05; x += step || .35) add(g, box(.05, h, .03, m), x, h / 2, z); }
+    function rollDoor(g, w, h, x, y0, z){
+      add(g, panel(w, h, M(0x4a4e57)), x, y0 + h / 2, z);
+      for (let i = 1; i < 6; i++) add(g, box(w, .02, .02, M(0x5f646e)), x, y0 + h * i / 6, z + .01);
+    }
+    function holding(p){ add(p, box(.28, .2, .22, cardMat), 0, .5, .2); return p; }
+    function megaphone(m){
+      const g = new THREE.Group(), inner = new THREE.Group();
+      const c = cone(.3, .55, m, 14); c.rotation.x = -Math.PI / 2; add(inner, c, 0, 0, .08);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(.3, .04, 6, 18), whiteMat); add(inner, rim, 0, 0, .355);
+      add(inner, new THREE.Mesh(new THREE.CircleGeometry(.27, 16), darkMat), 0, 0, .35);
+      add(inner, cyl(.06, .06, .3, darkMat, 8), 0, -.18, -.1);
+      inner.rotation.x = -.4; g.add(inner);
+      return g;
+    }
+    function scooter(g, x, z, accHex){
+      const s = new THREE.Group();
+      add(s, box(.7, .06, .18, darkMat), 0, .14, 0);
+      add(s, cyl(.025, .025, .8, steelMat, 6), .32, .52, 0);
+      add(s, box(.04, .04, .4, darkMat), .32, .92, 0);
+      [-.3, .32].forEach(wx => { const wh = cyl(.1, .1, .06, darkMat, 10); wh.rotation.x = Math.PI / 2; add(s, wh, wx, .1, 0); });
+      const p = person(); p.rotation.y = Math.PI / 2; add(s, p, -.05, .17, 0);
+      add(s, box(.3, .32, .3, M(accHex)), -.3, .85, 0);
+      s.position.set(x, 0, z); g.add(s); return s;
+    }
+    function drone(accHex){
+      const g = new THREE.Group();
+      add(g, box(.34, .08, .34, M(accHex)), 0, 0, 0);
+      [[.24, .24], [.24, -.24], [-.24, .24], [-.24, -.24]].forEach(([x, z]) => {
+        add(g, box(.04, .03, .04, darkMat), x, .02, z);
+        add(g, cyl(.11, .11, .015, M(0xdddddd), 10), x, .05, z);
+      });
+      add(g, box(.18, .14, .14, cardMat), 0, -.13, 0);
+      return g;
+    }
+    function locker(g, w, h, x, z, accHex){
+      add(g, box(w, h, .6, M(accHex)), x, h / 2, z - .3);
+      const cols = Math.max(2, Math.round(w / .32)), rows = Math.max(3, Math.round(h / .32));
+      const dm = M(0xccfbf1), cr = Math.floor(rows / 2), cc = Math.floor(cols / 2);
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const m = (r === cr && c === cc) ? new THREE.MeshBasicMaterial({ color: 0x1e3a8a }) : dm;
+        add(g, panel(w / cols - .04, h / rows - .04, m), x - w / 2 + (c + .5) * w / cols, (r + .5) * h / rows, z + .012);
+      }
+    }
+    function tumba(g, x, z){
+      const cols = [0xf472b6, 0xfacc15, 0x60a5fa, 0x34d399];
+      add(g, cyl(.32, .32, 1.5, M(0xe8e4dc), 14), x, .75, z);
+      for (let i = 0; i < 4; i++) add(g, cyl(.33, .33, .26, M(cols[i]), 14), x, .25 + i * .34, z);
+      add(g, new THREE.Mesh(new THREE.SphereGeometry(.34, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(0x2b2d3a)), x, 1.5, z);
+    }
+    function adTex(title, sub, bg, fg){
+      const key = 'ad' + title + sub + bg;
+      if (texCache[key]) return texCache[key];
+      const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+      const g = c.getContext('2d');
+      g.fillStyle = bg; g.fillRect(0, 0, 512, 256);
+      g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '700 60px Unbounded, Manrope, sans-serif'; g.fillText(title, 256, 106);
+      g.font = '800 34px Manrope, sans-serif'; g.fillText(sub, 256, 178);
+      const t = new THREE.CanvasTexture(c); texCache[key] = t; return t;
+    }
+    const ADS = [adTex('СКИДКИ', '−30% на всё', '#F472B6', '#1a1b24'), adTex('ЛАТТЕ', '2 по цене 1', '#FACC15', '#1a1b24'),
+      adTex('ДОСТАВКА', 'за 15 минут', '#60A5FA', '#0b0c0f'), adTex('ХЛЕБ', 'свежий с 7:00', '#34D399', '#0b0c0f')];
+    function poster(g, w, h, i, x, y, z){ return add(g, panel(w, h, new THREE.MeshBasicMaterial({ map: ADS[i % ADS.length] })), x, y, z); }
+    function adScreen(g, w, h, x, y, z){
+      const m = new THREE.MeshBasicMaterial({ map: ADS[0] });
+      add(g, box(w + .1, h + .1, .06, darkMat), x, y, z - .02);
+      add(g, panel(w, h, m), x, y, z + .015);
+      const off = Math.floor(rand(0, 4));
+      addAnim(g, t => { m.map = ADS[(Math.floor(t / 2.2) + off) % ADS.length]; });
+    }
+    function trafficCone(g, x, z){
+      add(g, cone(.13, .42, M(0xf97316), 10), x, .21, z);
+      add(g, cyl(.085, .1, .07, whiteMat, 10), x, .24, z);
+      add(g, box(.3, .03, .3, M(0xf97316)), x, .015, z);
+    }
+    function sandPile(g, x, z){ add(g, cone(.6, .45, M(0xc9a66b), 10), x, .22, z); }
+    function bricks(g, x, z){ pallet(g, x, z); add(g, box(.7, .45, .7, brickMat), x, .32, z); }
+    function cont(g, w, h, d, x, y, z, m){
+      add(g, box(w, h, d, m), x, y + h / 2, z - d / 2);
+      for (let xx = x - w / 2 + .12; xx < x + w / 2 - .05; xx += .25) add(g, box(.03, h - .08, .03, m), xx, y + h / 2, z + .012);
+    }
+    function wheel(g, x, y, z, r){ const wh = cyl(r, r, .12, darkMat, 10); wh.rotation.x = Math.PI / 2; add(g, wh, x, y, z); }
+    function excavator(g, x, z, accHex){
+      const e = new THREE.Group(), m = M(accHex);
+      add(e, box(.9, .2, .5, darkMat), 0, .1, 0);
+      add(e, box(.62, .32, .46, m), -.05, .36, 0);
+      add(e, box(.3, .38, .4, m), -.18, .71, 0);
+      add(e, panel(.22, .22, winMat), -.18, .76, .205);
+      const a1 = box(.08, .7, .08, m); a1.rotation.z = -.7; add(e, a1, .42, .62, 0);
+      const a2 = box(.08, .5, .08, m); a2.rotation.z = .5; add(e, a2, .74, .58, 0);
+      add(e, box(.22, .16, .3, darkMat), .84, .3, 0);
+      e.position.set(x, 0, z); g.add(e);
+    }
+    function towerCrane(g, x, z, h, accHex){
+      const m = M(accHex);
+      add(g, box(.5, .2, .5, concreteMat), x, .1, z);
+      add(g, box(.2, h, .2, m), x, h / 2, z);
+      for (let y = .5; y < h; y += .5) add(g, box(.23, .03, .23, darkMat), x, y, z);
+      const jib = new THREE.Group(); jib.userData.keep = true; jib.position.set(x, h, z);
+      add(jib, box(.3, .3, .3, m), 0, .15, 0);
+      add(jib, box(3.2, .12, .14, m), -1.3, .3, 0);
+      add(jib, box(1.0, .12, .14, m), .8, .3, 0);
+      add(jib, box(.4, .35, .3, concreteMat), 1.15, .15, 0);
+      add(jib, box(.02, 1.4, .02, darkMat), -2.6, -.4, 0);
+      add(jib, box(.3, .1, .3, cardMat), -2.6, -1.15, 0);
+      g.add(jib);
+      const ph = rand(0, 6);
+      addAnim(g, t => { jib.rotation.y = Math.sin(t * .25 + ph) * .9; });
+    }
+    function dumpTruck(g, x, z, accHex){
+      const t = new THREE.Group();
+      add(t, box(.6, .7, .8, M(accHex)), .75, .55, 0);
+      add(t, box(.04, .3, .62, M(0x1d2230)), 1.06, .68, 0);
+      add(t, box(1.4, .15, .8, darkMat), -.15, .3, 0);
+      const bed = box(1.2, .45, .78, M(0x6b7280)); bed.rotation.z = .1; add(t, bed, -.25, .62, 0);
+      add(t, cone(.45, .3, M(0xc9a66b), 8), -.25, .95, 0);
+      [[.75, .36], [.75, -.36], [-.55, .36], [-.55, -.36]].forEach(([wx, wz]) => wheel(t, wx, .17, wz, .17));
+      t.position.set(x, 0, z); g.add(t);
+    }
+    function mixerTruck(g, x, z, accHex){
+      const t = new THREE.Group();
+      add(t, box(.6, .7, .8, M(accHex)), .8, .55, 0);
+      add(t, box(.04, .3, .62, M(0x1d2230)), 1.11, .68, 0);
+      add(t, box(1.7, .15, .7, darkMat), 0, .3, 0);
+      const holder = new THREE.Group(); holder.userData.keep = true; holder.position.set(-.2, .85, 0); holder.rotation.z = Math.PI / 2 - .25;
+      const drum = new THREE.Group();
+      add(drum, cyl(.32, .42, 1.1, M(0xe5e7eb), 12), 0, 0, 0);
+      for (let i = 0; i < 3; i++) { const s = box(.08, 1.0, .1, M(accHex)); s.position.set(Math.cos(i * 2.1) * .38, 0, Math.sin(i * 2.1) * .38); drum.add(s); }
+      holder.add(drum); t.add(holder);
+      [.8, -.2, -.6].forEach(wx => { wheel(t, wx, .17, .36, .17); wheel(t, wx, .17, -.36, .17); });
+      t.position.set(x, 0, z); g.add(t);
+      addAnim(g, (tt, dt) => { drum.rotation.y += dt * 1.6; });
+    }
+    function roofSign(g, text, color, w, y, z, x){
+      x = x || 0;
+      add(g, cyl(.04, .04, .6, darkMat, 6), x - w / 2 + .2, y - .35, z); add(g, cyl(.04, .04, .6, darkMat, 6), x + w / 2 - .2, y - .35, z);
+      add(g, box(w + .06, .62, .06, darkMat), x, y, z - .03);
+      add(g, sign([text], color, w, .56), x, y, z + .005);
+    }
+
+    /* ---------- МАРКЕТПЛЕЙС: гараж → мини-склад → склад с конвейером → фулфилмент → хаб ---------- */
+    function buildMarket(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      const neon = new THREE.MeshBasicMaterial({ color: T.neonHex });
+      if (L === 1) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .1, d + .1, trim), 0, h + .05, -d / 2);
+        front(g, w * .78, 1.15, M(0x2a2633), 0, .58);
+        add(g, box(w * .8, .32, .08, acc), 0, 1.32, .04);
+        parcelStack(g, -.7, .45, 3); parcelStack(g, -.25, .55, 2); parcelStack(g, .25, .4, 3, .34);
+        add(g, box(.8, .05, .45, woodMat), w / 2 + .6, .62, .6);
+        add(g, box(.05, .6, .4, darkMat), w / 2 + .25, .3, .6); add(g, box(.05, .6, .4, darkMat), w / 2 + .95, .3, .6);
+        add(g, box(.3, .02, .22, darkMat), w / 2 + .6, .66, .62);
+        const scr = panel(.3, .2, neon); scr.rotation.x = -.3; add(g, scr, w / 2 + .6, .77, .52);
+        add(g, box(w * .9 + .06, .44, .06, darkMat), 0, h + .33, -.3);
+        add(g, sign(['МАРКЕТ'], T.accent, w * .9, .38), 0, h + .33, -.265);
+        g.userData.top = h + .9; return g;
+      }
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        ribs(g, w, h - .45, .02, ribMat);
+        add(g, box(w + .12, .12, d + .12, trim), 0, h + .06, -d / 2);
+        add(g, box(w + .04, .42, .08, acc), 0, h - .25, .04);
+        add(g, sign(['СКЛАД'], T.neon, w * .45, .34), 0, h - .25, .085);
+        rollDoor(g, w * .5, 1.45, -w * .17, 0, .04);
+        front(g, .55, 1.1, doorMat, w * .3, .55, .04);
+        pallet(g, w / 2 + .6, .6); parcelStack(g, w / 2 + .45, .45, 2, .34); parcelStack(g, w / 2 + .8, .75, 3);
+        g.userData.top = h + .6; return g;
+      }
+      if (L === 3) {
+        body(g, w, h, d, wall);
+        ribs(g, w, h - .5, .02, ribMat);
+        add(g, box(w + .12, .12, d + .12, trim), 0, h + .06, -d / 2);
+        frontSign(g, 'МАРКЕТПЛЕЙС', T.accent, w * .62, h - .3, 0, .04);
+        add(g, box(w * .45, .6, .9, concreteMat), -w * .2, .3, .45);
+        rollDoor(g, w * .38, 1.3, -w * .2, .6, .04);
+        rollDoor(g, w * .25, 1.6, w * .3, 0, .04);
+        add(g, box(.42, .06, 1.3, darkMat), -w * .2, .63, .6);
+        const moving = [];
+        for (let i = 0; i < 3; i++) { const p = new THREE.Group(); p.userData.keep = true; parcel(p, 0, 0, 0, .26); add(g, p, -w * .2, .66, 0); moving.push(p); }
+        addAnim(g, t => { moving.forEach((p, i) => { p.position.z = .05 + ((t * .3 + i / 3) % 1) * 1.15; }); });
+        parcelStack(g, -w * .2, 1.6, 2);
+        add(g, box(.5, .35, .5, steelMat), -w * .25, h + .3, -1.2); add(g, box(.5, .35, .5, steelMat), w * .2, h + .3, -1.6);
+        g.userData.top = h + .7; return g;
+      }
+      if (L === 4) {
+        body(g, w, h, d, wall);
+        let i = 0;
+        for (let x = -w / 2 + .25; x < w / 2; x += .5, i++) add(g, box(.48, h - .2, .04, i % 4 === 0 ? acc : ribMat), x, (h - .2) / 2, .02);
+        add(g, box(w + .12, .14, d + .12, trim), 0, h + .07, -d / 2);
+        add(g, box(w * .5, .6, .9, concreteMat), -w * .18, .3, .45);
+        rollDoor(g, w * .19, 1.3, -w * .3, .6, .05); rollDoor(g, w * .19, 1.3, -w * .06, .6, .05);
+        rollDoor(g, w * .22, 1.8, w * .3, 0, .05);
+        neonEdge(g, w, d, h, neon, true);
+        roofSign(g, 'ФУЛФИЛМЕНТ', T.neon, w * .85, h + .75, -.4);
+        const v = van(0xf0ece4, T.accentHex); add(g, v, -w * .2, 0, 1.6);
+        parcelStack(g, w * .3, 1.0, 3);
+        g.userData.top = h + 1.4; return g;
+      }
+      const bh = 2.2;
+      body(g, w, bh, d, wall);
+      const s = new THREE.Shape(); s.absellipse(0, 0, w / 2 + .05, 1.25, 0, Math.PI, false);
+      const geo = new THREE.ExtrudeGeometry(s, { depth: d + .1, bevelEnabled: false, curveSegments: 16 }); geo.translate(0, 0, -d - .05);
+      const arch = new THREE.Mesh(geo, M(0xc7cbd3)); arch.castShadow = true; arch.receiveShadow = true; add(g, arch, 0, bh, 0);
+      const s2 = new THREE.Shape(); s2.absellipse(0, 0, w * .3, .85, 0, Math.PI, false);
+      add(g, new THREE.Mesh(new THREE.ShapeGeometry(s2, 12), winMat), 0, bh + .05, .06);
+      add(g, box(w + .04, .4, .08, acc), 0, bh - .12, .04);
+      add(g, sign(['МАРКЕТПЛЕЙС'], T.neon, w * .62, .32), 0, bh - .12, .085);
+      for (let k = 0; k < 3; k++) rollDoor(g, w * .22, 1.4, -w * .3 + k * w * .3, 0, .04);
+      add(g, cyl(.5, .5, .05, M(0x3a3e48), 16), 0, bh + 1.28, -d / 2);
+      const dr = drone(T.accentHex); dr.userData.keep = true; dr.scale.setScalar(1.9); add(g, dr, 0, bh + 1.9, -d / 2);
+      addAnim(g, t => { dr.position.y = bh + 1.95 + Math.sin(t * 2) * .2; dr.position.x = Math.sin(t * .7) * .5; dr.rotation.y = t * .6; });
+      const v = van(0xf0ece4, T.accentHex); add(g, v, -w * .22, 0, 1.6);
+      pallet(g, w * .33, 1.1); parcelStack(g, w * .3, 1.0, 3); parcelStack(g, w * .38, 1.25, 2);
+      g.userData.top = bh + 2.6; return g;
+    }
+
+    /* ---------- ПВЗ: постамат → киоск → пункт выдачи → двухэтажный → сортировочный центр ---------- */
+    function buildPvz(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      const neon = new THREE.MeshBasicMaterial({ color: T.neonHex });
+      if (L === 1) {
+        locker(g, 1.4, 1.8, 0, 0, T.accentHex);
+        add(g, box(1.9, .08, 1.3, M(0x3a3e48)), 0, 1.98, -.15);
+        add(g, cyl(.03, .03, 1.95, darkMat, 6), -.88, .975, .4); add(g, cyl(.03, .03, 1.95, darkMat, 6), .88, .975, .4);
+        add(g, box(1.66, .34, .05, darkMat), 0, 2.24, .4);
+        add(g, sign(['ПОСТАМАТ'], T.neon, 1.6, .3), 0, 2.24, .43);
+        const p = holding(person()); add(g, p, .5, 0, .8);
+        g.userData.top = 2.9; return g;
+      }
+      const shelves = (x0, ww, ys, n) => ys.forEach(y => {
+        add(g, box(ww, .03, .08, whiteMat), x0, y, .05);
+        for (let i = 0; i < n; i++) parcel(g, x0 - ww / 2 + (i + .5) * ww / n, y + .015, .07, .18);
+      });
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .12, d + .1, trim), 0, h + .06, -d / 2);
+        add(g, box(w + .04, .45, .08, acc), 0, h - .25, .04);
+        add(g, sign(['ПВЗ'], T.neon, w * .62, .38), 0, h - .25, .085);
+        front(g, w * .55, 1.0, winMat, -w * .17, .8);
+        shelves(-w * .17, w * .55, [.5, .9], 4);
+        front(g, .55, 1.15, M(0x1c2a3a), w * .32, .58);
+        const p = holding(person()); add(g, p, w * .32, 0, .95);
+        g.userData.top = h + .6; return g;
+      }
+      if (L === 3 || L === 4) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .12, d + .1, trim), 0, h + .06, -d / 2);
+        const bandY = L === 3 ? h - .3 : 2.02;
+        add(g, box(w + .04, .48, .08, acc), 0, bandY, .04);
+        add(g, sign(['ПУНКТ ВЫДАЧИ'], T.neon, w * .72, .38), 0, bandY, .085);
+        front(g, w * .62, 1.5, winMat, -w * .16, .9);
+        shelves(-w * .16, w * .62, [.4, .8, 1.2], 5);
+        front(g, .6, 1.4, M(0x1c2a3a), w * .33, .7);
+        locker(g, .8, 1.6, -w / 2 - .55, .6, T.accentHex);
+        if (L === 4) {
+          for (let i = 0; i < 4; i++) {
+            const x = -w / 2 + (i + .5) * w / 4;
+            add(g, box(.62, .7, .04, acc), x, 2.9, .02); front(g, .5, .58, winMat, x, 2.9, .045);
+          }
+          neonEdge(g, w, d, h, neon, true);
+          bladeSign(g, 'ПВЗ', T.neon, w / 2 + .03, 2.6, -.4);
+          scooter(g, w * .05, 1.6, T.accentHex);
+        }
+        for (let i = 0; i < (L === 3 ? 2 : 3); i++) { const p = holding(person()); p.rotation.y = Math.PI; add(g, p, w * .33 + rand(-.06, .06), 0, .6 + i * .5); }
+        g.userData.top = h + .6; return g;
+      }
+      body(g, w, h, d, wall);
+      add(g, box(w + .1, .14, d + .1, trim), 0, h + .07, -d / 2);
+      for (let k = 0; k < 3; k++) rollDoor(g, w * .2, 1.6, -w * .34 + k * w * .23, 0, .03);
+      front(g, w * .2, 1.4, winMat, w * .37, .9);
+      add(g, box(w + .04, .5, .08, acc), 0, h - .35, .04);
+      add(g, sign(['СОРТИРОВКА'], T.neon, w * .62, .4), 0, h - .35, .085);
+      add(g, box(w * .78, .08, .38, darkMat), -w * .1, .58, .6);
+      [-w * .45, w * .25].forEach(x => add(g, box(.06, .54, .3, steelMat), x, .27, .6));
+      const moving = [];
+      for (let i = 0; i < 4; i++) { const p = new THREE.Group(); p.userData.keep = true; parcel(p, 0, 0, 0, .24); add(g, p, 0, .62, .6); moving.push(p); }
+      addAnim(g, t => { moving.forEach((p, i) => { p.position.x = -w * .48 + ((t * .25 + i / 4) % 1) * w * .76; }); });
+      for (let i = 0; i < 3; i++) scooter(g, -w * .32 + i * 1.0, 1.65, T.accentHex);
+      add(g, cyl(.03, .03, 1.4, darkMat, 6), w / 2 - .4, h + .7, -d + .5);
+      add(g, cyl(.04, .04, .4, darkMat, 6), -w / 2 + .6, h + .2, -1.0);
+      const dish = cyl(.36, .2, .08, whiteMat, 16); dish.rotation.x = .9; add(g, dish, -w / 2 + .6, h + .45, -.95);
+      add(g, cyl(.015, .015, .3, darkMat, 5), -w / 2 + .6, h + .55, -.8);
+      neonEdge(g, w, d, h, neon, false);
+      g.userData.top = h + 1.2; return g;
+    }
+
+    /* ---------- РЕКЛАМА: будка с афишами → студия → агентство → медиаофис → медиахолдинг ---------- */
+    function buildAds(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      const neon = new THREE.MeshBasicMaterial({ color: T.neonHex });
+      if (L === 1) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .1, d + .1, acc), 0, h + .05, -d / 2);
+        poster(g, .78, .4, 0, -.42, 1.05, .012); poster(g, .78, .4, 1, .42, 1.05, .012);
+        poster(g, .78, .4, 2, -.42, .55, .012); poster(g, .78, .4, 3, .42, .55, .012);
+        const side = panel(d * .7, .5, new THREE.MeshBasicMaterial({ map: ADS[2] })); side.rotation.y = Math.PI / 2; add(g, side, w / 2 + .012, .9, -d / 2);
+        add(g, cyl(.04, .04, .3, darkMat, 6), 0, h + .2, -d / 2 + .2);
+        const mg = megaphone(acc); mg.rotation.y = -1.15; mg.scale.setScalar(1.25); add(g, mg, 0, h + .45, -d / 2 + .2);
+        tumba(g, w / 2 + .75, .65);
+        g.userData.top = h + 1.1; return g;
+      }
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .12, d + .1, trim), 0, h + .06, -d / 2);
+        adScreen(g, w * .8, w * .4, 0, .95, 0);
+        neonEdge(g, w, d, h, neon, false);
+        add(g, box(.4, .05, .05, darkMat), w / 2 + .2, h - .35, .1);
+        const mg2 = megaphone(acc); mg2.rotation.y = 1.2; add(g, mg2, w / 2 + .42, h - .35, .15);
+        add(g, box(w * .6 + .06, .4, .06, darkMat), 0, h + .3, -.3);
+        add(g, sign(['РЕКЛАМА'], T.neon, w * .6, .34), 0, h + .3, -.265);
+        tumba(g, -w / 2 - .55, .65);
+        g.userData.top = h + .9; return g;
+      }
+      if (L === 3) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .12, d + .1, trim), 0, h + .06, -d / 2);
+        front(g, w * .5, 1.1, winMat, -w * .18, .75);
+        front(g, .6, 1.2, M(0x1c1d26), w * .32, .6);
+        frontSign(g, 'РЕКЛАМА', T.neon, w * .6, 1.62);
+        adScreen(g, w * .8, w * .4, 0, 2.55, 0);
+        roofSign(g, 'АГЕНТСТВО', T.accent, w * .75, h + .7, -.5);
+        tumba(g, w / 2 + .5, .7);
+        g.userData.top = h + 1.3; return g;
+      }
+      if (L === 4) {
+        add(g, box(w - .3, h, d - .3, wall), 0, h / 2, -d / 2);
+        [1.4, 2.8].forEach(y => add(g, box(w - .04, .08, d - .04, whiteMat), 0, y, -d / 2));
+        front(g, w * .7, 1.1, winMat, -.25, .7, -.138);
+        front(g, .6, 1.2, M(0x1c1d26), w * .33, .6, -.138);
+        for (let i = 0; i < 4; i++) front(g, .55, .5, winMat, -w / 2 + .15 + (i + .5) * (w - .3) / 4, 3.75, -.138);
+        const glass = box(w, h, d, glassMat); glass.castShadow = false; glass.receiveShadow = false; add(g, glass, 0, h / 2, -d / 2);
+        adScreen(g, w * .88, w * .44, 0, 2.15, .04);
+        neonEdge(g, w, d, h, neon, true);
+        [-w * .3, 0, w * .3].forEach(x => { const sp = cyl(.08, .13, .25, darkMat, 8); sp.rotation.x = .9; add(g, sp, x, h + .12, .12); });
+        frontSign(g, 'АГЕНТСТВО', T.neon, w * .5, 1.48, -.25, .06);
+        g.userData.top = h + .7; return g;
+      }
+      body(g, w, h, d, wall);
+      for (let i = 0; i < 4; i++) front(g, .35, h - 2.4, winMat, -w / 2 + .45 + i * (w - .9) / 3, 2.1 + (h - 2.4) / 2);
+      front(g, w * .75, 1.2, winMat, 0, .75);
+      add(g, box(w * .82, .08, .8, acc), 0, 1.45, .4);
+      frontSign(g, 'МЕДИА', T.neon, w * .45, 1.78);
+      add(g, box(w + .06, .14, d + .06, trim), 0, h + .07, -d / 2);
+      neonEdge(g, w, d, h, neon, true);
+      add(g, cyl(.08, .08, .45, darkMat, 8), 0, h + .22, -d / 2);
+      const cube = new THREE.Group(); cube.userData.keep = true; cube.position.set(0, h + 1.15, -d / 2);
+      add(cube, box(1.3, 1.3, 1.3, darkMat), 0, 0, 0);
+      for (let k = 0; k < 4; k++) {
+        const holder = new THREE.Group(); holder.rotation.y = k * Math.PI / 2;
+        const pn = panel(1.24, .62, new THREE.MeshBasicMaterial({ map: ADS[k] })); pn.position.z = .655; holder.add(pn); cube.add(holder);
+      }
+      g.add(cube);
+      add(g, cyl(.03, .03, 1.3, darkMat, 6), w / 2 - .3, h + .65, -d + .4);
+      const blink = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
+      add(g, new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), blink), w / 2 - .3, h + 1.33, -d + .4);
+      addAnim(g, t => { cube.rotation.y = t * .45; blink.visible = (t % 1.2) < .6; });
+      tumba(g, w / 2 + .5, .75);
+      g.userData.top = h + 2.3; return g;
+    }
+
+    /* ---------- РЕМОНТ: бытовка → мастерская → стройдвор → стройкомпания → девелопер ---------- */
+    function buildRepair(T, L){
+      const { w, h, d } = T.dims[L];
+      const g = new THREE.Group();
+      const wall = M(T.wall), trim = M(T.trim), acc = M(T.accentHex);
+      if (L === 1) {
+        const bh = h - .2;
+        add(g, box(w, bh, d, acc), 0, .2 + bh / 2, -d / 2);
+        for (let x = -w / 2 + .15; x < w / 2; x += .3) add(g, box(.03, bh - .1, .03, acc), x, .2 + bh / 2, .015);
+        [-w / 2 + .3, w / 2 - .3].forEach(x => add(g, box(.25, .2, .8, concreteMat), x, .1, -d / 2));
+        front(g, .6, .4, winMat, -w * .2, .2 + bh * .62, .035);
+        front(g, .45, .95, M(0x4b5563), w * .3, .7, .035);
+        add(g, box(.5, .1, .3, concreteMat), w * .3, .1, .2);
+        add(g, box(w * .6 + .06, .36, .06, darkMat), 0, .2 + bh + .25, -.3);
+        add(g, sign(['РЕМОНТ'], T.accent, w * .6, .3), 0, .2 + bh + .25, -.265);
+        trafficCone(g, -w / 2 - .25, .6); trafficCone(g, -w / 2 + .25, 1.0); trafficCone(g, w / 2 + .3, .9);
+        sandPile(g, w / 2 + .75, -.3);
+        g.userData.top = h + 1.0; return g;
+      }
+      if (L === 2) {
+        body(g, w, h, d, wall);
+        add(g, box(w + .1, .12, d + .1, trim), 0, h + .06, -d / 2);
+        add(g, box(w + .04, .42, .08, acc), 0, h - .25, .04);
+        add(g, sign(['МАСТЕРСКАЯ'], T.accent, w * .7, .34), 0, h - .25, .085);
+        front(g, w * .5, 1.4, M(0x22252b), -w * .15, .7);
+        const px = -w * .15;
+        add(g, panel(w * .42, .62, M(0xc9b48a)), px, 1.05, .02);
+        add(g, box(.04, .34, .03, woodMat), px - .32, 1.02, .04); add(g, box(.2, .07, .04, steelMat), px - .32, 1.2, .04);
+        add(g, box(.05, .3, .03, steelMat), px - .05, 1.05, .04); add(g, new THREE.Mesh(new THREE.TorusGeometry(.06, .02, 6, 10), steelMat), px - .05, 1.22, .04);
+        add(g, box(.34, .12, .02, steelMat), px + .27, 1.12, .04); add(g, box(.08, .12, .04, acc), px + .48, 1.12, .04);
+        [[-.3, 0xd63c3c], [-.12, 0x3f6fbf], [.06, 0xf2c94c]].forEach(([dx, c]) => add(g, cyl(.08, .08, .16, M(c), 10), px + dx, .08, .12));
+        add(g, box(1.0, .06, .45, woodMat), -w * .15, .75, .55);
+        add(g, box(.06, .72, .4, darkMat), -w * .15 - .45, .36, .55); add(g, box(.06, .72, .4, darkMat), -w * .15 + .45, .36, .55);
+        bricks(g, w * .33, .6);
+        const wb = new THREE.Group();
+        add(wb, box(.5, .22, .36, acc), 0, .35, 0); wheel(wb, .3, .12, 0, .12);
+        add(wb, box(.5, .03, .03, darkMat), -.4, .4, .14); add(wb, box(.5, .03, .03, darkMat), -.4, .4, -.14);
+        wb.position.set(w / 2 + .55, 0, 1.0); g.add(wb);
+        g.userData.top = h + .6; return g;
+      }
+      if (L === 3) {
+        const cx = -w / 2 + .95;
+        cont(g, 1.8, .95, 1.2, cx, 0, 0, acc);
+        cont(g, 1.8, .95, 1.2, cx, .95, 0, M(0x6b7280));
+        front(g, .5, .4, winMat, cx - .4, .55, .03); front(g, .4, .8, M(0x4b5563), cx + .5, .42, .03);
+        front(g, .5, .4, winMat, cx - .4, 1.5, .03); front(g, .5, .4, winMat, cx + .3, 1.5, .03);
+        add(g, box(1.66, .34, .05, darkMat), cx, 2.1, -.3);
+        add(g, sign(['СТРОЙДВОР'], T.accent, 1.6, .3), cx, 2.1, -.27);
+        const fx0 = cx + 1.0, fx1 = w / 2;
+        for (let x = fx0; x <= fx1 + .01; x += .4) add(g, box(.05, .9, .05, acc), x, .45, .05);
+        [.3, .8].forEach(y => add(g, box(fx1 - fx0, .04, .04, acc), (fx0 + fx1) / 2, y, .05));
+        [.3, .8].forEach(y => add(g, box(.04, .04, d, acc), fx1, y, -d / 2 + .05));
+        excavator(g, fx0 + .7, -.9, T.accentHex);
+        bricks(g, fx0 + .4, -2.0); bricks(g, fx1 - .5, -2.1);
+        sandPile(g, fx1 - .5, -1.0);
+        trafficCone(g, fx0 - .2, .55); trafficCone(g, fx0 + .3, .7);
+        g.userData.top = 2.7; return g;
+      }
+      if (L === 4) {
+        const ox = -w / 2 + .95;
+        body(g, 1.9, h, 2.6, wall, ox);
+        add(g, box(2.0, .12, 2.7, trim), ox, h + .06, -1.3);
+        front(g, .55, 1.15, M(0x4b5563), ox + .5, .58); front(g, .6, .6, winMat, ox - .45, .9);
+        roofSign(g, 'СТРОЙКОМПАНИЯ', T.accent, 1.9, h + .7, -.6, ox);
+        [ox - .45, ox + .45].forEach(x => front(g, .6, .6, winMat, x, 2.4));
+        add(g, box(1.94, .14, .08, acc), ox, h - .1, .04);
+        towerCrane(g, w / 2 - .4, -2.2, 4.6, T.accentHex);
+        bricks(g, .6, -1.9); sandPile(g, 1.4, -1.0);
+        dumpTruck(g, .7, 1.0, T.accentHex);
+        trafficCone(g, -w / 2 + .2, 1.6);
+        g.userData.top = 5.4; return g;
+      }
+      const ox = -w / 2 + 1.1;
+      add(g, box(2.0, h, 2.8, wall), ox, h / 2, -1.5);
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) front(g, .5, .7, winMat, ox - .65 + c * .65, 1.8 + r * .95, -.088);
+      front(g, 1.4, 1.1, winMat, ox, .7, -.088);
+      [1.35, 2.3, 3.25, 4.2].forEach(y => add(g, box(2.16, .07, 2.96, whiteMat), ox, y, -1.5));
+      [[-1, 0], [1, 0], [-1, -1], [1, -1]].forEach(([sx, sz]) => add(g, box(.1, h, .1, acc), ox + sx * 1.1, h / 2, sz * 3));
+      const gl = box(2.2, h, 3.0, glassMat); gl.castShadow = false; gl.receiveShadow = false; add(g, gl, ox, h / 2, -1.5);
+      roofSign(g, 'ДЕВЕЛОПЕР', T.accent, 2.0, h + .7, -1.4, ox);
+      const fx = 1.4;
+      [[-.7, -.4], [.7, -.4], [-.7, -2.4], [.7, -2.4]].forEach(([dx, z]) => add(g, box(.14, 3.9, .14, concreteMat), fx + dx, 1.95, z));
+      [[.7, 2.4], [-.7, 2.4]].forEach(([dx]) => add(g, box(.14, .7, .14, concreteMat), fx + dx, 4.25, -.4));
+      [1.3, 2.6, 3.9].forEach(y => add(g, box(1.6, .12, 2.2, concreteMat), fx, y, -1.4));
+      for (let y = .65; y < 3.9; y += 1.3) add(g, box(1.65, .04, .04, M(0xd4a73a)), fx, y, -.25);
+      towerCrane(g, w / 2 - .1, -2.9, 6.2, T.accentHex);
+      mixerTruck(g, -.6, 1.45, T.accentHex);
+      trafficCone(g, 1.0, 1.0); trafficCone(g, 1.6, .8);
+      g.userData.top = 7.0; return g;
+    }
+
+    /* ---------- business types ---------- */
+    const TYPES = {
+      coffee: { name: 'Кофейня', sign: 'КОФЕЙНЯ', wall: 0x7a4e34, trim: 0x5a3826, accent: '#D4A73A', accentHex: 0xd4a73a, neon: '#FFB347', neonHex: 0xffb347, base: 169, minLevel: 1, build: buildCoffee,
+        dims: [null, { w: 1.9, h: 1.4, d: 1.5 }, { w: 2.6, h: 2.0, d: 2.2 }, { w: 3, h: 3.3, d: 2.4 }, { w: 3.6, h: 3.6, d: 3 }, { w: 3.8, h: 5.4, d: 3 }],
+        desc: ['', 'Киоск с чашкой на крыше и зонтиком', 'Кафе с полосатым навесом и цветами', 'Двухэтажное кафе с летней террасой', 'Угловая кофейня с неоновой чашкой', 'Обжарка: медные силосы и гигантская чашка на крыше'] },
+      shop: { name: 'Магазин', sign: 'МАГАЗИН', wall: 0x2f4a6b, trim: 0x22364f, accent: '#6CB4EE', accentHex: 0x6cb4ee, neon: '#56C8FF', neonHex: 0x56c8ff, base: 86, minLevel: 1, build: buildShop,
+        dims: [null, { w: 1.8, h: 1.3, d: 1.4 }, { w: 2.8, h: 2.1, d: 2.2 }, { w: 3.8, h: 2.4, d: 2.8 }, { w: 4.0, h: 3.4, d: 3.0 }, { w: 4.2, h: 5.6, d: 3.2 }],
+        desc: ['', 'Ларёк с ящиками фруктов', 'Магазин у дома с витриной и тележками', 'Супермаркет со стеклянным фасадом', 'Сетевой магазин с логотипом на крыше и доставкой', 'Торговый центр со стеклянным атриумом и флагами'] },
+      bakery: { name: 'Пекарня', sign: 'ПЕКАРНЯ', wall: 0xdcc6a0, trim: 0x6b4a2f, accent: '#F2C46B', accentHex: 0xf2c46b, neon: '#FF8F6B', neonHex: 0xff8f6b, base: 120, minLevel: 0, build: buildBakery,
+        dims: [{ w: 3.6, h: 1.2, d: 2.6 }, { w: 1.8, h: 1.6, d: 1.4 }, { w: 2.6, h: 2.9, d: 2.2 }, { w: 3, h: 4.0, d: 2.4 }, { w: 3.8, h: 4.0, d: 2.6 }, { w: 4.2, h: 3.4, d: 3.2 }],
+        desc: ['Участок продаётся · собрано 88%', 'Хлебный прилавок под черепичной крышей', 'Домик-пекарня с трубой и витриной', 'Дом-пекарня с террасой и кренделем', 'Пекарня-кафе с дровяной печью', 'Хлебозавод: трубы, силос и батон на крыше'] },
+      market: { name: 'Магазин на маркетплейсе', sign: 'МАРКЕТ', wall: 0xb9bec8, trim: 0x3b2f5c, accent: '#A78BFA', accentHex: 0x8b5cf6, neon: '#C4B5FD', neonHex: 0xc4b5fd, base: 140, build: buildMarket,
+        dims: [null, { w: 2.4, h: 1.6, d: 2.2 }, { w: 2.8, h: 2.2, d: 2.4 }, { w: 3.6, h: 2.6, d: 2.8 }, { w: 4.0, h: 3.2, d: 3.0 }, { w: 4.4, h: 3.5, d: 3.2 }],
+        desc: ['Участок продаётся', 'Склад в гараже: коробки и ноутбук', 'Мини-склад с рольставней', 'Склад с рампой и конвейером', 'Фулфилмент-центр с неоновой вывеской', 'Логистический хаб: ангар и дрон-доставка'] },
+      pvz: { name: 'Пункт выдачи заказов', sign: 'ПВЗ', wall: 0xe8e4dc, trim: 0x0f766e, accent: '#2DD4BF', accentHex: 0x14b8a6, neon: '#5EEAD4', neonHex: 0x5eead4, base: 60, build: buildPvz,
+        dims: [null, { w: 1.9, h: 2.3, d: 1.0 }, { w: 2.2, h: 2.0, d: 1.8 }, { w: 3.0, h: 2.6, d: 2.4 }, { w: 3.4, h: 3.6, d: 2.6 }, { w: 4.2, h: 3.4, d: 3.2 }],
+        desc: ['Участок продаётся', 'Постамат под навесом', 'Пункт выдачи в киоске', 'Пункт выдачи с полками посылок и постаматом', 'Двухэтажный ПВЗ и курьер на самокате', 'Сортировочный центр: конвейер и курьеры'] },
+      ads: { name: 'Рекламное агентство', sign: 'РЕКЛАМА', wall: 0x2b2d3a, trim: 0x1a1b24, accent: '#F472B6', accentHex: 0xec4899, neon: '#F9A8D4', neonHex: 0xf9a8d4, base: 210, build: buildAds,
+        dims: [null, { w: 1.8, h: 1.6, d: 1.4 }, { w: 2.6, h: 2.2, d: 2.0 }, { w: 3.0, h: 3.3, d: 2.4 }, { w: 3.4, h: 4.2, d: 2.8 }, { w: 3.6, h: 6.0, d: 3.0 }],
+        desc: ['Участок продаётся', 'Будка с афишами, рупор и тумба', 'Студия с рекламной витриной', 'Агентство с LED-экраном', 'Медиаофис с гигантским экраном', 'Медиахолдинг с вращающимся билбордом'] },
+      repair: { name: 'Ремонтная бригада', sign: 'РЕМОНТ', wall: 0x8a8f98, trim: 0x4b5563, accent: '#FB923C', accentHex: 0xf97316, neon: '#FDBA74', neonHex: 0xfdba74, base: 190, build: buildRepair,
+        dims: [null, { w: 2.4, h: 1.5, d: 1.1 }, { w: 2.8, h: 2.0, d: 2.2 }, { w: 3.6, h: 2.2, d: 2.8 }, { w: 3.8, h: 3.0, d: 3.0 }, { w: 4.4, h: 5.4, d: 3.2 }],
+        desc: ['Участок продаётся', 'Бытовка, конусы и песок', 'Мастерская с верстаком и кирпичами', 'Стройдвор с экскаватором', 'Стройкомпания с башенным краном', 'Девелопер: офис, стройка и бетономешалка'] }
+    };
+    Object.values(TYPES).forEach(T => { T.minLevel = 0; if (!T.desc[0]) T.desc[0] = 'Участок продаётся'; });
+
+    function buildLot(sub){
+      const g = new THREE.Group();
+      add(g, box(3.6, .04, 2.6, M(0x3a3226)), 0, .02, -1.3);
+      for (let x = -1.8; x <= 1.81; x += .6) add(g, box(.07, .6, .07, woodMat), x, .3, -.05);
+      add(g, box(3.6, .05, .05, woodMat), 0, .45, -.05);
+      add(g, box(3.6, .05, .05, woodMat), 0, .2, -.05);
+      add(g, box(.05, .05, 2.6, woodMat), -1.8, .45, -1.3);
+      add(g, box(.05, .05, 2.6, woodMat), 1.8, .45, -1.3);
+      add(g, cyl(.04, .04, 1.6, darkMat, 6), 0, .8, -1.05);
+      add(g, box(1.98, .9, .06, darkMat), 0, 1.72, -1.04);
+      add(g, sign(['ПРОДАЁТСЯ', sub || '88% собрано'], '#3FBF8F', 1.9, .82), 0, 1.72, -1.005);
+      g.userData.top = 2.6;
+      return g;
+    }
+    function makeFor(type, L){
+      const T = TYPES[type];
+      if (L === 0) return buildLot();
+      const g = T.build(T, L);
+      const pw = T.dims[L].w + 1.4;
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(pw, 2.0), poolMat);
+      pl.rotation.x = -Math.PI / 2; pl.position.set(0, .135, 1.0); g.add(pl);
+      return g;
+    }
+    function dimsFor(type, L){ return L === 0 ? { w: 3.6, h: 1.2, d: 2.6 } : TYPES[type].dims[L]; }
+    function disposeGroup(g){ g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+
+    /* ===================== YOUR CITY ===================== */
+    // camera pulled far back along the same direction (orthographic, so the scale stays the same) so nothing near the bottom of the view falls behind it
+    OFFSET.set(56, 88, 136); LIGHT_OFF.set(16, 28, 20);
+    camera.near = 1; camera.far = 1000; camera.updateProjectionMatrix();
+    scene.fog.near = 190; scene.fog.far = 330;
+    dir.shadow.mapSize.set(2048, 2048);
+    Object.assign(dir.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 140 });
+    dir.shadow.camera.updateProjectionMatrix();
+
+    let seed = 7291;
+    const srand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const spick = a => a[Math.floor(srand() * a.length)];
+    const fmt = n => Math.round(n).toLocaleString('ru-RU') + ' ₽';
+
+    /* merge the static parts of a group into one mesh per material (far fewer draw calls on phones) */
+    function mergeStatic(g, pairs){
+      g.updateMatrixWorld(true);
+      const meshes = [];
+      (function collect(o){ if (o !== g && o.userData && o.userData.keep) return; if (o.isMesh) meshes.push(o); o.children.slice().forEach(collect); })(g);
+      const buckets = new Map();
+      meshes.forEach(mesh => {
+        const geo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+        geo.applyMatrix4(mesh.matrixWorld);
+        if (!buckets.has(mesh.material)) buckets.set(mesh.material, []);
+        buckets.get(mesh.material).push(geo);
+        mesh.parent.remove(mesh); mesh.geometry.dispose();
+      });
+      buckets.forEach((geos, mat) => {
+        let n = 0; geos.forEach(gm => { n += gm.attributes.position.count; });
+        const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+        let o = 0;
+        geos.forEach(gm => {
+          if (!gm.attributes.normal) gm.computeVertexNormals();
+          pos.set(gm.attributes.position.array, o * 3);
+          nor.set(gm.attributes.normal.array, o * 3);
+          if (gm.attributes.uv) uv.set(gm.attributes.uv.array, o * 2);
+          o += gm.attributes.position.count; gm.dispose();
+        });
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+        geo.computeBoundingSphere();
+        const mm = pairs ? mat.clone() : mat; if (pairs) pairs.push([mat, mm]);
+        const m = new THREE.Mesh(geo, mm);
+        m.castShadow = !mat.transparent && mat.type === 'MeshStandardMaterial'; m.receiveShadow = true;
+        g.add(m);
+      });
+    }
+
+    /* ---------- palettes & shared parts for houses ---------- */
+    const PASTEL = [0xd9a38f, 0xe3cf9e, 0x9fb7c9, 0xb9c9a7, 0xe6ddd0, 0xc9a6b5, 0xf0d9b5, 0xb7c4d6];
+    const PANEL = [0xd9d6cf, 0xc9c6be, 0xe2e0da, 0xbfc3c7, 0xd6cdbf];
+    const ACCENT = [0x3f6fbf, 0xb5543c, 0x3fbf8f, 0xf2a65a, 0x8b5cf6, 0xe07a9a, 0x14b8a6];
+    const ROOFS = [0x9c4a35, 0x4f5b66, 0x6b4a3a, 0x5d6f5a, 0x7a3b2e];
+    const STALIN = [0xe8c98f, 0xd9b48a, 0xe3d3b0, 0xc9a07a, 0xd7b9a0];
+    const WOOD = [0x7a5236, 0x5d7a4a, 0x6b7fa0, 0x8a6a45];
+    const DOORS = [0x4a5d72, 0x6b3f2e, 0x3f5e4a, 0x8a2f2f];
+    const CARCOL = [0xd4a73a, 0xe5e7eb, 0xb5543c, 0x3f6fbf, 0x3fbf8f, 0xf0ece4, 0x6c7bd9, 0x2b2d33];
+    const FRAME = M(0xefe9df), DARKF = M(0x2b2d33), RAIL = M(0x3a3d44), PLINTH = M(0x6f6a66), FLATROOF = M(0x55585f), GLASSP = M(0x9fc4dd, { roughness: .2 });
+    const WIN_ON = new THREE.MeshBasicMaterial({ color: 0xffc66b }), WIN_OFF = new THREE.MeshBasicMaterial({ color: 0x2b3140 });
+    const winPick = p => srand() < (p === undefined ? .35 : p) ? WIN_ON : WIN_OFF;
+
+    function wgrid(g, x0, x1, y0, rows, fh, cols, pw, ph, z, frame, skip){
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        if (skip && skip(r, c)) continue;
+        const x = x0 + (c + .5) * (x1 - x0) / cols, y = y0 + r * fh;
+        if (frame) add(g, panel(pw + .1, ph + .1, frame), x, y, z + .006);
+        add(g, panel(pw, ph, winPick()), x, y, z + .012);
+      }
+    }
+    function sideGrid(g, xFace, zA, zB, y0, rows, fh, cols, pw, ph){
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const p = panel(pw, ph, winPick()); p.rotation.y = Math.PI / 2;
+        add(g, p, xFace + .012, y0 + r * fh, zA + (c + .5) * (zB - zA) / cols);
+      }
+    }
+    function entrance(g, x, z, roofM){
+      add(g, panel(.55, .9, M(spick(DOORS))), x, .45, z + .012);
+      add(g, box(.9, .06, .5, roofM || FLATROOF), x, 1.05, z + .25);
+      add(g, box(.9, .12, .4, PLINTH), x, .06, z + .2);
+      add(g, new THREE.Mesh(new THREE.SphereGeometry(.05, 6, 5), bulbMat), x, .98, z + .06);
+    }
+    function bush(g, x, y, z, r){
+      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), M(spick([0x3f8f5a, 0x4f9a62, 0x356f48])));
+      b.castShadow = true; b.scale.y = .85; add(g, b, x, y, z);
+    }
+
+    /* ---------- house types ---------- */
+    function cottage(){
+      const g = new THREE.Group();
+      const two = srand() < .35, w = 2.6 + srand() * .7, d = 2.6, h = two ? 2.5 : 1.5, hz = -1.1;
+      const wall = M(spick(PASTEL)), roof = M(spick(ROOFS));
+      add(g, box(w, h, d, wall), 0, h / 2, hz - d / 2);
+      if (srand() < .5) add(g, gable(w + .3, d + .3, .95, roof), 0, h, hz + .15);
+      else add(g, eaveRoof(w + .3, d + .3, .9, roof), 0, h, hz - d / 2);
+      const dx = w * .22;
+      add(g, panel(.5, .95, M(spick(DOORS))), dx, .48, hz + .012);
+      add(g, box(.8, .06, .5, roof), dx, 1.08, hz + .25);
+      add(g, panel(.56, .5, FRAME), -w * .2, .85, hz + .006); add(g, panel(.46, .4, winPick(.45)), -w * .2, .85, hz + .012);
+      if (two) [-w * .2, dx].forEach(x => { add(g, panel(.56, .5, FRAME), x, 1.9, hz + .006); add(g, panel(.46, .4, winPick(.45)), x, 1.9, hz + .012); });
+      if (srand() < .6) add(g, box(.28, .7, .28, PLINTH), w * .28, h + .55, hz - d * .6);
+      if (srand() < .4) { add(g, box(.12, .3, .12, M(0x2b2d33)), -w / 2 + .3, h - .1, hz + .2); }
+      const fm = srand() < .5 ? FRAME : woodMat;
+      for (let x = -2.7; x <= 2.71; x += .3) if (Math.abs(x - dx) > .35) add(g, box(.05, .45, .05, fm), x, .225, .25);
+      add(g, box(5.5, .05, .04, fm), 0, .36, .25);
+      add(g, box(.7, .02, 1.25, M(0xcdbfa8)), dx, .03, -.45);
+      for (let k = 0; k < 3; k++) bush(g, -2.4 + srand() * 1.6, .22, -.25 - srand() * .6, .2 + srand() * .2);
+      if (srand() < .35) { const c = carMesh(spick(CARCOL)); c.rotation.y = Math.PI / 2; add(g, c, w / 2 + .85, .02, -.9); }
+      g.userData.info = { kind: two ? 'Частный дом в два этажа' : 'Частный дом', floors: two ? 2 : 1, residents: 3 + Math.floor(srand() * 3) };
+      g.userData.trees = srand() < .7 ? [[-2.3, -3.2], [2.3, -3.4]] : [[2.4, -3.3]];
+      g.userData.fw = 5.8;
+      return g;
+    }
+    function woodHouse(){
+      const g = new THREE.Group();
+      const w = 3.4, d = 3, h = 2.4, hz = -.9;
+      const wall = M(spick(WOOD)), roof = M(spick([0x4f5b66, 0x5d6f5a, 0x7a3b2e]));
+      add(g, box(w, h, d, wall), 0, h / 2, hz - d / 2);
+      for (let y = .3; y < h; y += .3) add(g, box(w + .02, .03, .02, M(0x3a2a1c)), 0, y, hz + .012);
+      add(g, gable(w + .3, d + .3, 1.2, roof), 0, h, hz + .15);
+      add(g, new THREE.Mesh(new THREE.CircleGeometry(.2, 12), winPick(.4)), 0, h + .45, hz + .16);
+      [[-1.05, .85], [1.05, .85], [-1.05, 1.85], [0, 1.85], [1.05, 1.85]].forEach(([x, y]) => {
+        add(g, panel(.62, .66, FRAME), x, y, hz + .02);
+        add(g, panel(.44, .5, winPick(.4)), x, y, hz + .026);
+        const top = gable(.72, .05, .2, FRAME); top.castShadow = false; add(g, top, x, y + .34, hz + .07);
+      });
+      add(g, panel(.55, 1.0, M(0x5a3a22)), 0, .5, hz + .012);
+      add(g, box(5.6, .65, .06, M(0x6b4a2f)), 0, .33, .2);
+      add(g, panel(.7, .6, M(0x4a321f)), 0, .33, .235);
+      bush(g, -2.2, .25, -.5, .3); bush(g, 2.2, .25, -.4, .28);
+      g.userData.info = { kind: 'Старый деревянный дом', floors: 2, residents: 4 + Math.floor(srand() * 5) };
+      g.userData.trees = [[2.4, -3.4]];
+      g.userData.fw = 5.8;
+      return g;
+    }
+    function townHouse(g, x0, w, h, style){
+      const d = 2.5, zf = 0, cx = x0 + w / 2;
+      const wall = M(spick(PASTEL)), roof = M(spick(ROOFS));
+      add(g, box(w, h, d, wall), cx, h / 2, -d / 2);
+      add(g, box(w + .04, .45, .06, PLINTH), cx, .225, .03);
+      const floors = Math.max(2, Math.floor((h - .4) / 1.05)), cols = 2, doorCol = Math.floor(srand() * cols);
+      for (let f = 0; f < floors; f++) for (let c = 0; c < cols; c++) {
+        const x = x0 + (c + .5) * w / cols, y = .95 + f * 1.05;
+        if (f === 0 && c === doorCol) {
+          add(g, box(.9, .12, .4, PLINTH), x, .06, .2);
+          add(g, panel(.5, .9, M(spick(DOORS))), x, .6, zf + .012);
+          add(g, box(.8, .06, .45, roof), x, 1.2, .22);
+          add(g, new THREE.Mesh(new THREE.SphereGeometry(.05, 6, 5), bulbMat), x, 1.12, .06);
+        } else {
+          add(g, panel(.48, .56, FRAME), x, y, zf + .006);
+          add(g, panel(.36, .44, winPick()), x, y, zf + .012);
+          if (style === 'flat' && f > 0 && c === 1) { add(g, box(.8, .06, .4, FRAME), x, y - .38, .2); add(g, box(.8, .3, .03, RAIL), x, y - .22, .39); }
+        }
+      }
+      if (style === 'gable') {
+        add(g, gable(w + .15, d + .15, .9, roof), cx, h, .075);
+        add(g, new THREE.Mesh(new THREE.CircleGeometry(.17, 14), winPick(.5)), cx, h + .33, .08);
+        add(g, box(.28, .7, .28, PLINTH), cx + w * .25, h + .55, -1.5);
+      } else if (style === 'flat') {
+        add(g, box(w + .2, .18, d + .2, FRAME), cx, h + .09, -d / 2);
+      } else {
+        add(g, eaveRoof(w + .2, d + .2, .85, roof), cx, h, -d / 2);
+        add(g, box(.7, .5, .6, wall), cx, h + .3, -.5);
+        add(g, gable(.85, .7, .35, roof), cx, h + .55, -.15);
+        add(g, panel(.3, .3, winPick(.5)), cx, h + .3, -.19);
+      }
+    }
+    function townhousePair(){
+      const g = new THREE.Group(); let x = -2.95, fl = 0;
+      for (let k = 0; k < 2; k++) { const w = 2.75 + srand() * .15, h = 3.1 + srand() * 2; townHouse(g, x, w, h, spick(['gable', 'flat', 'eave'])); fl = Math.max(fl, Math.floor((h - .4) / 1.05)); x += w + .1; }
+      g.userData.info = { kind: 'Городские дома', floors: fl, residents: 14 + Math.floor(srand() * 12) };
+      g.userData.fw = 5.9;
+      return g;
+    }
+    function khrushchevka(){
+      const g = new THREE.Group();
+      const w = 5.7, d = 3.2, floors = 5, fh = .85, h = floors * fh + .25;
+      const wall = M(spick(srand() < .3 ? [0xb46a4e, 0xa85f45] : PANEL));
+      add(g, box(w, h, d, wall), 0, h / 2, -d / 2);
+      add(g, box(w + .1, .12, d + .1, FLATROOF), 0, h + .06, -d / 2);
+      const cols = 7, ent = [1, 5];
+      wgrid(g, -w / 2, w / 2, .55, floors, fh, cols, .38, .42, 0, null, (r, c) => r === 0 && ent.includes(c));
+      ent.forEach(c => entrance(g, -w / 2 + (c + .5) * w / cols, 0));
+      [2, 4].forEach(c => {
+        const x = -w / 2 + (c + .5) * w / cols;
+        for (let r = 1; r < floors; r++) { const y = .55 + r * fh - .28; add(g, box(.66, .05, .32, FLATROOF), x, y, .16); add(g, box(.66, .22, .03, srand() < .5 ? wall : RAIL), x, y + .13, .31); }
+      });
+      sideGrid(g, w / 2, -d + .4, -.4, .55, floors, fh, 2, .38, .42);
+      add(g, box(.4, .3, .4, FLATROOF), -1.5, h + .27, -1.5);
+      g.userData.info = { kind: 'Пятиэтажка', floors, residents: 60 + Math.floor(srand() * 20) };
+      g.userData.fw = 5.8;
+      return g;
+    }
+    function panelTower(tall){
+      const g = new THREE.Group();
+      const floors = tall ? 12 + Math.floor(srand() * 5) : 9 + Math.floor(srand() * 2), fh = .78;
+      const w = 4.2, d = 3.6, h = floors * fh + .3, wall = M(spick(PANEL)), acc = M(spick(ACCENT));
+      add(g, box(w, h, d, wall), 0, h / 2, -d / 2);
+      add(g, box(w + .08, .14, d + .08, FLATROOF), 0, h + .07, -d / 2);
+      add(g, box(1.3, .7, 1.3, wall), -.6, h + .35, -d / 2);
+      add(g, cyl(.02, .02, 1.2, RAIL, 4), 1.2, h + .6, -d / 2);
+      const lx = w / 2 - .7;
+      for (let r = 1; r < floors; r++) { const y = .5 + r * fh; add(g, box(1.1, .5, .12, acc), lx, y - .05, .06); add(g, panel(.8, .32, winPick()), lx, y - .02, .125); }
+      wgrid(g, -w / 2, w / 2 - 1.4, .5, floors, fh, 3, .38, .44, 0, null, (r, c) => r === 0 && c === 1);
+      entrance(g, -w / 2 + 1.5 * (w - 1.4) / 3, 0, acc);
+      sideGrid(g, w / 2, -d + .4, -.4, .5, floors, fh, 3, .34, .42);
+      g.userData.info = { kind: floors + '-этажный панельный дом', floors, residents: floors * 16 };
+      g.userData.fw = 4.4;
+      return g;
+    }
+    function stalinka(){
+      const g = new THREE.Group();
+      const w = 5.7, d = 3.4, floors = 5 + Math.floor(srand() * 2), fh = 1.0, h = floors * fh + .3;
+      const wall = M(spick(STALIN)), base = M(0x8a7a66);
+      add(g, box(w, h, d, wall), 0, h / 2, -d / 2);
+      add(g, box(w + .04, 1.0, .06, base), 0, .5, .03);
+      add(g, box(w + .3, .22, d + .3, FRAME), 0, h + .11, -d / 2);
+      add(g, box(w + .1, .1, .1, FRAME), 0, 1.05, .05);
+      [-w / 2 + .2, -w / 6, w / 6, w / 2 - .2].forEach(x => add(g, box(.16, h - 1.1, .06, FRAME), x, 1.1 + (h - 1.1) / 2, .03));
+      const cols = 5;
+      wgrid(g, -w / 2, w / 2, 1.6, floors - 1, fh, cols, .42, .6, .06, FRAME);
+      for (let c = 0; c < cols; c++) {
+        const x = -w / 2 + (c + .5) * w / cols;
+        const m = c === 2 ? M(spick(DOORS)) : winPick(.55);
+        add(g, panel(.5, .52, m), x, .46, .07);
+        add(g, new THREE.Mesh(new THREE.CircleGeometry(.25, 12, 0, Math.PI), m), x, .72, .07);
+      }
+      if (srand() < .4) add(g, eaveRoof(w + .1, d + .1, .7, M(0x4f5b66)), 0, h + .22, -d / 2);
+      if (srand() < .3) {
+        add(g, box(1.1, 1.4, 1.1, wall), w / 2 - .7, h + .92, -.7);
+        add(g, box(1.2, .12, 1.2, FRAME), w / 2 - .7, h + 1.66, -.7);
+        add(g, cyl(.35, .35, .5, wall, 8), w / 2 - .7, h + 1.97, -.7);
+        add(g, cone(.38, 1.4, M(0xd4a73a, { metalness: .4, roughness: .4 }), 8), w / 2 - .7, h + 2.92, -.7);
+        add(g, new THREE.Mesh(new THREE.OctahedronGeometry(.16, 0), new THREE.MeshBasicMaterial({ color: 0xff4d4d })), w / 2 - .7, h + 3.75, -.7);
+      }
+      sideGrid(g, w / 2, -d + .4, -.4, 1.6, floors - 1, fh, 2, .42, .6);
+      g.userData.info = { kind: 'Сталинка', floors, residents: floors * 12 };
+      g.userData.fw = 5.9;
+      return g;
+    }
+    function modernTower(){
+      const g = new THREE.Group();
+      const floors = 10 + Math.floor(srand() * 8), fh = .8, w = 4.4, d = 3.6, h = floors * fh + .5;
+      const wall = M(spick([0xf0efe9, 0x3a3d44, 0xe8e2d6, 0x9aa3ad])), acc = M(spick(ACCENT));
+      add(g, box(w, h, d, wall), 0, h / 2, -d / 2);
+      add(g, panel(w * .9, .8, winPick(.75)), 0, .5, .012);
+      add(g, box(w + .1, .08, .6, acc), 0, 1.0, .3);
+      for (let r = 1; r < floors; r++) {
+        const y = .6 + r * fh;
+        for (let c = 0; c < 4; c++) {
+          const x = -w / 2 + (c + .5) * w / 4;
+          add(g, panel(.55, .5, winPick()), x, y, .012);
+          if ((c + r) % 3 === 0) add(g, panel(.22, .5, acc), x + .41, y, .008);
+        }
+        if (r % 2 === 0) { add(g, box(1.7, .05, .42, FLATROOF), -w / 2 + 1.05, y - .3, .21); add(g, box(1.7, .26, .02, GLASSP), -w / 2 + 1.05, y - .15, .42); }
+      }
+      add(g, box(w, .3, .04, RAIL), 0, h + .15, -.02);
+      bush(g, -1.2, h + .25, -1.2, .3); bush(g, 1, h + .25, -2, .35);
+      sideGrid(g, w / 2, -d + .4, -.4, .6 + fh, floors - 1, fh, 3, .4, .5);
+      g.userData.info = { kind: 'Новостройка, ' + floors + ' этажей', floors, residents: floors * 18 };
+      g.userData.fw = 4.6;
+      return g;
+    }
+    function loft(){
+      const g = new THREE.Group();
+      const floors = 3 + Math.floor(srand() * 2), fh = 1.15, w = 5.7, d = 3.2, h = floors * fh + .3;
+      const wall = M(spick([0x9a4b35, 0x7f3f2c, 0xa85f45]));
+      add(g, box(w, h, d, wall), 0, h / 2, -d / 2);
+      add(g, box(w + .12, .18, d + .12, DARKF), 0, h + .09, -d / 2);
+      wgrid(g, -w / 2, w / 2, .75, floors, fh, 4, .75, .8, 0, DARKF, (r, c) => r === 0 && c === 2);
+      entrance(g, -w / 2 + 2.5 * w / 4, 0, DARKF);
+      if (srand() < .6) {
+        const tx = -w / 4, tz = -d / 2, wood = M(0x6b4a2f);
+        [[-.4, -.4], [.4, -.4], [-.4, .4], [.4, .4]].forEach(([a, b]) => add(g, cyl(.04, .04, 1, DARKF, 5), tx + a, h + .5, tz + b));
+        add(g, cyl(.55, .55, .9, wood, 12), tx, h + 1.45, tz);
+        add(g, cone(.6, .45, DARKF, 12), tx, h + 2.12, tz);
+      }
+      sideGrid(g, w / 2, -d + .4, -.4, .75, floors, fh, 2, .6, .7);
+      g.userData.info = { kind: 'Кирпичный лофт', floors, residents: floors * 8 };
+      g.userData.fw = 5.9;
+      return g;
+    }
+    function office(){
+      const g = new THREE.Group();
+      const kind = srand(), floors = 10 + Math.floor(srand() * 9), fh = .8;
+      let info;
+      if (kind < .45) {
+        const w = 4.4, d = 3.6, h = floors * fh + .4;
+        add(g, box(w - .3, h, d - .3, M(0x2b2f38)), 0, h / 2, -d / 2);
+        wgrid(g, -w / 2 + .15, w / 2 - .15, .6, floors, fh, 5, .6, .55, -.15);
+        sideGrid(g, w / 2 - .15, -d + .5, -.5, .6, floors, fh, 4, .5, .55);
+        const gl = box(w, h, d, glassMat); gl.castShadow = false; add(g, gl, 0, h / 2, -d / 2);
+        add(g, box(w + .1, .25, d + .1, M(spick(ACCENT))), 0, h + .12, -d / 2);
+        add(g, cyl(.9, .9, .06, FLATROOF, 16), 0, h + .28, -d / 2);
+        info = 'Стеклянный офисный центр';
+      } else if (kind < .7) {
+        const r = 1.75, h = floors * fh + .4;
+        add(g, cyl(r, r, h, M(0x7f9bb5, { roughness: .25, metalness: .3 }), 16), 0, h / 2, -r - .05);
+        for (let f = 1; f <= floors; f++) add(g, cyl(r + .02, r + .02, .18, winPick(.5), 16), 0, f * fh, -r - .05);
+        add(g, cyl(r * .6, r * .8, 1.2, M(0x2b2f38), 16), 0, h + .6, -r - .05);
+        add(g, cyl(.03, .03, 2, RAIL, 4), 0, h + 2.2, -r - .05);
+        info = 'Башня бизнес-центра';
+      } else {
+        const w = 5.2, d = 3.4, h1 = 6 * fh, h2 = (floors - 6) * fh;
+        add(g, box(w, h1, d, M(0xd8dde3)), 0, h1 / 2, -d / 2);
+        wgrid(g, -w / 2, w / 2, .5, 6, fh, 6, .55, .5, 0);
+        add(g, box(w * .6, h2, d * .75, M(0x9fb0c3)), -.4, h1 + h2 / 2, -d / 2);
+        wgrid(g, -w * .3 - .4, w * .3 - .4, h1 + .4, floors - 6, fh, 4, .5, .5, -d * .125);
+        add(g, box(w * .6 + .1, .2, d * .75 + .1, M(spick(ACCENT))), -.4, h1 + h2 + .1, -d / 2);
+        info = 'Деловой центр';
+      }
+      g.userData.info = { kind: info, floors, residents: 0, workers: floors * 40 };
+      g.userData.fw = 5.4;
+      return g;
+    }
+    function warehouseInd(){
+      const g = new THREE.Group();
+      const w = 5.6, h = 2.4, d = 3.6, wall = M(spick([0xb9bec8, 0x9aa3ad, 0x8a8f98, 0x7f8f7a]));
+      add(g, box(w, h, d, wall), 0, h / 2, -d / 2);
+      ribs(g, w, h - .1, .02, M(0x8f949c));
+      add(g, box(w + .12, .12, d + .12, FLATROOF), 0, h + .06, -d / 2);
+      rollDoor(g, 1.5, 1.6, -1.4, 0, .04); rollDoor(g, 1.5, 1.6, .6, 0, .04);
+      add(g, box(.5, .35, .5, steelMat), 1.8, h + .3, -1.5);
+      if (srand() < .5) { const t = van(0xf0ece4, spick(ACCENT)); add(g, t, -.6, 0, 1.0); }
+      else { parcelStack(g, 2.1, .5, 3); pallet(g, 2.4, .9); }
+      g.userData.info = { kind: 'Склад', floors: 1, residents: 0, workers: 25 };
+      g.userData.fw = 5.8;
+      return g;
+    }
+    function plant(){
+      const g = new THREE.Group();
+      const w = 5, h = 3, d = 3.4;
+      add(g, box(w, h, d, brickMat), 0, h / 2, -d / 2);
+      wgrid(g, -w / 2, w / 2, 1.6, 1, 1, 5, .6, .9, 0, DARKF);
+      rollDoor(g, 1.4, 1.2, 1.4, 0, .02);
+      [[-1.4, -2.4], [-.4, -2.6]].forEach(([x, z]) => {
+        add(g, cyl(.28, .34, 6, brickMat, 12), x, 3, z);
+        add(g, cyl(.3, .3, .3, whiteMat, 12), x, 5.1, z); add(g, cyl(.3, .3, .3, M(0xd63c3c), 12), x, 5.6, z);
+        g.userData.smoke = (g.userData.smoke || []).concat([{ x, y: 6.1, z, kind: 'smoke' }]);
+      });
+      add(g, cyl(.12, .12, 3.4, steelMat, 8), 1.6, h + .6, -2.2);
+      g.userData.info = { kind: 'Завод', floors: 2, residents: 0, workers: 120 };
+      g.userData.fw = 5.4;
+      return g;
+    }
+    function tanks(){
+      const g = new THREE.Group();
+      [-1.4, 1.4].forEach(x => {
+        add(g, cyl(1.2, 1.2, 2.4, M(0xe5e7eb), 18), x, 1.2, -1.6);
+        add(g, new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2), M(0xe5e7eb)), x, 2.4, -1.6);
+        add(g, cyl(1.22, 1.22, .2, M(spick(ACCENT)), 18), x, 1.6, -1.6);
+      });
+      add(g, box(5.6, .05, .05, RAIL), 0, .6, .1);
+      for (let x = -2.8; x <= 2.81; x += .7) add(g, box(.05, .7, .05, RAIL), x, .35, .1);
+      g.userData.info = { kind: 'Нефтебаза', floors: 0, residents: 0, workers: 15 };
+      g.userData.fw = 5.8;
+      return g;
+    }
+    function garages(){
+      const g = new THREE.Group();
+      for (let k = 0; k < 5; k++) {
+        const x = -2.4 + k * 1.2;
+        add(g, box(1.15, 1.0, 2.6, M(0x8a8f98)), x, .5, -1.6);
+        add(g, panel(.9, .8, M(spick([0x6b7280, 0x3f6fbf, 0x5d6f5a, 0x8a2f2f, 0xb5543c]))), x, .42, -.29);
+      }
+      add(g, box(6.1, .08, 2.8, FLATROOF), 0, 1.04, -1.6);
+      g.userData.info = { kind: 'Гаражный кооператив', floors: 1, residents: 0, workers: 3 };
+      g.userData.fw = 6;
+      return g;
+    }
+    function containers(){
+      const g = new THREE.Group();
+      const cols = [0xb5543c, 0x3f6fbf, 0x3fbf8f, 0xf2a65a, 0x6b7280];
+      for (let layer = 0; layer < 3; layer++) for (let k = 0; k < 2; k++) for (let r = 0; r < 2; r++) {
+        if (layer === 2 && srand() < .5) continue;
+        const m = M(spick(cols)), x = -1.3 + k * 2.6, z = -1 - r * 1.1, y = .5 + layer * 1.0;
+        add(g, box(2.5, .98, 1.05, m), x, y, z);
+        for (let xx = x - 1.1; xx < x + 1.2; xx += .3) add(g, box(.03, .9, .02, m), xx, y, z + .53);
+      }
+      g.userData.info = { kind: 'Контейнерный склад', floors: 0, residents: 0, workers: 10 };
+      g.userData.fw = 5.4;
+      return g;
+    }
+
+    /* ---------- landmarks: each one changes demand around it ---------- */
+    function crossSign(g, x, y, z){
+      add(g, panel(.9, .9, M(0xffffff)), x, y, z);
+      add(g, panel(.6, .18, new THREE.MeshBasicMaterial({ color: 0xe03131 })), x, y, z + .005);
+      add(g, panel(.18, .6, new THREE.MeshBasicMaterial({ color: 0xe03131 })), x, y, z + .006);
+    }
+    function school(){
+      const g = new THREE.Group(), wall = M(0xe8d5b0), acc = M(0xb5543c);
+      add(g, box(7, 2.8, 3.2, wall), -2.3, 1.4, -1.6);
+      add(g, box(7.2, .16, 3.4, acc), -2.3, 2.88, -1.6);
+      wgrid(g, -5.8, 1.2, .75, 3, .85, 7, .62, .55, 0, FRAME, (r, c) => r === 0 && c === 3);
+      add(g, panel(.8, 1.0, M(0x4a5d72)), -2.3, .5, .012);
+      add(g, box(1.6, .08, .8, acc), -2.3, 1.15, .4); add(g, box(1.6, .12, .6, PLINTH), -2.3, .06, .3);
+      add(g, box(3.2, .5, .06, darkMat), -2.3, 2.45, .04); add(g, sign(['ШКОЛА №7'], '#F2C46B', 3.1, .44), -2.3, 2.45, .075);
+      add(g, box(4.2, .04, 3.4, M(0x4f9a62)), 3.6, .14, -1.8);
+      [[3.6, -1.8, 4.0, .04], [3.6, -.15, 4.0, .04], [3.6, -3.45, 4.0, .04]].forEach(([x, z, w]) => add(g, box(w, .02, .05, whiteMat), x, .17, z));
+      add(g, box(.05, .02, 3.3, whiteMat), 1.6, .17, -1.8); add(g, box(.05, .02, 3.3, whiteMat), 5.6, .17, -1.8);
+      [1.7, 5.5].forEach(x => { add(g, box(.05, .5, .05, whiteMat), x, .4, -1.3); add(g, box(.05, .5, .05, whiteMat), x, .4, -2.3); add(g, box(.05, .05, 1.0, whiteMat), x, .65, -1.8); });
+      add(g, cyl(.03, .03, 2.6, RAIL, 5), 1.3, 1.3, .3);
+      add(g, box(.6, .4, .02, M(0xffffff)), 1.6, 2.3, .3); add(g, box(.6, .13, .021, M(0x3f6fbf)), 1.6, 2.24, .3); add(g, box(.6, .13, .022, M(0xd63c3c)), 1.6, 2.11, .3);
+      g.userData.info = { kind: 'Школа №7', floors: 3, residents: 0, workers: 620, stats: [['Учеников', '≈ 620'], ['Спрос утром', '+20%']], note: 'Утром дети и родители берут выпечку и кофе. Пекарне и кофейне рядом выгодно.' };
+      g.userData.fw = 11.6; return g;
+    }
+    function hospital(){
+      const g = new THREE.Group(), wall = M(0xf2f2ee), acc = M(0xd63c3c);
+      add(g, box(8, 3.6, 3.4, wall), -1.6, 1.8, -1.7);
+      add(g, box(8.1, .25, .08, acc), -1.6, 1.2, .04);
+      wgrid(g, -5.6, 2.4, .7, 4, .85, 8, .55, .5, 0, null, (r, c) => r === 0 && (c === 3 || c === 4));
+      add(g, panel(1.4, 1.0, winPick(.8)), -1.6, .5, .012); add(g, box(2.4, .08, 1.0, acc), -1.6, 1.1, .5);
+      crossSign(g, -1.6, 3.1, .02);
+      add(g, cyl(1.0, 1.0, .05, M(0x55585f), 16), -1.6, 3.63, -1.7);
+      const hp = panel(1.2, 1.2, new THREE.MeshBasicMaterial({ map: signTex(['H'], '#ffffff', 256, 256), transparent: false }));
+      hp.rotation.x = -Math.PI / 2; add(g, hp, -1.6, 3.66, -1.7);
+      const amb = van(0xf2f2ee, 0xd63c3c); add(g, amb, 4.3, 0, -.9);
+      add(g, box(.5, .08, .2, new THREE.MeshBasicMaterial({ color: 0x3b82f6 })), 4.9, 1.0, -.9);
+      g.userData.info = { kind: 'Городская больница', floors: 4, residents: 0, workers: 900, stats: [['Посетителей в день', '≈ 900'], ['Работает', 'круглосуточно']], note: 'Врачи и посетители покупают кофе и продукты круглые сутки, даже ночью.' };
+      g.userData.fw = 11.6; return g;
+    }
+    function mall(){
+      const g = new THREE.Group(), wall = M(0xd8dde3), acc = M(0x8b5cf6);
+      add(g, box(11.2, 2.9, 3.5, wall), 0, 1.45, -1.75);
+      add(g, panel(4.5, 2.1, winPick(.85)), 0, 1.15, .012);
+      for (let x = -5; x <= 5; x += 1) if (Math.abs(x) > 2.4) add(g, box(.18, 2.9, .2, acc), x, 1.45, .05);
+      add(g, box(5, .1, 1.2, acc), 0, 2.25, .6);
+      roofSign(g, 'ТРЦ ГОРОД', '#C4B5FD', 4.6, 3.75, -.4);
+      for (let k = 0; k < 7; k++) add(g, box(.05, .01, 1.2, whiteMat), -4.6 + k * 1.3, 2.91, -2.2);
+      for (let k = 0; k < 6; k++) if (srand() < .7) { const c = carMesh(spick(CARCOL)); c.rotation.y = Math.PI / 2; add(g, c, -4 + k * 1.3, 2.92, -2.2); }
+      g.userData.info = { kind: 'ТРЦ «Город»', floors: 2, residents: 0, workers: 3000, stats: [['Посетителей в день', '≈ 3 000'], ['Магазинам рядом', 'тяжело']], note: 'Сам торгует продуктами, поэтому магазину рядом трудно. Но приводит толпы: кофейне и ПВЗ рядом выгодно.' };
+      g.userData.fw = 11.6; return g;
+    }
+    function theatre(){
+      const g = new THREE.Group(), wall = M(0xe9dcc0), trim = M(0xf7f2e6), roofG = M(0x6f7f8f), gold = M(0xd4a73a, { metalness: .5, roughness: .35 });
+      add(g, box(8.6, 3.4, 3.0, wall), 0, 1.7, -2.2);
+      add(g, box(8.8, .25, 3.2, trim), 0, 3.5, -2.2);
+      add(g, eaveRoof(8.8, 3.2, .7, roofG), 0, 3.62, -2.2);
+      add(g, box(4.6, .3, 1.5, trim), 0, .15, -.1);
+      add(g, box(4.4, .14, 1.3, trim), 0, .37, -.15);
+      for (let k = 0; k < 6; k++) add(g, cyl(.16, .18, 2.6, trim, 10), -1.9 + k * .76, 1.74, -.15);
+      add(g, box(4.6, .3, 1.5, trim), 0, 3.15, -.15);
+      const ped = gable(4.6, 1.5, .9, trim); add(g, ped, 0, 3.3, .6);
+      add(g, new THREE.Mesh(new THREE.CircleGeometry(.28, 16), gold), 0, 3.62, .62);
+      [-1.5, 0, 1.5].forEach(x => { add(g, panel(.7, 1.6, winPick(.85)), x, 1.25, -.69); add(g, new THREE.Mesh(new THREE.CircleGeometry(.35, 12, 0, Math.PI), winPick(.85)), x, 2.05, -.69); });
+      [-3.6, 3.6].forEach(x => { wgrid(g, x - .9, x + .9, 1.0, 2, 1.2, 2, .45, .7, -.7, trim); });
+      add(g, box(4.0, .55, .06, darkMat), 0, 2.85, -.64 + .76);
+      add(g, sign(['ТЕАТР'], '#F2C46B', 3.9, .48), 0, 2.85, -.64 + .8);
+      [[-3.2, 2], [3.2, 3]].forEach(([x, i]) => { add(g, box(.95, 1.4, .06, darkMat), x, .9, .2); poster(g, .85, .45, i, x, 1.2, .24); poster(g, .85, .45, i + 1, x, .7, .24); });
+      [-2.6, 2.6].forEach(x => { add(g, cyl(.04, .05, 1.8, darkMat, 6), x, .9, .7); add(g, new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 6), bulbMat), x, 1.85, .7); });
+      g.userData.info = { kind: 'Драмтеатр', floors: 2, residents: 0, workers: 120, stats: [['Зрителей вечером', '≈ 600'], ['Спрос вечером', '+30%']], note: 'Вечером перед спектаклем и после него у кофейни и пекарни рядом очередь.' };
+      g.userData.fw = 11.6; return g;
+    }
+    function metroPavilion(g, x, z){
+      add(g, box(1.6, 1.1, 1.2, GLASSP), x, .67, z);
+      add(g, box(1.8, .12, 1.4, M(0x2b2d33)), x, 1.28, z);
+      add(g, panel(1.0, .9, M(0x1c2a3a)), x, .56, z + .61);
+      add(g, cyl(.04, .04, 1.6, darkMat, 6), x + 1.1, .8, z + .4);
+      const m = panel(.6, .6, new THREE.MeshBasicMaterial({ map: signTex(['М'], '#ff4d4d', 256, 256) }));
+      add(g, m, x + 1.1, 1.75, z + .42);
+    }
+
+    /* ---------- courtyard fillers ---------- */
+    function playground(g, x, z){
+      add(g, box(1.3, .1, 1.3, woodMat), x - 1.2, .17, z);
+      add(g, box(1.1, .06, 1.1, M(0xe8d3a0)), x - 1.2, .21, z);
+      const ramp = box(.4, .05, 1.4, M(0xd63c3c)); ramp.rotation.x = .55; add(g, ramp, x + .4, .55, z + .3);
+      add(g, box(.5, .9, .5, M(0x3f6fbf)), x + .4, .45, z - .5);
+      [[1.2, -.4], [2.4, -.4]].forEach(([a, b]) => { add(g, box(.06, 1.2, .06, M(0xf2c94c)), x + a, .6, z + b); add(g, box(.06, 1.2, .06, M(0xf2c94c)), x + a, .6, z + b + .9); });
+      add(g, box(1.3, .06, .06, M(0xf2c94c)), x + 1.8, 1.2, z - .4); add(g, box(1.3, .06, .06, M(0xf2c94c)), x + 1.8, 1.2, z + .5);
+      add(g, box(.06, .06, .96, M(0xf2c94c)), x + 1.8, 1.2, z + .05);
+      add(g, box(.35, .04, .2, woodMat), x + 1.6, .45, z + .05); add(g, box(.35, .04, .2, woodMat), x + 2.05, .45, z + .05);
+    }
+    function parking(g, x, z, n){
+      for (let k = 0; k < n; k++) {
+        add(g, box(.05, .01, 1.4, whiteMat), x - n * .55 + k * 1.1, .14, z);
+        if (srand() < .75) { const c = carMesh(spick(CARCOL)); c.rotation.y = Math.PI / 2; add(g, c, x - n * .55 + k * 1.1 + .55, .1, z); }
+      }
+    }
+    function benchesPlaza(g, x, z){
+      add(g, box(6, .03, 2.4, M(0xcdbfa8)), x, .14, z);
+      [-1.6, 1.6].forEach(dx => {
+        add(g, box(1.1, .08, .35, M(0x6b4a2f)), x + dx, .42, z - .7); add(g, box(1.1, .3, .06, M(0x6b4a2f)), x + dx, .66, z - .86);
+        add(g, box(.06, .4, .3, darkMat), x + dx - .48, .2, z - .7); add(g, box(.06, .4, .3, darkMat), x + dx + .48, .2, z - .7);
+      });
+      add(g, cyl(.6, .6, .3, M(0x5a4636), 12), x, .25, z + .3);
+      for (let k = 0; k < 6; k++) add(g, new THREE.Mesh(new THREE.SphereGeometry(.09, 6, 5), M(spick([0xe07a9a, 0xf2c46b, 0xffffff]))), x + rand(-.4, .4), .45, z + .3 + rand(-.4, .4));
+    }
+
+    /* ---------- districts ---------- */
+    const DISTRICTS = {
+      center: { bt: 'coffee', name: 'Старый город', note: 'туристы и прогулки, дорогая земля', likes: ['кофе', 'выпечка', 'реклама'], base: .9, mix: [stalinka, stalinka, stalinka, townhousePair, townhousePair, loft] },
+      sleep: { bt: 'shop', name: 'Спальный район', note: 'много жителей, покупают каждый день', likes: ['продукты', 'посылки', 'хлеб'], base: .8, mix: [panelTower, () => panelTower(true), () => panelTower(true), khrushchevka, khrushchevka, khrushchevka] },
+      private: { bt: 'bakery', name: 'Частный сектор', note: 'семьи с машинами, тихо', likes: ['хлеб', 'ремонт', 'продукты'], base: .45, mix: [cottage, cottage, cottage, cottage, woodHouse, woodHouse] },
+      business: { bt: 'ads', name: 'Деловой квартал', note: 'офисы и большие бюджеты', likes: ['реклама', 'кофе', 'доставка'], base: .75, mix: [office, office, office, office, loft, modernTower] },
+      industry: { bt: 'repair', name: 'Промзона', note: 'дешёвая земля, удобно для складов', likes: ['склады', 'стройматериалы'], base: .3, mix: [warehouseInd, warehouseInd, plant, tanks, garages, containers] },
+      newres: { bt: 'pvz', name: 'Новый район', note: 'молодые семьи, много онлайн-заказов', likes: ['посылки', 'кофе', 'доставка'], base: .7, mix: [modernTower, modernTower, modernTower, modernTower, townhousePair, () => panelTower(true)] }
+    };
+    const DMAP = [['industry', 'industry', 'business'], ['private', 'center', 'business'], ['private', 'park', 'newres'], ['sleep', 'sleep', 'newres']];
+    // the city grows with the player's capital: districts open stage by stage
+    const STAGE_OF = { center: 1, sleep: 1, park: 1, private: 2, industry: 2, business: 3, newres: 4 };
+    const STAGE_CAP = { 1: 0, 2: 300000, 3: 1000000, 4: 2500000 };
+    const CAP_NOW = { 1: 184500, 2: 412300, 3: 1240000, 4: 2730000 };
+    let cityStage = 2;
+    const isLocked = b => !!b && STAGE_OF[b.d] > cityStage;
+    // landmarks take two back-row slots (k and k+1)
+    const LANDMARKS = [{ i: 1, j: 1, k: 0, fn: () => theatre() }, { i: 1, j: 3, k: 1, fn: () => school() }, { i: 2, j: 2, k: 2, fn: () => hospital() }, { i: 2, j: 0, k: 0, fn: () => mall() }];
+
+    /* ---------- layout ---------- */
+    const PW = 6, BW = 24, BD = 11, SW = 2.2, ST = 5;
+    const SX = BW + 2 * SW + ST, SZ = BD + 2 * SW + ST;
+    const COLS = 3, ROWS = 4;
+    const cityW = COLS * SX + ST, cityD = ROWS * SZ + ST;
+    const blocks = [];
+    for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) blocks.push({ i, j, x: (i - 1) * SX, z: (j - 1.5) * SZ, d: DMAP[j][i] });
+    const blk = (i, j) => blocks.find(b => b.i === i && b.j === j);
+
+    const envMats = [];
+    function EM(day, night){ const m = new THREE.MeshStandardMaterial({ color: day, roughness: .9, flatShading: true }); envMats.push([m, day, night]); return m; }
+    const grassMat = EM(0x6f8f57, 0x1b2620), asphaltMat = EM(0x4a4d55, 0x202227), walkMat = EM(0xb9bcc2, 0x3a3e48), dirtMat = EM(0x9a9486, 0x34322e);
+    const parkMat = EM(0x7fa565, 0x1f2e22), pathMat = EM(0xd8cdb6, 0x4a463e), stoneMat = EM(0x9a968e, 0x45433f), riverMat = EM(0x4f8fc0, 0x14243a), sandMat = EM(0xd9c79a, 0x3a352a);
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), grassMat);
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+    add(scene, box(cityW, .04, cityD, asphaltMat), 0, .02, 0);
+    const rz = cityD / 2 + 11;
+    add(scene, box(500, .05, 3, sandMat), 0, .03, rz - 5.2);
+    add(scene, box(500, .05, 8, riverMat), 0, .025, rz);
+    add(scene, box(500, .05, 3, sandMat), 0, .03, rz + 5.2);
+    add(scene, box(6, .3, 13, stoneMat), 0, .5, rz - .3);
+    [-2.8, 2.8].forEach(x => add(scene, box(.12, .5, 13, RAIL), x, .9, rz - .3));
+    add(scene, box(6, .04, 6, asphaltMat), 0, .03, cityD / 2 + 3);
+
+    const dashGeo = new THREE.BoxGeometry(1, .01, .12), dashMatC = new THREE.MeshBasicMaterial({ color: 0x9a9fa8 });
+    const dashSpots = [];
+    for (let j = 0; j <= ROWS; j++) { if (j === 2) continue; const z = (j - 2) * SZ; for (let x = -cityW / 2 + 1; x < cityW / 2; x += 2) dashSpots.push([x, z, 0]); }
+    for (let i = 0; i <= COLS; i++) { const x = (i - 1.5) * SX; for (let z = -cityD / 2 + 1; z < cityD / 2; z += 2) dashSpots.push([x, z, 1]); }
+    const dashes = new THREE.InstancedMesh(dashGeo, dashMatC, dashSpots.length);
+    const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(1, 1, 1), tmpP = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+    dashSpots.forEach(([x, z, v], k) => { tmpQ.setFromAxisAngle(UP, v ? Math.PI / 2 : 0); tmpM.compose(tmpP.set(x, .045, z), tmpQ, tmpS); dashes.setMatrixAt(k, tmpM); });
+    scene.add(dashes);
+
+    const treeSpots = [];
+    for (let k = 0; k < 170; k++) {
+      const a = srand() * Math.PI * 2, r = srand();
+      const x = Math.cos(a) * (cityW / 2 + 5 + r * 34), z = Math.sin(a) * (cityD / 2 + 5 + r * 26);
+      if (Math.abs(z - rz) < 7) continue;
+      if (x > cityW / 2 + 8 && x < cityW / 2 + 42 && z > -30 && z < 5) continue;   // stadium
+      if (Math.abs(z) < 4 && Math.abs(x) > cityW / 2) continue;                       // highway
+      if (x < -cityW / 2 - 6 && x > -cityW / 2 - 40 && z > -16 && z < -2) continue;     // roadside stop
+      if (x < -cityW / 2 - 6 && z < -cityD / 2 - 4) continue;                          // fields
+      if (x > cityW / 2 + 4 && z < -cityD / 2 - 4) continue;                           // dachas
+      treeSpots.push([x, z, .9 + srand() * .6]);
+    }
+
+    /* ---------- boulevard with a tree-lined median and a monument ---------- */
+    const outskirts = new THREE.Group();
+    for (let i = 0; i < COLS; i++) {
+      const x0 = (i - 1.5) * SX + 3.6, x1 = (i - .5) * SX - 3.6;
+      add(outskirts, box(x1 - x0, .16, 1.3, parkMat), (x0 + x1) / 2, .08, 0);
+      for (let x = x0 + 1; x < x1; x += 3) treeSpots.push([x, 0, .7]);
+    }
+    (function monument(){
+      const mx = 0, gold = M(0xd4a73a, { metalness: .5, roughness: .35 });
+      add(outskirts, box(1.2, 1.2, 1.2, stoneMat), mx, .7, 0);
+      add(outskirts, cyl(.25, .3, 1.2, gold, 10), mx, 1.9, 0);
+      add(outskirts, new THREE.Mesh(new THREE.SphereGeometry(.22, 10, 8), gold), mx, 2.7, 0);
+    })();
+
+    /* ---------- highway out of town ---------- */
+    [-1, 1].forEach(s => {
+      const len = 200, cx = s * (cityW / 2 + len / 2);
+      add(outskirts, box(len, .05, 5, asphaltMat), cx, .03, 0);
+      for (let x = cityW / 2 + 1; x < cityW / 2 + len; x += 3) add(outskirts, box(1.4, .01, .14, M(0xe8e8e8)), s * x, .06, 0);
+    });
+
+    /* ---------- fields and dachas ---------- */
+    const fieldCols = [0xd9c26a, 0x8fbf5a, 0x6f8f3a, 0xc9a96a, 0xa3c46a], fieldMats = {};
+    for (let a = 0; a < 3; a++) for (let c = 0; c < 2; c++) {
+      const fx = -cityW / 2 - 18 - a * 15, fz = -cityD / 2 - 14 - c * 13, col = spick(fieldCols);
+      if (!fieldMats[col]) fieldMats[col] = [EM(col, new THREE.Color(col).multiplyScalar(.25).getHex()), EM(new THREE.Color(col).multiplyScalar(.8).getHex(), 0x15201a)];
+      add(outskirts, box(13, .06, 11, fieldMats[col][0]), fx, .04, fz);
+      for (let r = -4.5; r <= 4.5; r += 1) add(outskirts, box(12.6, .02, .12, fieldMats[col][1]), fx, .08, fz + r);
+    }
+    for (let k = 0; k < 12; k++) {
+      const dx = cityW / 2 + 10 + (k % 4) * 7, dz = -cityD / 2 - 12 - Math.floor(k / 4) * 8;
+      const hw = 1.6 + srand() * .6, hh = 1.0 + srand() * .4, wall = M(spick(PASTEL)), roof = M(spick(ROOFS));
+      add(outskirts, box(hw, hh, 1.8, wall), dx, hh / 2, dz);
+      add(outskirts, gable(hw + .2, 2.0, .7, roof), dx, hh, dz + 1.0);
+      add(outskirts, panel(.4, .35, winPick(.4)), dx - .3, .65, dz + .91);
+      for (let x = -2.6; x <= 2.61; x += .4) add(outskirts, box(.04, .35, .04, woodMat), dx + x, .18, dz + 2.4);
+      add(outskirts, box(5.2, .03, 3.6, M(0x6b5a3a)), dx, .05, dz + .4);
+      for (let r = 0; r < 3; r++) treeSpots.push([dx - 2 + r * 2 + srand() * .6, dz - 1.8, .7 + srand() * .3]);
+    }
+    for (let x = -12; x < 30; x += 1) if (srand() < .9) treeSpots.push([-cityW / 2 - 14 - srand() * 30, -20 + x * 1.5, 1 + srand() * .5]);
+
+    /* ---------- stadium on the edge of town ---------- */
+    let stadiumHome = null;
+    (function stadium(){
+      const sx = cityW / 2 + 25, sz = -13;
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.12, 2.6, 36, 1, true), M(0x9fb0c3, { side: THREE.DoubleSide }));
+      bowl.scale.set(13, 1, 8.5); bowl.position.set(sx, 1.3, sz); bowl.castShadow = true; bowl.receiveShadow = true; outskirts.add(bowl);
+      const seats = new THREE.Mesh(new THREE.CylinderGeometry(.95, .78, 2.2, 36, 1, true), M(0xd63c3c, { side: THREE.DoubleSide }));
+      seats.scale.set(13, 1, 8.5); seats.position.set(sx, 1.25, sz); outskirts.add(seats);
+      const track = new THREE.Mesh(new THREE.CylinderGeometry(9.9, 9.9, .05, 36), M(0xb5543c)); track.scale.z = 8.5 / 13 * 1.0; track.position.set(sx, .12, sz); outskirts.add(track);
+      const pitch = box(13, .06, 6.6, M(0x4f9a62)); pitch.position.set(sx, .15, sz); pitch.castShadow = false; outskirts.add(pitch);
+      for (let k = -2; k <= 2; k++) add(outskirts, box(2.6, .01, 6.6, M(k % 2 ? 0x5aa86d : 0x4f9a62)), sx + k * 2.6, .19, sz);
+      add(outskirts, box(.06, .02, 6.6, whiteMat), sx, .2, sz);
+      [[-9.5, -6], [9.5, -6], [-9.5, 6], [9.5, 6]].forEach(([a, c]) => {
+        add(outskirts, cyl(.12, .16, 6, darkMat, 6), sx + a, 3, sz + c);
+        add(outskirts, box(1.2, .6, .2, M(0xe5e7eb)), sx + a, 6.1, sz + c);
+        glow(sx + a, 6.1, sz + c, 3.2);
+      });
+      add(outskirts, box(5, .7, .1, darkMat), sx, 3.2, sz + 8.7);
+      add(outskirts, sign(['СТАДИОН'], '#F2C46B', 4.8, .6), sx, 3.2, sz + 8.76);
+      stadiumHome = { x: sx, z: sz, hw: 13, hd: 8.5, front: true, info: { kind: 'Стадион', floors: 0, residents: 0, workers: 0, stats: [['Зрителей в матч', '≈ 25 000'], ['Спрос в дни матчей', '×3']], note: 'В дни матчей толпа идёт через весь город: кофе, продукты и выпечка продаются в несколько раз лучше.' }, dist: { name: 'Окраина', likes: [] }, px: sx, pz: sz + 8.5, b: null, box: new THREE.Box3(new THREE.Vector3(sx - 13, 0, sz - 8.5), new THREE.Vector3(sx + 13, 3, sz + 8.5)) };
+      add(outskirts, box(28, .05, 6, asphaltMat), sx, .03, sz - 11.8);
+      add(outskirts, box(4, .05, 9, asphaltMat), sx, .03, sz + 7.5);
+    })();
+    mergeStatic(outskirts); scene.add(outskirts);
+
+    /* ---------- small details, placed a little irregularly ---------- */
+    const details = new THREE.Group();
+    function busStop(x, z){
+      add(details, box(1.7, .06, .75, M(0x3a3d44)), x, 1.35, z);
+      add(details, box(1.7, 1.1, .04, GLASSP), x, .8, z - .32);
+      add(details, box(.05, 1.3, .05, RAIL), x - .82, .7, z - .32); add(details, box(.05, 1.3, .05, RAIL), x + .82, .7, z - .32);
+      add(details, box(1.1, .06, .3, M(0x6b4a2f)), x, .45, z - .15);
+      add(details, cyl(.03, .03, 1.9, RAIL, 5), x + 1.15, .95, z + .2);
+      add(details, panel(.42, .42, new THREE.MeshBasicMaterial({ map: signTex(['А'], '#2DD4BF', 128, 128) })), x + 1.15, 1.85, z + .23);
+    }
+    function roadSign(x, z, kind){
+      add(details, cyl(.025, .025, 1.6, RAIL, 5), x, .85, z);
+      if (kind === 0) { add(details, cyl(.22, .22, .03, new THREE.MeshBasicMaterial({ color: 0xd63c3c }), 14).rotateX(Math.PI / 2), x, 1.6, z + .02); add(details, cyl(.16, .16, .035, new THREE.MeshBasicMaterial({ color: 0xffffff }), 14).rotateX(Math.PI / 2), x, 1.6, z + .03); }
+      else if (kind === 1) add(details, box(.36, .36, .03, new THREE.MeshBasicMaterial({ color: 0x3f6fbf })), x, 1.6, z + .02);
+      else { const t = new THREE.Mesh(new THREE.CircleGeometry(.24, 3), new THREE.MeshBasicMaterial({ color: 0xf2c94c })); t.rotation.z = Math.PI / 2; add(details, t, x, 1.6, z + .03); }
+    }
+    blocks.forEach(b => {
+      if (b.d === 'park' || STAGE_OF[b.d] > 1) return;
+      if (srand() < .8) { const kk = 1 + Math.floor(srand() * 3); busStop(b.x - BW / 2 + kk * PW + rand(-.4, .4), b.z + BD / 2 + 1.2); }
+    });
+    for (let i = 0; i <= COLS; i++) for (let j = 0; j <= ROWS; j++) {
+      if (srand() < .55) continue;
+      const x = (i - 1.5) * SX + (srand() < .5 ? -3.2 : 3.2), z = (j - 2) * SZ + 3.1 + rand(-.2, .2);
+      if (Math.abs(x) < cityW / 2 && Math.abs(z) < cityD / 2) roadSign(x, z, Math.floor(srand() * 3));
+    }
+    // roadside stop on the highway: gas station, car wash and an all-night cafe
+    (function roadside(){
+      const rx = -cityW / 2 - 22, rz2 = -8;
+      add(details, box(7, .04, 9, asphaltMat), rx, .04, rz2 + .5);
+      add(details, box(6, .22, 3.6, M(0xf0ece4)), rx, 2.4, rz2);
+      add(details, box(6.04, .14, 3.64, M(0xd63c3c)), rx, 2.25, rz2);
+      [[-2.6, -1.5], [2.6, -1.5], [-2.6, 1.5], [2.6, 1.5]].forEach(([a, c]) => add(details, box(.18, 2.3, .18, M(0xf0ece4)), rx + a, 1.15, rz2 + c));
+      [-1.2, 1.2].forEach(a => { add(details, box(.5, 1.0, .35, M(0xd63c3c)), rx + a, .5, rz2); add(details, panel(.3, .2, new THREE.MeshBasicMaterial({ color: 0x9fe6ff })), rx + a, .8, rz2 + .18); });
+      add(details, box(4, 2, 2.6, M(0xe5e7eb)), rx, 1, rz2 - 3.6);
+      add(details, panel(2.4, 1.0, winPick(.9)), rx - .4, .8, rz2 - 2.29);
+      add(details, box(2.6, .5, .06, darkMat), rx, 1.75, rz2 - 2.27); add(details, sign(['АЗС 24'], '#F07167', 2.5, .44), rx, 1.75, rz2 - 2.23);
+      add(details, cyl(.06, .06, 3.2, RAIL, 6), rx + 3.2, 1.6, rz2 + 2.4);
+      add(details, box(1.1, 1.2, .1, darkMat), rx + 3.2, 3.3, rz2 + 2.4); add(details, sign(['95', '58,90'], '#F2C46B', 1.0, 1.1), rx + 3.2, 3.3, rz2 + 2.46);
+      const wx = rx + 8;
+      add(details, box(3.4, 2.2, 3.2, M(0x9fc4dd)), wx, 1.1, rz2 - 1);
+      add(details, panel(2.2, 1.7, M(0x1c2a3a)), wx, .85, rz2 + .61);
+      add(details, box(3, .5, .06, darkMat), wx, 2.45, rz2 + .62); add(details, sign(['МОЙКА'], '#60A5FA', 2.9, .44), wx, 2.45, rz2 + .66);
+      const cx2 = rx - 8;
+      add(details, box(3.6, 1.8, 2.8, M(0xf2c94c)), cx2, .9, rz2 - 1);
+      add(details, eaveRoof(3.8, 3.0, .6, M(0xd63c3c)), cx2, 1.8, rz2 - 1);
+      add(details, panel(2.6, .9, winPick(.9)), cx2, .9, rz2 + .41);
+      add(details, box(2.8, .5, .06, darkMat), cx2, 2.75, rz2 + .4); add(details, sign(['КАФЕ 24'], '#F2C46B', 2.7, .44), cx2, 2.75, rz2 + .44);
+      for (let k = 0; k < 3; k++) { const t = cafeTable(0xd63c3c); t.scale.setScalar(.8); t.position.set(cx2 - 1.2 + k * 1.2, .04, rz2 + 1.6); details.add(t); }
+      for (let k = 0; k < 4; k++) { const c = carMesh(spick(CARCOL)); c.rotation.y = Math.PI / 2; c.position.set(rx - 2.4 + k * 1.6, .04, rz2 + 3.6); details.add(c); }
+      glow(rx, 2.2, rz2, 3.5); pool(rx, rz2, 7);
+    })();
+    mergeStatic(details); scene.add(details);
+
+    /* ---------- business plots ---------- */
+    const ME = { name: 'Иванов Групп', color: '#D4A73A', me: true };
+    const BOT = n => ({ name: n, bot: true, color: '#8A8F98' });
+    const BIZ = [
+      { i: 1, j: 1, k: 1, type: 'coffee', level: 3, owner: ME },
+      { i: 0, j: 3, k: 1, type: 'shop', level: 2, owner: ME },
+      { i: 1, j: 3, k: 2, type: 'pvz', level: 2, owner: ME },
+      { i: 0, j: 0, k: 2, type: 'market', level: 3, owner: ME },
+      { i: 1, j: 1, k: 2, type: 'coffee', level: 3, owner: BOT('Премиум') },
+      { i: 1, j: 3, k: 0, type: 'shop', level: 2, owner: BOT('Демпингер') },
+      { i: 2, j: 1, k: 1, type: 'ads', level: 3, owner: BOT('Осторожный') },
+      { i: 2, j: 3, k: 2, type: 'pvz', level: 2, owner: BOT('Демпингер') },
+      { i: 0, j: 1, k: 2, lot: true }, { i: 0, j: 2, k: 0, lot: true }, { i: 2, j: 0, k: 1, lot: true },
+      { i: 2, j: 2, k: 1, lot: true }, { i: 1, j: 0, k: 3, lot: true }, { i: 2, j: 3, k: 0, lot: true }
+    ];
+    const plots = BIZ.map(bz => {
+      const b = blk(bz.i, bz.j), D = DISTRICTS[b.d];
+      const p = Object.assign({ block: b, x: b.x - BW / 2 + PW / 2 + bz.k * PW, z: b.z + BD / 2, rot: 0, dist: D }, bz);
+      p.cx = p.x; p.cz = p.z - 1.6;
+      p.demand = clamp(D.base + (srand() - .5) * .2, .05, 1);
+      if (p.lot) { p.level = 0; p.price = Math.round((20000 + D.base * 90000) / 1000) * 1000; }
+      return p;
+    });
+    const isBiz = (b, k, front) => front && plots.some(p => p.block === b && p.k === k);
+
+    /* ---------- construction site for districts that are not open yet ---------- */
+    function siteFor(b){
+      const g = new THREE.Group(), cap = STAGE_CAP[STAGE_OF[b.d]];
+      add(g, box(BW + 2 * SW - .4, .05, BD + 2 * SW - .4, M(0x8a7a5e)), b.x, .14, b.z);
+      const fm = M(0xf97316), wm = M(0xf0ece4);
+      for (let x = -BW / 2; x <= BW / 2 + .01; x += 1.2) add(g, box(.06, .9, .06, fm), b.x + x, .55, b.z + BD / 2 + .9);
+      for (let x = -BW / 2; x < BW / 2; x += 1.2) add(g, box(1.2, .18, .04, Math.round(x / 1.2) % 2 ? fm : wm), b.x + x + .6, .75, b.z + BD / 2 + .9);
+      towerCrane(g, b.x + 7, b.z - 2.5, 8, 0xf97316);
+      sandPile(g, b.x - 4, b.z - 1); sandPile(g, b.x + 1, b.z + 1.5);
+      bricks(g, b.x - 8, b.z + 1); bricks(g, b.x - 7, b.z + 1.2);
+      add(g, box(4.6, 1.5, .08, darkMat), b.x - 3, 2.3, b.z + BD / 2 - .2);
+      add(g, cyl(.06, .06, 1.6, darkMat, 6), b.x - 4.8, .8, b.z + BD / 2 - .2); add(g, cyl(.06, .06, 1.6, darkMat, 6), b.x - 1.2, .8, b.z + BD / 2 - .2);
+      add(g, sign(['СТРОЙКА', 'откроется при ' + fmt(cap)], '#FB923C', 4.5, 1.4), b.x - 3, 2.3, b.z + BD / 2 - .15);
+      mergeStatic(g); g.userData.siteOf = b;
+      return g;
+    }
+
+    /* ---------- build the blocks ---------- */
+    const homes = [];   // footprints of residential & industrial buildings for tapping
+    const smokeSpots = [];
+    blocks.forEach(b => {
+      add(scene, box(BW + 2 * SW, .12, BD + 2 * SW, b.d === 'park' ? parkMat : b.d === 'industry' ? dirtMat : walkMat), b.x, .06, b.z);
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+        const x = b.x + sx * (BW / 2 + SW - .35), z = b.z + sz * (BD / 2 + SW - .35);
+        add(scene, cyl(.05, .07, 2.4, darkMat, 6), x, 1.2, z);
+        add(scene, new THREE.Mesh(new THREE.SphereGeometry(.13, 8, 6), bulbMat), x, 2.45, z);
+        glow(x, 2.45, z, 1.7); pool(x, z, 4.5);
+      });
+      if (b.d === 'park') return;
+      for (let k = 0; k <= 4; k++) treeSpots.push([b.x - BW / 2 + k * PW, b.z + BD / 2 + SW - .45, .75, b]);
+      const G = new THREE.Group();
+      const D = DISTRICTS[b.d];
+      [true, false].forEach(front => {
+        for (let k = 0; k < 4; k++) {
+          if (isBiz(b, k, front)) continue;
+          const lm = front ? null : LANDMARKS.find(l => l.i === b.i && l.j === b.j && (k === l.k || k === l.k + 1));
+          if (lm && k === lm.k + 1) continue;
+          const h = lm ? lm.fn() : spick(D.mix)();
+          // both rows face the camera: the back row opens onto the courtyard, like real city blocks
+          const x = b.x - BW / 2 + PW / 2 + k * PW + (lm ? PW / 2 : 0), z = b.z + (front ? BD / 2 : -BD / 2 + 3.8);
+          h.position.set(x, 0, z); G.add(h);
+          (h.userData.trees || []).forEach(([tx, tz]) => treeSpots.push([x + tx, z + tz, .8 + srand() * .4, b]));
+          (h.userData.smoke || []).forEach(e => smokeSpots.push({ x: x + e.x, y: e.y, z: z + e.z, kind: e.kind, b }));
+          const fd = 3.8;
+          h.updateMatrixWorld(true);
+          homes.push({ x, z: z - fd / 2, hw: (h.userData.fw || 5.6) / 2, hd: fd / 2 + .4, front, info: h.userData.info, dist: D, px: x, pz: z, b, box: new THREE.Box3().setFromObject(h) });
+        }
+      });
+      if ((b.i === 1 && b.j === 1) || (b.i === 0 && b.j === 3)) {
+        const mx = b.x + BW / 2 + .9, mz = b.z + BD / 2 + 1.0;
+        metroPavilion(G, mx, mz);
+        homes.push({ x: mx, z: mz, hw: 1.2, hd: 1.0, front: true, info: { kind: 'Станция метро', floors: 1, residents: 0, workers: 30, stats: [['Пассажиров в день', '≈ 12 000'], ['Час пик', '8:00 и 18:00']], note: 'Поток людей утром и вечером: кофе с собой и ПВЗ у метро зарабатывают больше.' }, dist: D, px: mx, pz: mz + .7, b, box: new THREE.Box3(new THREE.Vector3(mx - 1, 0, mz - .7), new THREE.Vector3(mx + 1, 2, mz + .7)) });
+      }
+      // courtyard between the two rows
+      const cz = b.z;
+      if ((b.d === 'sleep' || b.d === 'newres') && (b.i + b.j) % 2 === 1) {
+        add(G, box(5.6, .04, 3.0, M(0xd9813b)), b.x + 6, .14, cz); add(G, box(5.2, .02, .05, whiteMat), b.x + 6, .17, cz);
+        add(G, box(.05, .02, 2.8, whiteMat), b.x + 6, .17, cz);
+        [-2.6, 2.6].forEach(dx => { add(G, cyl(.04, .04, 1.6, RAIL, 5), b.x + 6 + dx, .8, cz); add(G, box(.06, .45, .6, whiteMat), b.x + 6 + dx * .95, 1.5, cz); add(G, new THREE.Mesh(new THREE.TorusGeometry(.14, .02, 5, 10), M(0xd63c3c)), b.x + 6 + dx * .88, 1.32, cz); });
+        playground(G, b.x - 6, cz); for (let k = 0; k < 4; k++) treeSpots.push([b.x - 11 + k * 1.6, cz + (k % 2 ? .9 : -.9), .8, b]);
+      }
+      else if (b.d === 'sleep' || b.d === 'newres') { playground(G, b.x - 6, cz); parking(G, b.x + 6, cz, 6); for (let k = 0; k < 4; k++) treeSpots.push([b.x - 11 + k * 1.6, cz + (k % 2 ? .9 : -.9), .8, b]); }
+      else if (b.d === 'center') { benchesPlaza(G, b.x - 6, cz); benchesPlaza(G, b.x + 6, cz); }
+      else if (b.d === 'business') { benchesPlaza(G, b.x, cz); parking(G, b.x - 8, cz, 4); parking(G, b.x + 8, cz, 4); }
+      else if (b.d === 'industry') { parking(G, b.x - 5, cz, 6); const t = van(0xe5e7eb, 0xf97316); add(G, t, b.x + 7, 0, cz); }
+      else { for (let k = 0; k < 6; k++) treeSpots.push([b.x - 10 + k * 4, cz + (srand() - .5) * 1.5, .9 + srand() * .4, b]); }
+      b.pairs = []; mergeStatic(G, b.pairs); G.userData.block = b; scene.add(G); b.G = G;
+      b.site = siteFor(b); scene.add(b.site);
+    });
+
+    // city park with a pond and the season trophy
+    let fountainJet = null;
+    (function park(){
+      const b = blocks.find(q => q.d === 'park'), { x, z } = b;
+      add(scene, box(BW + 2 * SW - .6, .03, 1.4, pathMat), x, .135, z);
+      add(scene, box(1.4, .03, BD + 2 * SW - .6, pathMat), x - 6, .135, z);
+      const pond = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, .05, 24), new THREE.MeshBasicMaterial({ color: 0x5fb7e8 }));
+      pond.scale.z = .55; add(scene, pond, x + 5.5, .14, z + 2.2);
+      add(scene, cyl(1.4, 1.5, .4, stoneMat, 20), x - 6, .32, z);
+      const water = new THREE.MeshBasicMaterial({ color: 0x5fb7e8, transparent: true, opacity: .85 });
+      add(scene, new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, .05, 20), water), x - 6, .53, z);
+      add(scene, cyl(.12, .16, 1.0, stoneMat, 8), x - 6, .95, z);
+      fountainJet = new THREE.Mesh(new THREE.ConeGeometry(.18, .8, 8), water); add(scene, fountainJet, x - 6, 1.75, z);
+      const tx = x + 4, tz = z - 2.6;
+      add(scene, box(1.2, .9, 1.2, stoneMat), tx, .57, tz);
+      const goldM = M(0xd4a73a, { metalness: .5, roughness: .35 });
+      add(scene, cyl(.32, .18, .55, goldM, 16), tx, 1.45, tz); add(scene, cyl(.08, .08, .25, goldM, 8), tx, 1.07, tz); add(scene, cyl(.25, .25, .06, goldM, 12), tx, .99, tz);
+      [-1, 1].forEach(s => { const h = new THREE.Mesh(new THREE.TorusGeometry(.15, .035, 6, 12), goldM); h.rotation.y = Math.PI / 2; add(scene, h, tx + s * .36, 1.5, tz); });
+      add(scene, box(1.0, .3, .04, darkMat), tx, .62, tz + .62);
+      add(scene, sign(['ТОП-3', 'сезона'], '#D4A73A', .95, .28), tx, .62, tz + .645);
+      [[-10, 3.5], [-10, -3.5], [-2, 4], [-2, -4], [9, -3.5], [10.5, -1], [-13, 0], [1, 4.6], [12, 4], [-4.5, 4.5], [-8, -4.6], [7, -4.8], [2.5, -4.2]].forEach(([a, c]) => treeSpots.push([x + a, z + c, 1 + srand() * .4]));
+      const bn = new THREE.Group();
+      [[-2.5, -1.2], [-9.5, -1.2], [1.5, 1.2]].forEach(([a, c]) => {
+        add(bn, box(1.1, .08, .35, M(0x6b4a2f)), x + a, .42, z + c); add(bn, box(1.1, .3, .06, M(0x6b4a2f)), x + a, .66, z + c - .16);
+      });
+      mergeStatic(bn); scene.add(bn);
+    })();
+
+    const trunkI = new THREE.InstancedMesh(new THREE.CylinderGeometry(.08, .11, .9, 6), M(0x5a4030), treeSpots.length);
+    const crownI = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.62, 0), leafMat, treeSpots.length);
+    const treeRot = treeSpots.map(() => srand() * 3);
+    function writeTrees(){
+      treeSpots.forEach(([x, z, s, b], k) => {
+        const sc = b && isLocked(b) ? .0001 : s;
+        tmpQ.identity(); tmpS.set(sc, sc, sc);
+        tmpM.compose(tmpP.set(x, .45 * sc + .12, z), tmpQ, tmpS); trunkI.setMatrixAt(k, tmpM);
+        tmpQ.setFromAxisAngle(UP, treeRot[k]);
+        tmpM.compose(tmpP.set(x, 1.25 * sc + .12, z), tmpQ, tmpS); crownI.setMatrixAt(k, tmpM);
+      });
+      trunkI.instanceMatrix.needsUpdate = crownI.instanceMatrix.needsUpdate = true;
+      tmpS.set(1, 1, 1);
+    }
+    writeTrees();
+    trunkI.castShadow = crownI.castShadow = true; scene.add(trunkI, crownI);
+
+    /* ---------- district labels ---------- */
+    function labelSprite(title, sub){
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 200;
+      const g = c.getContext('2d');
+      g.font = '700 64px Unbounded, Manrope, sans-serif';
+      const tw = Math.max(g.measureText(title).width, 400) + 90;
+      rr(g, (1024 - tw) / 2, 10, tw, 180, 36); g.fillStyle = 'rgba(11,12,15,.78)'; g.fill();
+      g.fillStyle = '#F2F2F4'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(title, 512, 78);
+      g.font = '800 42px Manrope, sans-serif'; g.fillStyle = '#D4A73A'; g.fillText(sub, 512, 146);
+      const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+      s.scale.set(16, 3.1, 1); s.renderOrder = 15; return s;
+    }
+    const labels = [];
+    const dLabels = {};
+    const districtCenter = key => { const bs = blocks.filter(b => b.d === key); return [bs.reduce((a, b) => a + b.x, 0) / bs.length, bs.reduce((a, b) => a + b.z, 0) / bs.length]; };
+    function placeLabel(key){
+      const old = dLabels[key];
+      if (old) { scene.remove(old); labels.splice(labels.indexOf(old), 1); old.material.map.dispose(); old.material.dispose(); }
+      const [x, z] = districtCenter(key), locked = STAGE_OF[key] > cityStage;
+      const s = labelSprite(DISTRICTS[key].name, locked ? 'откроется при ' + fmt(STAGE_CAP[STAGE_OF[key]]) : 'спрос: ' + DISTRICTS[key].likes.slice(0, 2).join(', '));
+      s.position.set(x, 1.5, z); s.visible = camera.zoom < .8; scene.add(s); labels.push(s); dLabels[key] = s;
+    }
+    Object.keys(DISTRICTS).forEach(placeLabel);
+    const parkLabel = labelSprite('Городской парк', 'кубок лучших за сезон');
+    const pb = blocks.find(b => b.d === 'park'); parkLabel.position.set(pb.x, 1.5, pb.z); scene.add(parkLabel); labels.push(parkLabel);
+
+    /* ---------- markers ---------- */
+    function pinSprite(color, label){
+      const c = document.createElement('canvas'); c.width = 128; c.height = 160;
+      const g = c.getContext('2d');
+      g.fillStyle = color; g.beginPath(); g.arc(64, 58, 50, Math.PI * .82, Math.PI * 2.18); g.lineTo(64, 152); g.closePath(); g.fill();
+      g.lineWidth = 6; g.strokeStyle = 'rgba(11,12,15,.85)'; g.stroke();
+      g.fillStyle = '#0B0C0F'; g.beginPath(); g.arc(64, 58, 34, 0, Math.PI * 2); g.fill();
+      g.fillStyle = color; g.font = '800 40px Manrope, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 64, 60);
+      const t = new THREE.CanvasTexture(c);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+      s.center.set(.5, 0); s.scale.set(1.8, 2.25, 1); s.renderOrder = 20;
+      return s;
+    }
+    function frameRect(g, w, z0, z1, mat, t){
+      const y = .17;
+      add(g, box(w, .05, t, mat), 0, y, z1); add(g, box(w, .05, t, mat), 0, y, z0);
+      add(g, box(t, .05, z1 - z0, mat), -w / 2, y, (z0 + z1) / 2); add(g, box(t, .05, z1 - z0, mat), w / 2, y, (z0 + z1) / 2);
+    }
+    const goldLine = new THREE.MeshBasicMaterial({ color: 0xd4a73a });
+    const selRing = new THREE.Group(); frameRect(selRing, 1, -.5, .5, new THREE.MeshBasicMaterial({ color: 0xffffff }), .02); selRing.visible = false; scene.add(selRing);
+    function showRing(x, z, w, d){ selRing.visible = true; selRing.position.set(x, 0, z); selRing.scale.set(w, 1, d); }
+
+    const myPins = [];
+    function buildPlotVisual(p){
+      const g = p.level === 0 ? buildLot(fmt(p.price)) : makeFor(p.type, p.level);
+      mergeStatic(g);
+      g.position.set(p.x, 0, p.z); scene.add(g); p.group = g;
+      g.traverse(o => { o.userData.plot = p; });
+      if (p.owner && !p.owner.me) {
+        const fl = new THREE.Group();
+        add(fl, cyl(.03, .03, 1.5, darkMat, 5), 0, .75, 0);
+        add(fl, box(.55, .32, .03, M(0x8a8f98)), .29, 1.32, 0);
+        fl.position.set(-PW / 2 + .35, 0, .35); g.add(fl);
+      }
+      if (p.owner && p.owner.me) {
+        // your businesses stand on a raised golden plinth and are a bit larger, so they read among the towers
+        g.scale.setScalar(1.12); g.position.y = .26;
+        const ped = new THREE.Group();
+        add(ped, box(PW - .2, .26, 5.9, M(0xe2d3a6)), p.x, .13, p.z - .9);
+        add(ped, box(PW - .1, .06, 5.98, M(0xd4a73a, { metalness: .3, roughness: .5 })), p.x, .27, p.z - .9);
+        if (!p.ped) { mergeStatic(ped); scene.add(ped); p.ped = ped; }
+        const fr = new THREE.Group(); frameRect(fr, PW - .5, -3.6, 1.9, goldLine, .08); g.add(fr);
+        const top = g.userData.top * 1.12 + .56;
+        if (!p.pin) { const pin = pinSprite('#D4A73A', 'Я'); scene.add(pin); p.pin = pin; p.pinRec = { pin, base: top, ph: rand(0, 6) }; myPins.push(p.pinRec); }
+        p.pin.position.set(p.cx, top, p.cz); p.pinRec.base = top;
+      }
+      const heat = new THREE.Mesh(new THREE.PlaneGeometry(PW - .5, 1.9), new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(.62 - p.demand * .62, .85, .52), transparent: true, opacity: .62, depthWrite: false }));
+      heat.rotation.x = -Math.PI / 2; heat.position.set(0, .16, 1.05); heat.visible = false; g.add(heat); p.heat = heat;
+      return g;
+    }
+    plots.forEach(buildPlotVisual);
+
+    /* ---------- traffic ---------- */
+    function carMesh(color){
+      const g = new THREE.Group();
+      add(g, box(1.3, .35, .66, M(color)), 0, .32, 0);
+      add(g, box(.72, .3, .6, M(0x1d2230)), -.08, .62, 0);
+      [[.42, .33], [.42, -.33], [-.42, .33], [-.42, -.33]].forEach(([x, z]) => { const wh = cyl(.14, .14, .1, darkMat, 10); wh.rotation.x = Math.PI / 2; add(g, wh, x, .14, z); });
+      const hl = new THREE.MeshBasicMaterial({ color: 0xfff2c0 });
+      add(g, box(.04, .08, .14, hl), .66, .36, .2); add(g, box(.04, .08, .14, hl), .66, .36, -.2);
+      mergeStatic(g);
+      return g;
+    }
+    function busMesh(color){
+      const g = new THREE.Group();
+      add(g, box(3.2, .95, .9, M(color)), 0, .62, 0);
+      add(g, box(3.0, .32, .92, M(0x1d2230)), -.05, .82, 0);
+      add(g, box(.04, .5, .7, M(0x1d2230)), 1.61, .75, 0);
+      [1.0, -1.0].forEach(x => { wheel(g, x, .18, .43, .18); wheel(g, x, .18, -.43, .18); });
+      mergeStatic(g); return g;
+    }
+    function truckMesh(color){
+      const g = new THREE.Group();
+      add(g, box(.7, .8, .8, M(color)), 1.1, .6, 0);
+      add(g, box(.04, .32, .62, M(0x1d2230)), 1.46, .78, 0);
+      add(g, box(2.2, 1.0, .85, M(spick([0xe5e7eb, 0x6b7280, 0x3f6fbf]))), -.5, .72, 0);
+      [1.1, -.1, -1.2].forEach(x => { wheel(g, x, .18, .42, .18); wheel(g, x, .18, -.42, .18); });
+      mergeStatic(g); return g;
+    }
+    function bikeMesh(){
+      const g = new THREE.Group();
+      [-.32, .32].forEach(x => { const w = new THREE.Mesh(new THREE.TorusGeometry(.2, .025, 5, 12), darkMat); add(g, w, x, .22, 0); });
+      add(g, box(.62, .04, .04, M(spick([0xd63c3c, 0x3f6fbf, 0x3fbf8f]))), 0, .36, 0);
+      add(g, box(.04, .3, .04, darkMat), .26, .4, 0);
+      const r = person(); r.scale.setScalar(.8); add(g, r, -.05, .26, 0);
+      mergeStatic(g); return g;
+    }
+    const cars = [];
+    for (let k = 0; k < 20; k++) {
+      const vertical = k % 2 === 1, dirn = srand() < .5 ? 1 : -1;
+      const road = vertical ? (Math.floor(srand() * (COLS + 1)) - 1.5) * SX : (Math.floor(srand() * (ROWS + 1)) - 2) * SZ;
+      const lane = road + dirn * (vertical ? -1.2 : 1.2);
+      const c = carMesh(CARCOL[k % CARCOL.length]);
+      if (vertical) { c.position.set(lane, .04, rand(-cityD / 2, cityD / 2)); c.rotation.y = dirn > 0 ? -Math.PI / 2 : Math.PI / 2; }
+      else { c.position.set(rand(-cityW / 2, cityW / 2), .04, lane); c.rotation.y = dirn > 0 ? 0 : Math.PI; }
+      scene.add(c); cars.push({ g: c, vertical, dir: dirn, speed: rand(3, 4.5) });
+    }
+    for (let k = 0; k < 8; k++) {
+      const dirn = k % 2 ? 1 : -1, c = carMesh(CARCOL[(k + 3) % CARCOL.length]);
+      c.position.set(rand(-140, 140), .04, dirn * 1.2); c.rotation.y = dirn > 0 ? 0 : Math.PI;
+      scene.add(c); cars.push({ g: c, vertical: false, dir: dirn, speed: rand(5, 7), lim: 140 });
+    }
+    // buses on the boulevard and main streets, trucks around the industrial zone, bikes along the kerb
+    [[0, 1.2, 1], [0, -1.2, -1], [-SZ, 1.2, 1], [SZ, -1.2, -1]].forEach(([z, off, d], k) => {
+      const c = busMesh(k % 2 ? 0xf2c94c : 0x3f6fbf); c.position.set(rand(-cityW / 2, cityW / 2), .04, z + off); c.rotation.y = d > 0 ? 0 : Math.PI;
+      scene.add(c); cars.push({ g: c, vertical: false, dir: d, speed: 2.6 });
+    });
+    [[-2 * SZ, 1.2, 1], [-2 * SZ, -1.2, -1], [-SZ, -1.2, -1]].forEach(([z, off, d]) => {
+      const c = truckMesh(0xf97316); c.position.set(rand(-cityW / 2, cityW / 2), .04, z + off); c.rotation.y = d > 0 ? 0 : Math.PI;
+      scene.add(c); cars.push({ g: c, vertical: false, dir: d, speed: 2.8 });
+    });
+    for (let k = 0; k < 8; k++) {
+      const vertical = k % 2 === 0, d = srand() < .5 ? 1 : -1;
+      const road = vertical ? (Math.floor(srand() * (COLS + 1)) - 1.5) * SX : (Math.floor(srand() * (ROWS + 1)) - 2) * SZ;
+      const c = bikeMesh();
+      if (vertical) { c.position.set(road + d * -2.1, .04, rand(-cityD / 2, cityD / 2)); c.rotation.y = d > 0 ? -Math.PI / 2 : Math.PI / 2; }
+      else { c.position.set(rand(-cityW / 2, cityW / 2), .04, road + d * 2.1); c.rotation.y = d > 0 ? 0 : Math.PI; }
+      scene.add(c); cars.push({ g: c, vertical, dir: d, speed: rand(1.4, 2) });
+    }
+    const walkers = [];
+    blocks.forEach(b => {
+      for (let k = 0; k < 3; k++) {
+        const p = person(); mergeStatic(p); const dirn = srand() < .5 ? 1 : -1;
+        const z = b.d === 'park' ? b.z + (srand() - .5) * .8 : b.z + BD / 2 + SW - .9;
+        p.position.set(b.x + rand(-BW / 2, BW / 2), .12, z); p.rotation.y = dirn > 0 ? Math.PI / 2 : -Math.PI / 2;
+        scene.add(p); walkers.push({ g: p, b, dir: dirn, speed: rand(.5, .9), ph: rand(0, 6) });
+      }
+    });
+
+    /* ---------- effects ---------- */
+    const tweens = [];
+    function tween(dur, fn, done){ tweens.push({ t: 0, dur, fn, done }); }
+    const puffGeo = new THREE.SphereGeometry(1, 7, 5);
+    function puff(x, y, z, color, size, rise, life){
+      const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .45, depthWrite: false });
+      const s = new THREE.Mesh(puffGeo, m); s.scale.setScalar(size); s.position.set(x, y, z); scene.add(s);
+      tween(life, p => { s.position.y = y + p * rise; s.position.x = x + p * .35; s.scale.setScalar(size * (1 + p * 1.6)); m.opacity = .45 * (1 - p); }, () => { scene.remove(s); m.dispose(); });
+    }
+    function coinSprite(amount){
+      const c = document.createElement('canvas'); c.width = 256; c.height = 96;
+      const g = c.getContext('2d');
+      rr(g, 4, 8, 248, 80, 40); g.fillStyle = 'rgba(11,12,15,.88)'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#D4A73A'; g.stroke();
+      g.beginPath(); g.arc(48, 48, 26, 0, Math.PI * 2); g.fillStyle = '#D4A73A'; g.fill();
+      g.fillStyle = '#0B0C0F'; g.font = '800 30px Manrope, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('₽', 48, 50);
+      g.fillStyle = '#F7D774'; g.font = '800 40px Manrope, sans-serif'; g.textAlign = 'left'; g.fillText('+' + amount.toLocaleString('ru-RU'), 88, 50);
+      const t = new THREE.CanvasTexture(c);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false }));
+      s.scale.set(2.4, .9, 1); s.renderOrder = 21; s.userData.t = t; return s;
+    }
+    const myPlots = plots.filter(p => p.owner && p.owner.me);
+    function spawnCoin(){
+      const ready = myPlots.filter(q => !q.build && q.group.visible); if (!ready.length) return;
+      const p = pick(ready), T = TYPES[p.type];
+      const sp = coinSprite(Math.round(T.base * (.8 + .35 * p.level) * rand(1, 1.6)));
+      const y0 = p.group.userData.top + 2.8;
+      sp.position.set(p.cx, y0, p.cz); scene.add(sp);
+      tween(1.6, q => { sp.position.y = y0 + q * 1.4; sp.material.opacity = q < .6 ? 1 : 1 - (q - .6) / .4; }, () => { scene.remove(sp); sp.userData.t.dispose(); sp.material.dispose(); });
+    }
+
+    /* ---------- construction by stages ---------- */
+    const BUILD_STAGES = [['Котлован', 2.6], ['Фундамент', 2.6], ['Каркас', 3.6], ['Фасад и окна', 3.2], ['Благоустройство', 1.6]];
+    const BUILD_TOTAL = BUILD_STAGES.reduce((a, s2) => a + s2[1], 0);
+    const BRIGADES = ['Прораб Плюс', 'СтройКом', 'Мастер и Ко'];
+    function progressSprite(){
+      const c = document.createElement('canvas'); c.width = 512; c.height = 120;
+      const g = c.getContext('2d'), t = new THREE.CanvasTexture(c);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+      s.scale.set(4.6, 1.08, 1); s.renderOrder = 22;
+      return { sprite: s, draw(name, pct){
+        g.clearRect(0, 0, 512, 120); rr(g, 4, 4, 504, 112, 26); g.fillStyle = 'rgba(11,12,15,.9)'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#FB923C'; g.stroke();
+        g.fillStyle = '#F2F2F4'; g.font = '800 34px Manrope, sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText(name, 26, 40);
+        g.textAlign = 'right'; g.fillStyle = '#FB923C'; g.fillText(Math.round(pct * 100) + '%', 486, 40);
+        rr(g, 26, 72, 460, 22, 11); g.fillStyle = '#2b2d33'; g.fill();
+        rr(g, 26, 72, Math.max(22, 460 * pct), 22, 11); g.fillStyle = '#FB923C'; g.fill();
+        t.needsUpdate = true;
+      }, dispose(){ t.dispose(); s.material.dispose(); } };
+    }
+    function startConstruction(p, type, level){
+      if (p.build) return;
+      const T = TYPES[type];
+      if (p.group) p.group.visible = false;
+      if (p.heat) p.heat.visible = false;
+      const site = new THREE.Group(); site.position.set(p.x, 0, p.z); scene.add(site);
+      const fm = M(0xf97316), wm = M(0xf0ece4), fence = new THREE.Group();
+      for (let x = -2.8; x <= 2.81; x += .7) add(fence, box(.05, .8, .05, fm), x, .45, .4);
+      for (let x = -2.8; x < 2.8; x += .7) add(fence, box(.7, .16, .03, Math.round((x + 2.8) / .7) % 2 ? fm : wm), x + .35, .62, .4);
+      [-2.8, 2.8].forEach(x => add(fence, box(.05, .16, 4, fm), x, .62, -1.6));
+      mergeStatic(fence); site.add(fence);
+      const prog = progressSprite(); scene.add(prog.sprite);
+      p.build = { type, level, t: 0, idx: -1, lastPct: -1, brigade: spick(BRIGADES), site, prog, sg: null };
+      prog.sprite.position.set(p.cx, 5.6, p.cz);
+      toast('Стройка началась: ' + T.name + ', ур. ' + level + '. Бригада «' + p.build.brigade + '»');
+      for (let i = 0; i < 10; i++) puff(p.x + rand(-2.4, 2.4), .3, p.z - rand(.5, 3.5), 0xb5a68a, .4, 1.2, 1.2);
+    }
+    function stageVisual(p, idx){
+      const B = p.build;
+      if (B.sg) { B.site.remove(B.sg); disposeGroup(B.sg); }
+      const g = new THREE.Group(); B.sg = g; B.site.add(g); B.slabs = null; B.fb = null;
+      const D = TYPES[B.type].dims[B.level], w = Math.min(D.w, 4.6), d = Math.min(D.d, 3.4), h = Math.min(D.h, 6);
+      if (idx === 0) {
+        add(g, box(w + .4, .05, d + .4, M(0x4a3a28)), 0, .14, -d / 2 - .2);
+        add(g, cone(.8, .7, M(0x7a6248), 8), w / 2 + .3, .35, -d - .2); add(g, cone(.6, .5, M(0x7a6248), 8), -w / 2 - .1, .25, -d - .1);
+        excavator(g, -.3, -d / 2, 0xf97316);
+        const ex = g.children[g.children.length - 1];
+        addAnim(g, t => { ex.rotation.y = Math.sin(t * 1.4) * .5; });
+      } else if (idx === 1) {
+        add(g, box(w, .3, d, concreteMat), 0, .15, -d / 2);
+        for (let x = -w / 2 + .3; x < w / 2; x += .6) for (let z = -d + .3; z < 0; z += .6) add(g, box(.04, .6, .04, M(0x8a4a2a)), x, .6, z);
+        mixerTruck(g, w / 2 + .2, .9, 0xf97316);
+      } else if (idx === 2) {
+        add(g, box(w, .3, d, concreteMat), 0, .15, -d / 2);
+        [[-1, -1], [1, -1], [-1, 0], [1, 0], [0, -1], [0, 0]].forEach(([sx, sz]) => add(g, box(.18, h, .18, concreteMat), sx * (w / 2 - .1), h / 2, sz * (d - .1) - (sz ? 0 : .1) + (sz ? 0 : 0)));
+        B.slabs = [];
+        for (let y = 1.1; y < h; y += 1.1) { const sl = box(w, .12, d, concreteMat); sl.position.set(0, y, -d / 2); sl.visible = false; g.add(sl); B.slabs.push(sl); }
+        towerCrane(g, w / 2 + .9, -d + .3, h + 2.5, 0xf97316);
+      } else if (idx === 3) {
+        const fb = makeFor(B.type, B.level); g.add(fb); B.fb = fb; fb.scale.y = .3;
+        const lines = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + .3, h, d + .3)), new THREE.LineBasicMaterial({ color: 0xfb923c }));
+        lines.position.set(0, h / 2, -d / 2); g.add(lines);
+        for (let y = .8; y < h; y += .8) add(g, box(w + .4, .05, .25, woodMat), 0, y, .2);
+        towerCrane(g, w / 2 + .9, -d + .3, h + 2.5, 0xf97316);
+      } else {
+        const fb = makeFor(B.type, B.level); g.add(fb); B.fb = fb;
+        for (let k = 0; k < 3; k++) { const pr = person(); pr.position.set(-2 + k * 1.6, 0, .9); g.add(pr); }
+        add(g, cone(.35, .5, M(0x5a4636), 8), 2.3, .25, .8);
+      }
+    }
+    function confetti(x, y, z){
+      const cols = [0xd4a73a, 0xf07167, 0x3fbf8f, 0x60a5fa, 0xffffff];
+      for (let i = 0; i < 36; i++) {
+        const m = new THREE.MeshBasicMaterial({ color: pick(cols), transparent: true });
+        const s = new THREE.Mesh(puffGeo, m); s.scale.set(.09, .03, .09); s.position.set(x, y, z); scene.add(s);
+        const vx = rand(-2.5, 2.5), vy = rand(3, 6), vz = rand(-2.5, 2.5), spin = rand(4, 10);
+        tween(1.8, q => { const t = q * 1.8; s.position.set(x + vx * t, y + vy * t - 4.5 * t * t, z + vz * t); s.rotation.x = t * spin; m.opacity = 1 - q * q; }, () => { scene.remove(s); m.dispose(); });
+      }
+    }
+    function finishConstruction(p){
+      const B = p.build;
+      scene.remove(B.site); disposeGroup(B.site); scene.remove(B.prog.sprite); B.prog.dispose();
+      const wasLot = p.level === 0;
+      if (wasLot) { p.owner = ME; p.lot = false; myPlots.push(p); }
+      p.type = B.type; p.level = B.level; p.build = null;
+      const old = p.group; scene.remove(old); disposeGroup(old);
+      const g = buildPlotVisual(p);
+      p.heat.visible = heatOn;
+      const s0 = g.scale.x; g.scale.y = .01;
+      tween(.9, q => { const c1 = 1.70158, c3 = c1 + 1, e = 1 + c3 * Math.pow(q - 1, 3) + c1 * Math.pow(q - 1, 2); g.scale.y = Math.max(.01, s0 * e); });
+      confetti(p.cx, g.userData.top * 1.12 + 1, p.cz);
+      toast((wasLot ? 'Открыт новый бизнес: ' : 'Готово: ') + TYPES[p.type].name + ', ур. ' + p.level + '. Новый облик уже на карте');
+      if (cardPlot === p) showPlot(p);
+    }
+    function updateConstruction(dt){
+      plots.forEach(p => {
+        const B = p.build; if (!B) return;
+        B.t += dt;
+        let acc = 0, idx = 0;
+        for (; idx < BUILD_STAGES.length; idx++) { if (B.t < acc + BUILD_STAGES[idx][1]) break; acc += BUILD_STAGES[idx][1]; }
+        if (idx >= BUILD_STAGES.length) { finishConstruction(p); return; }
+        if (idx !== B.idx) { B.idx = idx; stageVisual(p, idx); }
+        const local = (B.t - acc) / BUILD_STAGES[idx][1], pct = B.t / BUILD_TOTAL;
+        if (B.slabs) { const n = Math.floor(local * (B.slabs.length + 1)); B.slabs.forEach((sl, i) => { sl.visible = i < n; }); }
+        if (B.fb && idx === 3) B.fb.scale.y = .3 + .7 * local;
+        if (B.sg && B.sg.userData.anims) B.sg.userData.anims.forEach(fn => fn(clock, dt));
+        if (Math.round(pct * 100) !== B.lastPct) { B.lastPct = Math.round(pct * 100); B.prog.draw(BUILD_STAGES[idx][0], pct); }
+        if (cardPlot === p && !card.hidden && Math.round(pct * 100) % 5 === 0) showPlot(p);
+      });
+    }
+
+    /* ---------- day / night ---------- */
+    const btnDay = document.getElementById('btn-day'), btnNight = document.getElementById('btn-night');
+    function applyTime(day){
+      const sky = day ? 0x9cc8ea : 0x10131d;
+      scene.background.set(sky); scene.fog.color.set(sky);
+      hemi.intensity = day ? .8 : .46; hemi.color.set(day ? 0xdfefff : 0x6f7fb0); hemi.groundColor.set(day ? 0x6b5a45 : 0x1a1a22);
+      dir.intensity = day ? 1.0 : .3; dir.color.set(day ? 0xfff1d6 : 0x9fb0ff);
+      winMat.color.set(day ? 0x9cc3e0 : 0x2a2a30); winMat.emissiveIntensity = day ? 0 : 1;
+      WIN_ON.color.set(day ? 0x8fa7bd : 0xffc66b); WIN_OFF.color.set(day ? 0x8fa7bd : 0x2b3140);
+      glowMat.visible = !day; poolMat.visible = !day;
+      bulbMat.color.set(day ? 0xd8d8d0 : 0xffe08a);
+      envMats.forEach(([m, d, n]) => m.color.set(day ? d : n));
+      syncClones();
+      btnDay.setAttribute('aria-pressed', String(day)); btnNight.setAttribute('aria-pressed', String(!day));
+    }
+    btnDay.addEventListener('click', () => applyTime(true));
+    btnNight.addEventListener('click', () => applyTime(false));
+    const hr = new Date().getHours();
+    applyTime(hr >= 7 && hr < 19);
+
+    /* ---------- filters ---------- */
+    const chipIds = ['f-all', 'f-mine', 'f-lots', 'f-rivals'];
+    let filterPins = [], heatOn = false;
+    function setFilter(f){
+      filterPins.forEach(s => { scene.remove(s); s.material.map.dispose(); s.material.dispose(); });
+      filterPins = [];
+      let list = [], color = '#3FBF8F', label = '₽';
+      if (f === 'f-lots') list = plots.filter(p => p.level === 0);
+      if (f === 'f-rivals') { list = plots.filter(p => p.owner && !p.owner.me); color = '#F07167'; label = '!'; }
+      list.forEach(p => { const s = pinSprite(color, label); s.position.set(p.cx, p.group.userData.top + .3, p.cz); scene.add(s); filterPins.push(s); });
+      if (f === 'f-mine') { target.set(myPlots.reduce((a, p) => a + p.cx, 0) / myPlots.length, 2.4, myPlots.reduce((a, p) => a + p.cz, 0) / myPlots.length); zoomTo(.55); }
+      chipIds.forEach(id => document.getElementById(id).setAttribute('aria-pressed', String(id === f)));
+      if (f === 'f-lots') toast('Свободных участков: ' + list.length + '. В центре дорого, в промзоне дёшево');
+      if (f === 'f-rivals') toast('Конкуренты в твоём городе: ' + list.length);
+      if (f === 'f-mine') toast('Твои бизнесы стоят в четырёх разных районах');
+    }
+    chipIds.forEach(id => document.getElementById(id).addEventListener('click', () => setFilter(id)));
+    const heatBtn = document.getElementById('f-heat');
+    heatBtn.addEventListener('click', () => {
+      heatOn = !heatOn; heatBtn.setAttribute('aria-pressed', String(heatOn));
+      plots.forEach(p => { p.heat.visible = heatOn; });
+      document.getElementById('legend').classList.toggle('heat-on', heatOn);
+    });
+
+    /* ---------- card ---------- */
+    const card = document.getElementById('card'), toastEl = document.getElementById('toast');
+    let toastTimer = null;
+    function toast(text){ toastEl.textContent = text; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2600); }
+    const demandWord = d => d > .66 ? 'высокий' : d > .38 ? 'средний' : 'низкий';
+    function stat(label, value){ const el = document.createElement('div'); el.className = 'stat'; const s = document.createElement('small'); s.textContent = label; const b = document.createElement('b'); b.textContent = value; el.append(s, b); return el; }
+    const $ = id => document.getElementById(id);
+    function fillCard(dot, name, owner, tagText, tagClass, desc, stats, a1, a2){
+      $('c-dot').style.background = dot; $('c-name').textContent = name; $('c-owner').textContent = owner;
+      const tag = $('c-tag'); tag.className = 'tag' + (tagClass ? ' ' + tagClass : ''); tag.textContent = tagText;
+      $('c-desc').textContent = desc;
+      const st = $('c-stats'); st.textContent = ''; stats.forEach(([l, v]) => st.append(stat(l, v)));
+      $('c-a1').textContent = a1; $('c-a2').textContent = a2;
+      card.hidden = false;
+    }
+    let cardPlot = null;
+    function showPlot(p){
+      showRing(p.x, p.z - .85, PW - .2, 5.7); selected = [p.cx, 1.2, p.z + .3]; cardPlot = p;
+      const D = p.dist;
+      if (p.build) {
+        const B = p.build, T = TYPES[B.type], pct = Math.min(1, B.t / BUILD_TOTAL), st = BUILD_STAGES[Math.max(0, B.idx)][0];
+        fillCard('#FB923C', 'Стройка: ' + T.name + ', ур. ' + B.level, 'Бригада «' + B.brigade + '» · ' + D.name, 'идёт стройка', 'build',
+          'Этапы: котлован, фундамент, каркас, фасад, благоустройство. Хорошая бригада строит быстрее. В игре стройка идёт часы, здесь ускорено.',
+          [['Этап', st], ['Готово', Math.round(pct * 100) + '%']], 'Следить за стройкой', 'Закрыть');
+        return;
+      }
+      if (p.level === 0) {
+        fillCard('var(--lot)', 'Свободный участок', D.name, 'продаётся', 'lot',
+          'Спрос в районе: ' + D.likes.join(', ') + '. Открой бизнес, который здесь нужен.',
+          [['Цена', fmt(p.price)], ['Лучше всего здесь', TYPES[D.bt].name]], 'Купить и построить', 'Что здесь открыть');
+        return;
+      }
+      const T = TYPES[p.type], o = p.owner;
+      const rev = T.base * (6 + p.level * 9) * (.7 + p.demand);
+      fillCard(o.color, T.name + ' · ур. ' + p.level, (o.me ? 'Твой бизнес' : o.name + ' · конкурент') + ' · ' + D.name,
+        o.me ? 'твой' : 'конкурент', o.me ? 'mine' : 'rival', T.desc[p.level] + '. Район: ' + D.note + '.',
+        [[o.me ? 'Выручка сегодня' : 'Выручка (оценка)', fmt(rev)], ['Спрос рядом', demandWord(p.demand)]],
+        o.me ? 'Открыть бизнес' : 'Выкупить', o.me ? (p.level < 5 ? 'Улучшить' : 'Максимум') : 'Его цены');
+    }
+    function showHome(h){
+      showRing(h.x, h.z, h.hw * 2 + .3, h.hd * 2 + .2); selected = [h.x, 1.0, h.pz + .3];
+      const i = h.info, D = h.dist;
+      const people = i.stats || (i.residents ? [['Жителей', '≈ ' + i.residents], ['Этажей', String(i.floors || 1)]] : [['Работников', '≈ ' + (i.workers || 10)], ['Этажей', String(i.floors || 1)]]);
+      const desc = i.note || ('Спрос в районе: ' + D.likes.join(', ') + '. ' + (i.residents ? 'Чем больше жителей рядом, тем больше покупателей у бизнесов по соседству.' : 'Работники этого здания тоже покупатели для бизнесов рядом.'));
+      fillCard(i.note ? '#D4A73A' : '#9EA3AD', i.kind, D.name, i.note ? 'ориентир' : (i.residents ? 'жилой' : 'нежилой'), i.note ? 'mine' : 'bot', desc, people, 'Свободные участки рядом', 'Закрыть');
+    }
+    function showSite(b){
+      const D = DISTRICTS[b.d], cap = STAGE_CAP[STAGE_OF[b.d]];
+      showRing(b.x, b.z, BW + 2 * SW, BD + 2 * SW); selected = null;
+      fillCard('#FB923C', D.name, 'Район строится', 'скоро', 'rival',
+        'Район откроется, когда капитал компании дойдёт до ' + fmt(cap) + '. Здесь будет спрос: ' + D.likes.join(', ') + '.',
+        [['Нужно капитала', fmt(cap)], ['Сейчас', fmt(CAP_NOW[cityStage])]], 'Как вырасти быстрее', 'Закрыть');
+    }
+    function hideCard(){ card.hidden = true; selRing.visible = false; selected = null; cardPlot = null; }
+    $('c-close').addEventListener('click', hideCard);
+    ['c-a1', 'c-a2'].forEach(id => $(id).addEventListener('click', e => {
+      const t = e.currentTarget.textContent;
+      if (t === 'Закрыть') { hideCard(); return; }
+      if (t === 'Свободные участки рядом') { hideCard(); setFilter('f-lots'); return; }
+      const cp = cardPlot;
+      if (t === 'Улучшить' && cp && cp.level < 5) { startConstruction(cp, cp.type, cp.level + 1); showPlot(cp); return; }
+      if (t === 'Купить и построить' && cp && cp.level === 0) { toast('Участок куплен за ' + fmt(cp.price)); setTimeout(() => { startConstruction(cp, cp.dist.bt, 1); showPlot(cp); }, 900); return; }
+      if (t === 'Что здесь открыть' && cp) { toast('Здесь лучше всего пойдёт: ' + TYPES[cp.dist.bt].name + '. Спрос в районе: ' + cp.dist.likes.join(', ')); return; }
+      if (t === 'Следить за стройкой' && cp) { target.set(cp.cx + 2, 2.4, cp.cz + 4); zoomTo(1.1); return; }
+      toast('Это макет: в игре здесь откроется «' + t + '»');
+    }));
+
+    /* ---------- see-through: blocks that hide your business (or the selected building) turn translucent ---------- */
+    let selected = null;
+    const occl = new Set(), occRay = new THREE.Raycaster(), occV = new THREE.Vector3(), occHit = new THREE.Vector3(), occNdc = new THREE.Vector2();
+    function setBlockOpacity(b, o){
+      const fade = o < .999;
+      b.pairs.forEach(([src, m]) => {
+        const tr = fade || src.transparent;
+        if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; }
+        m.opacity = (src.transparent ? src.opacity : 1) * o; m.depthWrite = !fade && src.depthWrite !== false;
+      });
+    }
+    function checkOcclusion(){
+      occl.clear();
+      const pts = myPlots.filter(p => p.group.visible).map(p => [p.cx, 1.4, p.z + .3]);
+      if (selected) pts.push(selected);
+      pts.forEach(([x, y, z]) => {
+        occV.set(x, y, z).project(camera); occNdc.set(occV.x, occV.y);
+        occRay.setFromCamera(occNdc, camera);
+        const dist = occRay.ray.origin.distanceTo(occV.set(x, y, z));
+        homes.forEach(h => {
+          if (isLocked(h.b) || occl.has(h.b)) return;
+          if (occRay.ray.intersectBox(h.box, occHit) && occRay.ray.origin.distanceTo(occHit) < dist - .8) occl.add(h.b);
+        });
+      });
+    }
+    function syncClones(){ blocks.forEach(b => (b.pairs || []).forEach(([src, m]) => { m.color.copy(src.color); if (src.emissive) { m.emissive.copy(src.emissive); m.emissiveIntensity = src.emissiveIntensity; } m.visible = src.visible; })); }
+
+    /* ---------- city growth ---------- */
+    const easeOut = q => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(q - 1, 3) + c1 * Math.pow(q - 1, 2); };
+    const subEl = document.querySelector('.sub');
+    function applyStage(animate){
+      let k = 0;
+      blocks.forEach(b => {
+        if (b.d === 'park') return;
+        const locked = isLocked(b);
+        if (locked) { b.site.visible = true; b.G.visible = false; return; }
+        const wasHidden = !b.G.visible;
+        b.G.visible = true;
+        if (animate && wasHidden) {
+          const delay = k++ * .25, G = b.G, site = b.site;
+          G.scale.y = .01;
+          for (let i = 0; i < 16; i++) puff(b.x + rand(-11, 11), .4, b.z + rand(-4, 4), 0xb5a68a, .45, 1.4, 1.4);
+          tween(.5 + delay, () => {}, () => { site.visible = false; tween(1.0, q => { G.scale.y = Math.max(.01, easeOut(q)); }); });
+        } else { b.site.visible = false; b.G.scale.y = 1; }
+      });
+      plots.forEach(p => {
+        const L = isLocked(p.block);
+        if (!L && animate && !p.group.visible) { const g = p.group, s0 = g.scale.x; g.scale.y = .01; tween(1.6, q => { g.scale.y = Math.max(.01, s0 * easeOut(q)); }); }
+        p.group.visible = !L; if (p.ped) p.ped.visible = !L; if (p.pin) p.pin.visible = !L;
+      });
+      walkers.forEach(w => { w.g.visible = !isLocked(w.b); });
+      writeTrees();
+      Object.keys(DISTRICTS).forEach(placeLabel);
+      const open = Object.keys(DISTRICTS).filter(k2 => STAGE_OF[k2] <= cityStage).length;
+      subEl.textContent = 'Капитал ' + fmt(CAP_NOW[cityStage]) + ' · открыто районов: ' + open + ' из 6';
+    }
+    applyStage(false);
+    const growBtn = document.getElementById('f-grow');
+    growBtn.addEventListener('click', () => {
+      const prev = cityStage; cityStage = cityStage >= 4 ? 1 : cityStage + 1;
+      hideCard(); applyStage(cityStage > prev);
+      if (cityStage > prev) {
+        const keys = Object.keys(DISTRICTS).filter(k2 => STAGE_OF[k2] === cityStage);
+        const c = keys.map(districtCenter).reduce((a, q) => [a[0] + q[0] / keys.length, a[1] + q[1] / keys.length], [0, 0]);
+        target.set(c[0], 2.4, c[1] + 4); zoomTo(.42);
+        toast('Капитал вырос до ' + fmt(CAP_NOW[cityStage]) + '. ' + (keys.length > 1 ? 'Открылись районы: ' : 'Открылся район: ') + keys.map(k2 => DISTRICTS[k2].name).join(', '));
+      } else { toast('Начало игры: открыты только Старый город и Спальный район'); target.copy(HOME_C); zoomTo(HOME_Z); }
+    });
+
+    /* ---------- camera controls ---------- */
+    const HOME_C = new THREE.Vector3(-8, 2.4, 6);
+    target.copy(HOME_C);
+    function zoomTo(z){ camera.zoom = clamp(z, .22, 2.2); camera.updateProjectionMatrix(); labels.forEach(l => { l.visible = camera.zoom < .8; }); }
+    const HOME_Z = stage.clientWidth / stage.clientHeight < 1 ? .5 : .4;
+    zoomTo(HOME_Z);
+    const pointers = new Map();
+    let down = null, pinch = null, lastTap = 0;
+    const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+    const vR = new THREE.Vector3(), vU = new THREE.Vector3();
+    canvas.addEventListener('pointerdown', e => {
+      canvas.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) down = { moved: 0 };
+      if (pointers.size === 2) { const [a, b] = Array.from(pointers.values()); pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: camera.zoom }; if (down) down.moved = 99; }
+    });
+    canvas.addEventListener('pointermove', e => {
+      const prev = pointers.get(e.pointerId); if (!prev) return;
+      const cur = { x: e.clientX, y: e.clientY }; pointers.set(e.pointerId, cur);
+      if (pointers.size === 1) {
+        const dx = cur.x - prev.x, dy = cur.y - prev.y;
+        if (down) down.moved += Math.abs(dx) + Math.abs(dy);
+        const wpp = (camera.right - camera.left) / camera.zoom / stage.clientWidth;
+        vR.setFromMatrixColumn(camera.matrix, 0); vR.y = 0; vR.normalize();
+        vU.setFromMatrixColumn(camera.matrix, 1); vU.y = 0; const L = vU.length() || 1; vU.normalize();
+        target.addScaledVector(vR, -dx * wpp).addScaledVector(vU, dy * wpp / L);
+        target.x = clamp(target.x, -cityW / 2, cityW / 2); target.z = clamp(target.z, -cityD / 2, cityD / 2 + 10);
+      } else if (pointers.size === 2 && pinch) {
+        const [a, b] = Array.from(pointers.values());
+        zoomTo(pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.dist);
+      }
+    });
+    function endPointer(e){
+      if (!pointers.has(e.pointerId)) return;
+      const wasSingle = pointers.size === 1;
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (wasSingle && down && down.moved < 8 && e.type === 'pointerup') {
+        const now = performance.now();
+        if (now - lastTap < 320) { target.copy(HOME_C); zoomTo(HOME_Z); lastTap = 0; }
+        else {
+          lastTap = now;
+          const r = canvas.getBoundingClientRect();
+          ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+          raycaster.setFromCamera(ndc, camera);
+          const hits = raycaster.intersectObjects(scene.children, true).filter(h => h.object.isMesh && h.object !== ground);
+          const hp = hits.find(h => h.object.userData.plot);
+          if (hp && (hits[0] === hp || hits[0].distance > hp.distance - .5)) { showPlot(hp.object.userData.plot); }
+          else if (hits.length) {
+            const pt = hits[0].point;
+            const hm = homes.find(h => !isLocked(h.b) && Math.abs(pt.x - h.x) <= h.hw && Math.abs(pt.z - h.z) <= h.hd) || (stadiumHome && Math.abs(pt.x - stadiumHome.x) <= 13 && Math.abs(pt.z - stadiumHome.z) <= 8.5 ? stadiumHome : null);
+            const lb = blocks.find(b => b.d !== 'park' && isLocked(b) && Math.abs(pt.x - b.x) <= BW / 2 + SW && Math.abs(pt.z - b.z) <= BD / 2 + SW);
+            if (hm) showHome(hm); else if (lb) showSite(lb); else if (hp) showPlot(hp.object.userData.plot); else hideCard();
+          } else hideCard();
+        }
+      }
+      if (pointers.size === 0) down = null;
+    }
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('wheel', e => { e.preventDefault(); zoomTo(camera.zoom * (e.deltaY < 0 ? 1.1 : .9)); }, { passive: false });
+
+    /* ---------- loop ---------- */
+    let last = performance.now(), clock = 0, coinT = 0, smokeT = 0, occT = 0, visible = true;
+    const halfW = cityW / 2, halfD = cityD / 2, tmpV = new THREE.Vector3();
+    function frameLoop(){
+      const now = performance.now();
+      const dt = Math.min(.05, (now - last) / 1000); last = now; clock += dt;
+      for (let i = tweens.length - 1; i >= 0; i--) {
+        const tw = tweens[i]; tw.t += dt; const q = Math.min(1, tw.t / tw.dur);
+        tw.fn(q); if (q >= 1) { tweens.splice(i, 1); if (tw.done) tw.done(); }
+      }
+      blocks.forEach(b => {
+        if (b.site && b.site.visible && b.site.userData.anims) b.site.userData.anims.forEach(fn => fn(clock, dt));
+        if (!b.pairs) return;
+        const tgt = occl.has(b) ? .2 : 1, cur = b.op === undefined ? 1 : b.op;
+        if (Math.abs(cur - tgt) > .005) { const nx = Math.abs(tgt - cur) < .02 ? tgt : cur + (tgt - cur) * Math.min(1, dt * 7); b.op = nx; setBlockOpacity(b, nx); }
+      });
+      occT += dt; if (occT > .25) { occT = 0; checkOcclusion(); }
+      updateConstruction(dt);
+      plots.forEach(p => {
+        const u = p.group.userData;
+        if (u.anims) u.anims.forEach(fn => fn(clock, dt));
+        if (u.flicker) u.flicker.forEach((m, i) => m.color.setRGB(1, .42 + .1 * Math.sin(clock * 11 + i * 2), .12));
+      });
+      if (!reduce) {
+        cars.forEach(c => {
+          if (c.vertical) { c.g.position.z += c.dir * c.speed * dt; if (c.g.position.z > halfD) c.g.position.z = -halfD; if (c.g.position.z < -halfD) c.g.position.z = halfD; }
+          else { const L = c.lim || halfW; c.g.position.x += c.dir * c.speed * dt; if (c.g.position.x > L) c.g.position.x = -L; if (c.g.position.x < -L) c.g.position.x = L; }
+        });
+        walkers.forEach(w => {
+          w.g.position.x += w.dir * w.speed * dt;
+          const lo = w.b.x - BW / 2 - SW + .3, hi = w.b.x + BW / 2 + SW - .3;
+          if (w.g.position.x > hi) w.g.position.x = lo; if (w.g.position.x < lo) w.g.position.x = hi;
+          w.g.position.y = .12 + Math.abs(Math.sin(clock * 7 + w.ph)) * .05;
+        });
+        myPins.forEach(m => { m.pin.position.y = m.base + Math.sin(clock * 2.2 + m.ph) * .18; });
+        if (fountainJet) fountainJet.scale.y = 1 + .18 * Math.sin(clock * 6);
+        smokeT += dt;
+        if (smokeT > .9) {
+          smokeT = 0;
+          plots.forEach(p => (p.group.userData.smoke || []).forEach(e => {
+            tmpV.set(e.x, e.y, e.z); p.group.localToWorld(tmpV);
+            if (e.kind === 'steam') puff(tmpV.x, tmpV.y, tmpV.z, 0xf2f2f4, .1, .9, 1.6); else puff(tmpV.x, tmpV.y, tmpV.z, 0x8f8a86, .16, 1.6, 2.4);
+          }));
+          smokeSpots.forEach(e => { if (!isLocked(e.b)) puff(e.x, e.y, e.z, 0x8f8a86, .3, 2.4, 3); });
+        }
+      }
+      coinT += dt;
+      if (coinT > (reduce ? 4 : 2.2)) { coinT = 0; spawnCoin(); }
+      placeCamera();
+      renderer.render(scene, camera);
+    }
+    function setRunning(on){ renderer.setAnimationLoop(on ? frameLoop : null); if (on) last = performance.now(); }
+    setRunning(true);
+    new IntersectionObserver(entries => { visible = entries[0].isIntersecting; setRunning(visible && !document.hidden); }).observe(stage);
+    document.addEventListener('visibilitychange', () => setRunning(visible && !document.hidden));
+    window.__city = { startConstruction, finishConstruction, cars,  plots, homes, target, zoomTo, applyTime, setFilter, showPlot, showHome, heatBtn, info: () => renderer.info.render.calls, faded: () => blocks.filter(b => b.op !== undefined && b.op < .9).map(b => b.d) };
+  }
+})();
+</script>

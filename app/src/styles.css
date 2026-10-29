@@ -2860,3 +2860,117 @@ h2.section-title {
     animation: none;
   }
 }
+
+/* ---------- Карта города ---------- */
+
+.city-stage {
+  position: relative;
+  height: clamp(360px, 58vh, 560px);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #10131d;
+}
+
+.city-stage canvas {
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.city-stage canvas:active {
+  cursor: grabbing;
+}
+
+.map-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.map-head b {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+.chips-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chips-row .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.map-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-card .hint {
+  margin: 0;
+}
+
+.map-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.map-card-head .warn {
+  color: var(--warn);
+}
+
+.lot-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: #3fbf8f;
+  flex: none;
+}
+
+.catalog-card.pick {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.catalog-card.pick.chip-active {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.map-district {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-district-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-district-head .stat-label {
+  margin-left: auto;
+}
+
+.map-district-plots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

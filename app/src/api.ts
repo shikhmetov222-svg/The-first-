@@ -281,6 +281,14 @@ export interface GameState {
   ads?: AdsConfig;
   upgrade?: UpgradeConfig;
   npc_niches?: { marketplace?: string[]; pvz?: string[] } | null; // NPC-конкуренты в новых нишах
+  /** Город игрока для карты; у старого сервера его нет. */
+  city?: {
+    seed: number;
+    stage: number; // 1–4: сколько районов открыто
+    caps: number[]; // капитал (коп.), с которого открывается стадия 1…4
+    other_mult: number; // продажи, если сам поставил бизнес не в лучший район
+    plots: { type: string; i: number; j: number; k: number }[];
+  };
   street?: {
     district: [number, number]; // капитал (коп.), с которого «Район» и «Центр»
     weather: { kind: 'clear' | 'rain' | 'snow'; until: string }; // одна погода на весь город
@@ -411,6 +419,8 @@ export interface MarketView {
   my_businesses?: { type: BusinessType; valuation: number; listed: boolean }[];
 }
 
+import type { CityData } from './city/views';
+
 export class ApiError extends Error {}
 
 async function call<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
@@ -438,7 +448,10 @@ type WithResult<R> = GameState & { result: R };
 export const api = {
   login: () => call<LoginResult>('login'),
   state: () => call<WithResult<null>>('state'),
-  openBusiness: (type: BusinessType) => call<WithResult<null>>('open_business', { type }),
+  /** plot — участок на карте; без него сервер выберет участок сам. */
+  openBusiness: (type: BusinessType, plot?: { i: number; j: number; k: number }) =>
+    call<WithResult<null>>('open_business', plot ? { type, plot } : { type }),
+  city: () => call<{ city: CityData }>('city'),
   restock: (type: BusinessType, qty: number) => call<WithResult<null>>('restock', { type, qty }),
   transferBread: (qty: number) => call<WithResult<null>>('transfer_bread', { qty }),
   setPrice: (type: BusinessType, price: number) => call<WithResult<null>>('set_price', { type, price }),

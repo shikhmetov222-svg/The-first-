@@ -160,7 +160,14 @@ function marketAction(run: (id: string, body: Body) => Promise<unknown>) {
 const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknown>> = {
   login,
   state: action(async () => null),
-  open_business: action((id, b) => rpc('open_business', { p_player_id: id, p_type: str(b, 'type') })),
+  // С картой: участок (i, j, k) — квартал и место; без участка сервер выберет его сам (старые версии игры).
+  open_business: action((id, b) =>
+    b.plot === undefined || b.plot === null
+      ? rpc('open_business', { p_player_id: id, p_type: str(b, 'type') })
+      : rpc('open_business_at', {
+          p_player_id: id, p_type: str(b, 'type'),
+          p_i: int(b.plot as Body, 'i'), p_j: int(b.plot as Body, 'j'), p_k: int(b.plot as Body, 'k'),
+        })),
   restock: action((id, b) =>
     rpc('restock', { p_player_id: id, p_type: str(b, 'type'), p_qty: int(b, 'qty') })),
   transfer_bread: action((id, b) => rpc('transfer_bread', { p_player_id: id, p_qty: int(b, 'qty') })),
@@ -186,6 +193,8 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
     await playerId(user); // смотреть карточки могут только игроки
     return { company: await rpc('company_card', { p_player_id: id }) };
   },
+  // Карта города: бизнесы других игроков и NPC-конкуренты (свои участки приходят в состоянии).
+  city: async (user) => ({ city: await rpc('city_view', { p_player: await playerId(user) }) }),
   // ---------- Рынок между игроками: каждое действие — одна транзакция в базе ----------
   market: async (user) => ({ market: await rpc('market_view', { p_player: await playerId(user) }) }),
   create_lot: marketAction((id, b) =>

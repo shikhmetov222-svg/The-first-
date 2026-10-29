@@ -28,6 +28,7 @@
   - Загруженные файлы записываются в `public.deploy_log`.
   - Миграции не меняем после загрузки — только новый файл со следующим номером.
 - **Edge Function:** выкладывается через Supabase MCP `deploy_edge_function`. Передавать оба файла: `api/index.ts` и `_shared/telegram.ts`.
+  - Если она вызывает новые SQL-функции — выкладывать после того, как миграция загрузилась (`deploy_log`).
   - Секреты (`TELEGRAM_BOT_TOKEN`, `ADMIN_TELEGRAM_IDS`) задаёт владелец в панели Supabase.
 - **Supabase MCP:** без подтверждения можно только читать (`execute_sql` с select) — так проверяем результат. Изменения базы — только через миграции.
 - Файлы `supabase/setup_*.sql` — старый ручной способ загрузки. Новых не создаём.
@@ -49,12 +50,16 @@ app/src/
                      views.ts (данные игры → что показать, подмены разработчика, чужая улица; без three.js),
                      Street2D.tsx + street2d.json (простая графика из картинок; без three.js)
   street/gen/        СГЕНЕРИРОВАНО из docs/street-mockup.js скриптом app/scripts/port-street.py — руками не править
+  city/              3D-карта города (вкладка «Карта»): City.tsx (R3F, жесты, цикл кадра), world.ts (свет, тени, склейка,
+                     инстансы транспорта), views.ts (районы, участки, seed; без three.js)
+  city/gen/city.js   СГЕНЕРИРОВАНО из docs/city-mockup.html скриптом app/scripts/port-city.py — руками не править;
+                     здания бизнесов и детали берёт из street/gen
 app/public/street2d/ СГЕНЕРИРОВАНО: PNG каждого бизнеса на каждом уровне — node scripts/render-street2d.mjs (из app/)
 supabase/
-  migrations/        0001…0018, по порядку; каждая следующая переопределяет функции целиком (create or replace)
+  migrations/        0001…0020, по порядку; каждая следующая переопределяет функции целиком (create or replace)
   functions/api/     Edge Function: проверка initData, вызов SQL-функций через rpc
   sim/               симуляция баланса (локальная копия базы, настоящие функции тика)
-docs/                эталон 3D-улицы (street-mockup.html/.js) и скриншоты сравнения
+docs/                эталоны 3D-улицы (street-mockup.html/.js) и карты города (city-mockup.html), скриншоты сравнения
 ```
 
 ## Главные правила

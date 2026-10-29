@@ -1,10 +1,11 @@
-import { Building2, CandlestickChart, Trophy, UserRound, Wrench, type LucideIcon } from 'lucide-react';
+import { Building2, CandlestickChart, Map as MapIcon, Trophy, UserRound, Wrench, type LucideIcon } from 'lucide-react';
 import { haptic } from '../telegram';
 
-export type Tab = 'empire' | 'market' | 'rating' | 'profile' | 'dev';
+export type Tab = 'empire' | 'map' | 'market' | 'rating' | 'profile' | 'dev';
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'empire', label: 'Империя', icon: Building2 },
+  { id: 'map', label: 'Карта', icon: MapIcon },
   { id: 'market', label: 'Рынок', icon: CandlestickChart },
   { id: 'rating', label: 'Рейтинг', icon: Trophy },
   { id: 'profile', label: 'Профиль', icon: UserRound },

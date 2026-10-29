@@ -97,16 +97,19 @@ function findAnimated(g: THREE.Object3D, mutable: Set<THREE.Material>) {
 
 /** Материалы без текстуры, у которых различается только цвет, склеиваем в один — цвет уходит в вершины. */
 function bakeSignature(m: AnyMat, mutable: Set<THREE.Material>): string | null {
-  if (mutable.has(m) || !(m instanceof THREE.MeshStandardMaterial) || m.map || m.vertexColors) return null;
+  if (mutable.has(m) || m.map || m.vertexColors) return null;
+  const common = [m.transparent, m.opacity, m.side, m.depthWrite, m.depthTest, m.blending, (m as { fog?: boolean }).fog].join('|');
+  if (m instanceof THREE.MeshBasicMaterial) {
+    if (m.alphaMap || m.aoMap || m.envMap) return null;
+    return `basic|${common}`;
+  }
+  if (!(m instanceof THREE.MeshStandardMaterial)) return null;
   if (m.emissiveMap || m.alphaMap || m.normalMap || m.roughnessMap || m.metalnessMap) return null;
-  return [
-    m.flatShading, m.roughness, m.metalness, m.emissive.getHex(), m.emissiveIntensity,
-    m.transparent, m.opacity, m.side, m.depthWrite, m.blending,
-  ].join('|');
+  return [m.flatShading, m.roughness, m.metalness, m.emissive.getHex(), m.emissiveIntensity, common].join('|');
 }
 
-const bakedMats = new Map<string, THREE.MeshStandardMaterial>();
-function bakedMaterial(sig: string, like: THREE.MeshStandardMaterial) {
+const bakedMats = new Map<string, THREE.MeshStandardMaterial | THREE.MeshBasicMaterial>();
+function bakedMaterial(sig: string, like: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial) {
   let m = bakedMats.get(sig);
   if (!m) {
     m = like.clone();
@@ -166,7 +169,15 @@ function prepare(it: Item, indexed: boolean): THREE.BufferGeometry {
  * Склеить неподвижные меши внутри root. keep — объекты (с потомками), которые трогать нельзя:
  * двигаются, прячутся или нужны коду по ссылке. Возвращает, сколько мешей было и стало.
  */
-export function mergeStatic(root: THREE.Object3D, mutable: Set<THREE.Material>, keep: Iterable<THREE.Object3D> = []) {
+export function mergeStatic(
+  root: THREE.Object3D,
+  mutable: Set<THREE.Material>,
+  keep: Iterable<THREE.Object3D> = [],
+  /** Какие материалы можно запечь в цвет вершин (по умолчанию — любые неизменяемые). */
+  bakeable: (m: THREE.Material) => boolean = () => true,
+  /** Слой «теневой копии»: если задан, все неподвижные тени контейнера рисуются одним мешем (см. shadowProxy). */
+  proxyLayer?: number,
+) {
   const skip = new Set(keep);
   findAnimated(root, mutable).forEach((o) => skip.add(o));
   root.updateMatrixWorld(true);
@@ -183,15 +194,16 @@ export function mergeStatic(root: THREE.Object3D, mutable: Set<THREE.Material>, 
     if (!mesh.geometry || Array.isArray(mat) || mesh.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender) return;
     if (Object.keys(mesh.geometry.morphAttributes).length) return;
     before++;
-    const sig = bakeSignature(mat, mutable);
-    const flags = `${mesh.castShadow ? 1 : 0}${mesh.receiveShadow ? 1 : 0}${mesh.renderOrder}`;
+    const sig = bakeable(mat) ? bakeSignature(mat, mutable) : null;
+    // С теневой копией тени рисует она, поэтому «отбрасывает тень» больше не разделяет детали.
+    const flags = `${proxyLayer === undefined && mesh.castShadow ? 1 : 0}${mesh.receiveShadow ? 1 : 0}${mesh.renderOrder}`;
     const key = sig ? `b${flags}|${sig}` : `m${flags}|${mat.uuid}`;
     let b = buckets.get(key);
     if (!b) buckets.set(key, (b = { mat, items: [], baked: !!sig }));
     b.items.push({
       mesh,
       matrix: inv.clone().multiply(mesh.matrixWorld),
-      color: sig ? (mat as THREE.MeshStandardMaterial).color.clone() : null,
+      color: sig ? (mat as THREE.MeshBasicMaterial).color.clone() : null,
     });
   };
   visit(root);
@@ -207,7 +219,7 @@ export function mergeStatic(root: THREE.Object3D, mutable: Set<THREE.Material>, 
     const first = b.items[0].mesh;
     const mat = b.baked ? bakedMaterial(bakeSignature(b.mat as AnyMat, mutable)!, b.mat as THREE.MeshStandardMaterial) : b.mat;
     const m = new THREE.Mesh(merged, mat);
-    m.castShadow = first.castShadow;
+    m.castShadow = b.items.some((it) => it.mesh.castShadow);
     m.receiveShadow = first.receiveShadow;
     m.renderOrder = first.renderOrder;
     m.name = 'merged';
@@ -219,7 +231,45 @@ export function mergeStatic(root: THREE.Object3D, mutable: Set<THREE.Material>, 
     after -= b.items.length - 1;
   });
   pruneEmpty(root, skip);
+  if (proxyLayer !== undefined) shadowProxy(root, skip, proxyLayer);
   return { before, after };
+}
+
+const proxyMat = new THREE.MeshBasicMaterial();
+/**
+ * Теневая копия: вся неподвижная геометрия контейнера, которая отбрасывает тень, — одним мешем на отдельном слое.
+ * Этот слой видит только камера теней, поэтому в картинке копии нет, а тени стоят один вызов вместо десятков.
+ */
+function shadowProxy(root: THREE.Object3D, skip: Set<THREE.Object3D>, layer: number) {
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const casters: THREE.Mesh[] = [];
+  const visit = (o: THREE.Object3D) => {
+    if (skip.has(o) || !o.visible) return;
+    o.children.forEach(visit);
+    const m = o as THREE.Mesh;
+    if (m.isMesh && !(m as THREE.InstancedMesh).isInstancedMesh && m.castShadow && m.geometry?.attributes.position) casters.push(m);
+  };
+  visit(root);
+  if (casters.length < 2) return;
+  const geos = casters.map((m) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', m.geometry.attributes.position.clone());
+    if (m.geometry.index) g.setIndex(m.geometry.index.clone());
+    g.applyMatrix4(inv.clone().multiply(m.matrixWorld));
+    return g.index ? g.toNonIndexed() : g;
+  });
+  const merged = mergeGeometries(geos, false);
+  geos.forEach((g) => g.dispose());
+  if (!merged) return;
+  casters.forEach((m) => {
+    m.castShadow = false;
+  });
+  const proxy = new THREE.Mesh(merged, proxyMat);
+  proxy.castShadow = true;
+  proxy.layers.set(layer);
+  proxy.name = 'shadow-proxy';
+  root.add(proxy);
 }
 
 /** Убрать опустевшие группы, чтобы сцену не приходилось обходить зря. */
@@ -265,7 +315,7 @@ export function mergeSprites(scene: THREE.Object3D, spriteMat: THREE.SpriteMater
  * Прохожие через InstancedMesh. Логика движения остаётся прежней и двигает невидимые «скелеты»;
  * sync() каждый кадр переносит их положение в инстансы. Все люди должны быть собраны одинаково.
  */
-export function instancePeople(scene: THREE.Scene, people: THREE.Object3D[]) {
+export function instancePeople(scene: THREE.Scene, people: THREE.Object3D[], shadows = true, mergeUniform = false) {
   const HIDDEN_LAYER = 31;
   const leaves = people.map((p) => {
     const out: THREE.Mesh[] = [];
@@ -276,18 +326,53 @@ export function instancePeople(scene: THREE.Scene, people: THREE.Object3D[]) {
   });
   const n = leaves[0]?.length ?? 0;
   if (!n || leaves.some((l) => l.length !== n)) return { sync: () => {} };
+  const colorOf = (m: THREE.Mesh) => (m.material as THREE.MeshStandardMaterial).color;
+
+  // mergeUniform: детали, одинаковые по цвету у всех (колёса, кабина, фары), склеиваются в одну деталь модели;
+  // отдельными инстансами остаются только детали, цвет которых у каждого свой (кузов, рубашка).
+  // Только для моделей, у которых детали не прячутся по отдельности (у прохожих на улице есть зонтики).
+  const uniform = leaves[0].map((proto, j) => mergeUniform && leaves.every((l) => colorOf(l[j]).equals(colorOf(proto))));
+  const empty = new Set<THREE.Material>();
+  const shared = new Map<string, number[]>();
+  leaves[0].forEach((proto, j) => {
+    if (!uniform[j]) return;
+    const sig = bakeSignature(proto.material as AnyMat, empty);
+    const key = sig ?? `part${j}`;
+    shared.set(key, [...(shared.get(key) ?? []), j]);
+  });
 
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
-  const parts = leaves[0].map((proto, j) => {
-    const base = (proto.material as THREE.MeshStandardMaterial).clone();
-    base.color.setRGB(1, 1, 1);
-    const im = new THREE.InstancedMesh(proto.geometry, base, people.length);
-    im.castShadow = proto.castShadow;
-    im.receiveShadow = proto.receiveShadow;
+  const mk = (geo: THREE.BufferGeometry, mat: THREE.Material, cast: boolean, recv: boolean) => {
+    const im = new THREE.InstancedMesh(geo, mat, people.length);
+    im.castShadow = shadows && cast;
+    im.receiveShadow = recv;
     im.frustumCulled = false;
-    people.forEach((_, i) => im.setColorAt(i, (leaves[i][j].material as THREE.MeshStandardMaterial).color));
     scene.add(im);
     return im;
+  };
+  // Отдельные детали: матрица — сама деталь, цвет — свой у каждого.
+  const single = leaves[0].map((proto, j) => {
+    if (uniform[j]) return null;
+    const base = (proto.material as THREE.MeshStandardMaterial).clone();
+    base.color.setRGB(1, 1, 1);
+    const im = mk(proto.geometry, base, proto.castShadow, proto.receiveShadow);
+    people.forEach((_, i) => im.setColorAt(i, colorOf(leaves[i][j])));
+    return im;
+  });
+  // Склеенные одинаковые детали: геометрия в координатах модели, цвет — в вершинах, матрица — вся модель.
+  const root0 = people[0];
+  root0.updateMatrixWorld(true);
+  const inv0 = root0.matrixWorld.clone().invert();
+  const groups = [...shared.values()].map((js) => {
+    const proto = leaves[0][js[0]];
+    const items = js.map((jj) => ({ mesh: leaves[0][jj], matrix: inv0.clone().multiply(leaves[0][jj].matrixWorld), color: colorOf(leaves[0][jj]).clone() }));
+    const indexed = items.every((it) => it.mesh.geometry.index);
+    const geos = items.map((it) => prepare(it, indexed));
+    const geo = js.length > 1 ? mergeGeometries(geos, false)! : geos[0];
+    const mat = (proto.material as THREE.MeshStandardMaterial).clone();
+    mat.color.setRGB(1, 1, 1);
+    mat.vertexColors = true;
+    return { js, im: mk(geo, mat, items.some((it) => it.mesh.castShadow), proto.receiveShadow) };
   });
   leaves.forEach((l) => l.forEach((m) => m.layers.set(HIDDEN_LAYER)));
 
@@ -298,13 +383,15 @@ export function instancePeople(scene: THREE.Scene, people: THREE.Object3D[]) {
     }
     return true;
   };
+  const all = [...single.filter(Boolean), ...groups.map((g) => g.im)] as THREE.InstancedMesh[];
   function sync() {
     people.forEach((p, i) => {
       const vis = p.visible;
       if (vis) p.updateMatrixWorld(true);
-      leaves[i].forEach((m, j) => parts[j].setMatrixAt(i, vis && shown(m, p) ? m.matrixWorld : zero));
+      leaves[i].forEach((m, j) => single[j]?.setMatrixAt(i, vis && shown(m, p) ? m.matrixWorld : zero));
+      groups.forEach((g) => g.im.setMatrixAt(i, vis ? p.matrixWorld : zero));
     });
-    parts.forEach((im) => {
+    all.forEach((im) => {
       im.instanceMatrix.needsUpdate = true;
     });
   }

@@ -17,6 +17,7 @@ import { NotificationsSheet } from './components/NotificationsSheet';
 import { CatalogSheet } from './components/CatalogSheet';
 import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
+import { MapTab } from './components/MapTab';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
 import { streetLife, streetVan, streetViews } from './street/views';
@@ -65,6 +66,11 @@ function Game() {
   const [adFor, setAdFor] = useState<BusinessType | null | undefined>(undefined);
   const [upgradeFor, setUpgradeFor] = useState<BusinessType | null>(null);
   const graphics = useGraphics();
+  // Карта строится при первом открытии вкладки и дальше живёт скрытой, чтобы не строить город заново.
+  const [mapOpened, setMapOpened] = useState(false);
+  useEffect(() => {
+    if (tab === 'map') setMapOpened(true);
+  }, [tab]);
   const simpleStreet = useSimpleStreet();
 
   // Настройка вибрации хранится на сервере.
@@ -380,6 +386,28 @@ function Game() {
         />
       )}
       {tab === 'dev' && isAdmin && <DevPanel game={game} onState={setGame} onToast={showToast} />}
+      {mapOpened && (
+        <div hidden={tab !== 'map'}>
+          <MapTab
+            game={game}
+            active={tab === 'map'}
+            isAdmin={isAdmin}
+            onSlow={onSlowStreet}
+            onBuy={(type, plot) =>
+              run(
+                () => api.openBusiness(type, plot),
+                () => `Открыт новый бизнес: ${bizNames[type] ?? type}`,
+                'purchase',
+              )
+            }
+            onUpgrade={(type) => setUpgradeFor(type)}
+            onOpenCard={(type) => {
+              setTab('empire');
+              window.setTimeout(() => selectOnStreet(type, true), 80);
+            }}
+          />
+        </div>
+      )}
       {tab === 'rating' && <Leaderboard season={game.season} serverOffset={serverOffset} game={game} />}
       {tab === 'profile' && (
         <ProfileTab game={game} onEditCompany={() => setEditingCompany(true)} onToast={showToast} />
