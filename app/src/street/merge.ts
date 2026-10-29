@@ -127,6 +127,23 @@ interface Item {
 }
 
 /** Геометрия детали в координатах контейнера, только position/normal/uv (+ цвет). */
+/**
+ * Против мерцания совпадающих граней (крышка кружки на кружке, вывеска на стене, плита на земле): каждая деталь
+ * чуть раздувается вдоль нормалей, и чем она меньше, тем сильнее. Тогда из двух граней в одной плоскости
+ * всегда ближе грань меньшей детали — она и рисуется, без «полос» при движении камеры. Сдвиг — сотые доли единицы.
+ */
+let tie = 0;
+function nudge(g: THREE.BufferGeometry) {
+  const pos = g.attributes.position as THREE.BufferAttribute, nor = g.attributes.normal as THREE.BufferAttribute;
+  g.computeBoundingSphere();
+  // Одинаковым по размеру деталям — немного разный сдвиг, чтобы и между ними не было ничьей.
+  const eps = 0.02 / (1 + 2 * g.boundingSphere!.radius) + (tie++ % 16) * 2.5e-4;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setXYZ(i, pos.getX(i) + nor.getX(i) * eps, pos.getY(i) + nor.getY(i) * eps, pos.getZ(i) + nor.getZ(i) * eps);
+  }
+  g.boundingSphere = null;
+}
+
 function prepare(it: Item, indexed: boolean): THREE.BufferGeometry {
   let g = it.mesh.geometry.clone();
   for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
@@ -135,6 +152,7 @@ function prepare(it: Item, indexed: boolean): THREE.BufferGeometry {
   if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
   if (!indexed && g.index) g = g.toNonIndexed();
   g.applyMatrix4(it.matrix);
+  nudge(g);
   // Зеркальный масштаб выворачивает треугольники — разворачиваем обход обратно.
   if (it.matrix.determinant() < 0) {
     if (g.index) {

@@ -106,7 +106,7 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
     world.current.applyTime(dev.day ?? isDaytime());
     world.current.setLow(low);
     // Для замеров на стенде (только в режиме разработки, в игру не попадает).
-    if (import.meta.env.DEV) (window as unknown as { __city: unknown }).__city = { world: world.current, scene, gl, cam, THREE };
+    if (import.meta.env.DEV) (window as unknown as { __city: unknown }).__city = { world: world.current, scene, gl, cam, THREE, target: target.current };
   }
   // Сгенерированный модуль макета (gen/city.js) — без типов.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -539,7 +539,7 @@ export default function City(props: Props & { active?: boolean; showFps?: boolea
         linear
         legacy
         orthographic
-        camera={{ manual: true, near: 1, far: 1000, position: [56, 88, 136] }}
+        camera={{ manual: true, near: 1, far: 600, position: [56, 88, 136] }}
         dpr={dpr}
         frameloop={running ? 'always' : 'never'}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
