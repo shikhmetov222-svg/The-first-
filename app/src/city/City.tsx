@@ -2,10 +2,13 @@
 // Управление и цикл кадра — как в макете; пауза, FPS и снижение чёткости — как у улицы (street/Street.tsx).
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
+import { Lock } from 'lucide-react';
 import * as THREE from 'three';
 import { createCityWorld, frameCityCamera, type CityWorld } from './world';
 import { DISTRICTS, districtOf, type CityPlot, type DistrictKey, type Owner } from './views';
 import { isDaytime, streetDev } from '../street/views';
+import { money } from '../format';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -129,9 +132,6 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
   function zoomTo(z: number) {
     cam.zoom = clamp(z, 0.22, 2.2);
     cam.updateProjectionMatrix();
-    city.labels.forEach((l: THREE.Sprite) => {
-      l.visible = cam.zoom < 0.8;
-    });
   }
 
   // День и ночь — по часам игрока или как задал разработчик.
@@ -454,7 +454,55 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
     world.current!.updateShadows(gl, cam, dt);
   });
 
-  return null;
+  return <DistrictLabels city={city} stage={stage} caps={caps} cam={cam} />;
+}
+
+/**
+ * Названия районов — обычными элементами страницы поверх карты: текст чёткий на любом экране,
+ * а не картинка в 3D, которая размывается при уменьшении. Картинки-названия из макета прячем.
+ */
+function DistrictLabels({ city, stage, caps, cam }: {
+  city: Record<string, any>;
+  stage: number;
+  caps: number[];
+  cam: THREE.OrthographicCamera;
+}) {
+  const els = useRef<(HTMLDivElement | null)[]>([]);
+  const items = (Object.keys(DISTRICTS) as Exclude<DistrictKey, 'park'>[]).map((key) => {
+    const [x, z] = city.districtCenter(key) as [number, number];
+    const need = city.STAGE_OF[key] as number;
+    const locked = need > stage;
+    return {
+      key, x, z, locked,
+      title: DISTRICTS[key].name,
+      sub: locked ? `откроется при ${money(caps[need - 1] ?? 0)}` : `спрос: ${DISTRICTS[key].likes.slice(0, 2).join(', ')}`,
+    };
+  });
+  const park = (city.blocks as { d: string; x: number; z: number }[]).find((b) => b.d === 'park');
+  if (park) items.push({ key: 'park' as never, x: park.x, z: park.z, locked: false, title: 'Городской парк', sub: 'кубок лучших за сезон' });
+  useFrame(() => {
+    // Макет пересоздаёт картинки-названия при открытии района — держим их на невидимом слое.
+    (city.labels as THREE.Sprite[]).forEach((l) => l.layers.set(31));
+    const display = cam.zoom < 0.8 ? '' : 'none';
+    const transform = `scale(${Math.round(Math.max(0.7, Math.min(1, cam.zoom / 0.65)) * 20) / 20})`;
+    els.current.forEach((el) => {
+      if (!el) return;
+      if (el.style.display !== display) el.style.display = display;
+      if (el.style.transform !== transform) el.style.transform = transform;
+    });
+  });
+  return (
+    <>
+      {items.map((it, n) => (
+        <Html key={it.key} position={[it.x, 1.5, it.z]} center zIndexRange={[3, 1]} style={{ pointerEvents: 'none' }}>
+          <div className={`district-label ${it.locked ? 'locked' : ''}`} ref={(el) => (els.current[n] = el)}>
+            <b>{it.title}</b>
+            <span>{it.locked && <Lock size={10} aria-hidden />}{it.sub}</span>
+          </div>
+        </Html>
+      ))}
+    </>
+  );
 }
 
 /** Счётчик кадров и снижение чёткости на медленном телефоне — как у улицы. */
