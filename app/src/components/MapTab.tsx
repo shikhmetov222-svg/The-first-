@@ -20,7 +20,7 @@ interface Props {
   isAdmin: boolean;
   serverOffset: number;
   /** Наехать на участок (из списка строек в «Империи»). */
-  focus: { i: number; j: number; k: number; n: number } | null;
+  focus: { i: number; j: number; k: number; n: number; zoom?: number; district?: boolean } | null;
   onToast: (text: string) => void;
   onBuy: (type: BusinessType, plot: { i: number; j: number; k: number }, brigade: BrigadeId) => Promise<boolean>;
   onUpgrade: (type: BusinessType) => void;
@@ -91,7 +91,7 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
 
   // «Следить за стройкой» из «Империи».
   useEffect(() => {
-    if (focus) setRequest((r) => ({ focus: { i: focus.i, j: focus.j, k: focus.k }, n: r.n + 1 }));
+    if (focus) setRequest((r) => ({ focus: { i: focus.i, j: focus.j, k: focus.k, zoom: focus.zoom, district: focus.district }, n: r.n + 1 }));
   }, [focus]);
 
   // Стройка закончилась у тебя на глазах: здание выпрыгивает, конфетти — и тост.
@@ -107,6 +107,14 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
 
   // Пока сервер не прислал конкурентов, город не строим: иначе его пришлось бы сразу пересобрать.
   const ready = loaded || !active;
+  const now = useNow(serverOffset, 30_000);
+  const mapEvents = useMemo(
+    () =>
+      (game.events ?? [])
+        .filter((e) => new Date(e.starts_at).getTime() <= now && new Date(e.ends_at).getTime() > now)
+        .map((e) => ({ district: e.district, bad: e.mult < 1, text: `${e.title.split(':')[0].split(' в ')[0]} · ${e.mult < 1 ? '−' : '+'}${Math.round(Math.abs(e.mult - 1) * 100)}%` })),
+    [game.events, now],
+  );
 
   if (!game.city) {
     return <p className="hint center">Карта появится после обновления игры. Закрой и открой игру заново.</p>;
@@ -166,6 +174,7 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
                 active={active}
                 showFps={isAdmin}
                 onSlow={onSlow}
+                events={mapEvents}
               />
             </Suspense>
           )}

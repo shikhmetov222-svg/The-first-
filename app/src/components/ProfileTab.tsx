@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, Box, Copy, Flame, Send, Vibrate } from 'lucide-react';
+import { Bell, Box, Copy, Flame, Send, Trophy, Vibrate } from 'lucide-react';
 import { api, type GameState, type MyProfile } from '../api';
 import { count, money } from '../format';
 import { notify, requestWriteAccess, setHapticsEnabled, shareLink } from '../telegram';
@@ -100,7 +100,25 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
         <Achievements earned={profile.achievements} />
       </section>
 
-      <h2 className="section-title">История сезонов</h2>
+      <h2 className="section-title">
+        <span>История сезонов</span>
+        {profile.history.some((h) => h.place <= 10) && (
+          <span className="stat-label season-cups">
+            {[1, 2, 3].map((n) => {
+              const k = profile.history.filter((h) => h.place === n).length;
+              return k > 0 ? (
+                <span key={n} className={`cup cup-${n}`}>
+                  <Trophy size={13} aria-hidden /> ×{k}
+                </span>
+              ) : null;
+            })}
+            {(() => {
+              const k = profile.history.filter((h) => h.place > 3 && h.place <= 10).length;
+              return k > 0 ? <span className="cup">топ-10 ×{k}</span> : null;
+            })()}
+          </span>
+        )}
+      </h2>
       <section className="card">
         {profile.history.length === 0 ? (
           <p className="hint small" style={{ margin: 0 }}>
@@ -116,7 +134,8 @@ export function ProfileTab({ game, onEditCompany, onToast }: Props) {
                 </span>
                 <span className="right">
                   <b>
-                    #{h.place} <span className="stat-label">из {h.total}</span>
+                    {h.place <= 3 && <Trophy size={14} className={`cup-${h.place}`} aria-label={`${h.place} место`} />} #{h.place}{' '}
+                    <span className="stat-label">из {h.total}</span>
                   </b>
                   <div className="stat-label">{money(h.capital)}</div>
                 </span>

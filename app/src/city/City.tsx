@@ -41,7 +41,7 @@ export type MapPick =
 
 export interface CityRequest {
   /** Наехать камерой на участок. */
-  focus?: { i: number; j: number; k: number; zoom?: number };
+  focus?: { i: number; j: number; k: number; zoom?: number; district?: boolean };
   /** Вернуть общий вид. */
   home?: boolean;
   n: number;
@@ -64,13 +64,15 @@ interface Props {
   onFinished?: (p: CityPlot, wasLot: boolean) => void;
   /** «Графика: низкая»: без теней, велосипедистов, конфетти и с половиной машин. */
   low?: boolean;
+  /** События в городе: отметка на названии района. */
+  events?: { district: string; text: string; bad: boolean }[];
 }
 
 const slotKey = (plots: CityPlot[]) => plots.map((p) => `${p.i}:${p.j}:${p.k}`).sort().join('|');
 /** Облик участка на карте сейчас (у объекта из gen/city.js те же поля). */
 const plotKey = (p: CityPlot) => `${p.type ?? ''}:${p.level ?? 0}:${p.lot ? 1 : 0}:${p.owner?.name ?? ''}:${p.owner?.me ? 1 : 0}:${p.price ?? 0}`;
 
-function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished, low = false }: Props) {
+function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished, low = false, events }: Props) {
   const { scene, camera, gl, size } = useThree();
   const cam = camera as THREE.OrthographicCamera;
   const world = useRef<CityWorld | null>(null);
@@ -239,10 +241,16 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
     }
     const f = request.focus;
     if (f) {
-      const p = (city.plots as MapPlot[]).find((q) => q.i === f.i && q.j === f.j && q.k === f.k);
+      const p = f.district ? undefined : (city.plots as MapPlot[]).find((q) => q.i === f.i && q.j === f.j && q.k === f.k);
+      // Участка нет (событие в районе) — едем к центру района, туда, где его название.
+      const b = p ? null : (city.blocks as { i: number; j: number; x: number; z: number }[]).find((q) => q.i === f.i && q.j === f.j);
       if (p) {
         target.current.set(p.cx + 2, 2.4, p.cz + 4);
         zoomTo(f.zoom ?? 1.1);
+      } else if (b) {
+        const [x, z] = city.districtCenter(districtOf(f.i, f.j)) as [number, number];
+        target.current.set(x, 1.5, z);
+        zoomTo(f.zoom ?? 0.6);
       }
     }
   }, [request?.n]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -454,18 +462,19 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, 
     world.current!.updateShadows(gl, cam, dt);
   });
 
-  return <DistrictLabels city={city} stage={stage} caps={caps} cam={cam} />;
+  return <DistrictLabels city={city} stage={stage} caps={caps} cam={cam} events={events} />;
 }
 
 /**
  * Названия районов — обычными элементами страницы поверх карты: текст чёткий на любом экране,
  * а не картинка в 3D, которая размывается при уменьшении. Картинки-названия из макета прячем.
  */
-function DistrictLabels({ city, stage, caps, cam }: {
+function DistrictLabels({ city, stage, caps, cam, events = [] }: {
   city: Record<string, any>;
   stage: number;
   caps: number[];
   cam: THREE.OrthographicCamera;
+  events?: Props['events'];
 }) {
   const els = useRef<(HTMLDivElement | null)[]>([]);
   const ndc = useRef(new THREE.Vector3());
@@ -504,6 +513,13 @@ function DistrictLabels({ city, stage, caps, cam }: {
           <div className={`district-label ${it.locked ? 'locked' : ''}`} ref={(el) => (els.current[n] = el)}>
             <b>{it.title}</b>
             <span>{it.locked && <Lock size={10} aria-hidden />}{it.sub}</span>
+            {events
+              .filter((e) => e.district === it.key)
+              .map((e) => (
+                <em key={e.text} className={e.bad ? 'bad' : ''}>
+                  {e.bad ? '▼' : '▲'} {e.text}
+                </em>
+              ))}
           </div>
         </Html>
       ))}

@@ -185,6 +185,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
   create_company: action((id, b) => rpc('create_company', companyArgs(id, b))),
   update_company: action((id, b) => rpc('update_company', companyArgs(id, b))),
   tutorial: action((id, b) => rpc('set_tutorial_step', { p_player_id: id, p_step: int(b, 'step') })),
+  daily_claim: action((id, b) => rpc('claim_daily', { p_player: id, p_code: str(b, 'code') })),
   profile: async (user) => {
     const [profile, bot] = await Promise.all([
       playerId(user).then((id) => rpc('my_profile', { p_player_id: id })),
@@ -285,6 +286,8 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       befriend: () => rpc('dev_befriend', { p_admin: id, p_test: str(b, 'player') }),
       badge: () => rpc('dev_badge', { p_admin: id, p_show: bool(b, 'show') }),
       reset_me: () => rpc('dev_reset_me', { p_admin: id }),
+      new_event: () => rpc('dev_new_event', { p_admin: id }),
+      daily_reset: () => rpc('dev_daily_reset', { p_admin: id }),
     };
     if (!Object.hasOwn(ops, op)) throw new ApiError(400, 'Неизвестное действие разработчика');
     const result = await ops[op]();

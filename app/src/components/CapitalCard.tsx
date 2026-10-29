@@ -1,4 +1,4 @@
-import { Trophy, Wallet } from 'lucide-react';
+import { Target, Trophy, Wallet } from 'lucide-react';
 import type { GameState } from '../api';
 import { money, signedMoney } from '../format';
 import { TICK_MS, useTickCountdown } from './useTick';
@@ -39,6 +39,8 @@ export function CapitalCard({ game, serverOffset, pending, busy, onCollect }: Pr
         {signedMoney(diff)} ({pct > 0 ? '+' : pct < 0 ? '−' : ''}
         {Math.abs(pct)}%) <span className="muted">от старта</span>
       </div>
+
+      <RivalLine game={game} />
 
       <Sparkline points={game.capital_history ?? []} current={game.capital} serverOffset={serverOffset} />
 
@@ -132,5 +134,23 @@ function Sparkline({ points, current, serverOffset }: { points: [number, number]
       <path d={area} fill="url(#spark-fill)" />
       <path d={line} fill="none" stroke="#D4A73A" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/** Ближняя цель: сколько до игрока выше в лиге или до следующей лиги. */
+function RivalLine({ game }: { game: GameState }) {
+  const r = game.rival;
+  if (!r) return null;
+  const place = game.league_place;
+  const text = r.ahead
+    ? `До ${place && place > 1 ? `#${place - 1}` : 'места выше'} — ${money(r.ahead.gap)} · ${r.ahead.name}`
+    : r.next_league
+      ? `Ты первый в лиге. До «${r.next_league.name}» — ${money(r.next_league.gap)}`
+      : null;
+  if (!text) return null;
+  return (
+    <div className="rival-line">
+      <Target size={14} aria-hidden /> {text}
+    </div>
   );
 }

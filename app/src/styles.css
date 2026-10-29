@@ -3169,3 +3169,122 @@ h2.section-title {
 .district-label {
   transition: opacity 0.2s;
 }
+
+/* Задания дня и события в городе (components/Daily.tsx). */
+.daily,
+.event-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.daily-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.daily-row .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.daily-row b {
+  font-size: 14px;
+}
+.daily-row.claimed b {
+  color: var(--muted);
+}
+.daily-claim {
+  width: auto;
+  flex: none;
+}
+.daily-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--up);
+  font-size: 13px;
+  font-weight: 700;
+  flex: none;
+}
+.event-card {
+  border-color: rgba(212, 167, 58, 0.35);
+  background: linear-gradient(180deg, rgba(212, 167, 58, 0.08), transparent 70%), var(--card);
+}
+.event-card.bad {
+  border-color: rgba(242, 166, 90, 0.35);
+  background: linear-gradient(180deg, rgba(242, 166, 90, 0.08), transparent 70%), var(--card);
+}
+.event-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--gold);
+}
+.event-card.bad .event-head {
+  color: var(--warn);
+}
+.event-head b {
+  color: var(--text);
+  font-size: 15px;
+}
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.event-meta .link-button {
+  margin-left: auto;
+}
+.rival-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rival-line svg {
+  color: var(--gold);
+  flex: none;
+}
+.district-label em {
+  margin-top: 3px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(212, 167, 58, 0.18);
+  color: #f2c46b;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.district-label em.bad {
+  background: rgba(242, 166, 90, 0.16);
+  color: var(--warn);
+}
+.district-label:has(em) {
+  border-color: rgba(212, 167, 58, 0.8);
+}
+
+/* Кубки за места в сезонах (ProfileTab). */
+.season-cups {
+  display: inline-flex;
+  gap: 8px;
+}
+.cup {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.cup-1 {
+  color: #d4a73a;
+}
+.cup-2 {
+  color: #c9ccd3;
+}
+.cup-3 {
+  color: #c98a5a;
+}

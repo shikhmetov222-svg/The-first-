@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
-  BarChart3, Bot, CalendarClock, HardHat, Map as MapIcon, Package, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
+  BarChart3, Bot, CalendarCheck, CalendarClock, HardHat, Map as MapIcon, Package, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
   Warehouse, Wrench,
 } from 'lucide-react';
 import { api, type DevInfo, type GameState } from '../api';
@@ -42,6 +42,8 @@ const ACTIONS: Record<string, string> = {
   parcels_add: 'Фоновые посылки',
   finish_repairs: 'Ремонты завершены',
   finish_builds: 'Стройки достроены',
+  new_event: 'Событие в городе',
+  daily_reset: 'Новые задания дня',
   build_speed: 'Скорость строек',
   set_level: 'Уровень бизнеса',
   ticks: 'Тики рынка',
@@ -233,6 +235,20 @@ export function DevPanel({ game, onState, onToast }: Props) {
             onClick={() => run('build_speed', { fast: (game.build?.speed ?? 1) === 1 })}
           >
             {(game.build?.speed ?? 1) === 1 ? 'Стройки ×60' : 'Обычная скорость'}
+          </button>
+        </div>
+      </DevSection>
+
+      <DevSection icon={<CalendarCheck size={18} />} title="Задания и события">
+        <p className="hint small">
+          Событие: {(game.events ?? [])[0]?.title ?? 'нет'}. Заданий сегодня: {game.daily?.items.length ?? 0}.
+        </p>
+        <div className="actions">
+          <button className="button small" disabled={busy} onClick={() => run('new_event')}>
+            Событие сейчас
+          </button>
+          <button className="button small secondary" disabled={busy} onClick={() => run('daily_reset')}>
+            Новые задания
           </button>
         </div>
       </DevSection>

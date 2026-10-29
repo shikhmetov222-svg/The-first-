@@ -19,6 +19,8 @@ import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
 import { MapTab } from './components/MapTab';
 import { BuildsCard } from './components/Builds';
+import { DailyCard, EventCard } from './components/Daily';
+import { DMAP } from './city/views';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
 import { setGraphics, useGraphics } from './graphics';
@@ -68,7 +70,7 @@ function Game() {
   // Карта строится при первом открытии вкладки и дальше живёт скрытой, чтобы не строить город заново.
   const [mapOpened, setMapOpened] = useState(false);
   // «Следить за стройкой» из «Империи»: открыть карту и наехать на участок.
-  const [mapFocus, setMapFocus] = useState<{ i: number; j: number; k: number; n: number } | null>(null);
+  const [mapFocus, setMapFocus] = useState<{ i: number; j: number; k: number; n: number; zoom?: number; district?: boolean } | null>(null);
   useEffect(() => {
     if (tab === 'map') setMapOpened(true);
   }, [tab]);
@@ -442,6 +444,29 @@ function Game() {
           setTab('map');
         }}
       />
+
+      <EventCard
+        game={game}
+        serverOffset={serverOffset}
+        onShow={
+          game.city
+            ? (e) => {
+                // Квартал района события — к нему и едем, издалека, чтобы было видно название района.
+                const j = DMAP.findIndex((row) => row.includes(e.district as never));
+                if (j >= 0) setMapFocus({ i: DMAP[j].indexOf(e.district as never), j, k: 0, n: Date.now(), zoom: 0.55, district: true });
+                setTab('map');
+              }
+            : undefined
+        }
+      />
+
+      {game.daily && (
+        <DailyCard
+          daily={game.daily}
+          busy={busy}
+          onClaim={(code) => run(() => api.dailyClaim(code), (text) => text, 'collect')}
+        />
+      )}
 
       {game.effects.length > 0 && (
         <div className="effects">

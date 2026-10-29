@@ -288,6 +288,12 @@ export interface GameState {
   /** Активные стройки игрока (бригады-NPC и заказы у бригад игроков); у старого сервера их нет. */
   builds?: Build[];
   build?: BuildConfig;
+  /** Задания дня; у старого сервера их нет. */
+  daily?: DailyTasks;
+  /** Текущее и следующее событие в городе. */
+  events?: CityEvent[];
+  /** Ближайший соперник выше в лиге и сколько до следующей лиги. */
+  rival?: { ahead: { name: string; gap: number } | null; next_league: { name: string; gap: number } | null };
   /** Город игрока для карты; у старого сервера его нет. */
   city?: {
     seed: number;
@@ -491,6 +497,7 @@ export const api = {
   createCompany: (c: CompanyInput) => call<WithResult<null>>('create_company', { ...c }),
   updateCompany: (c: CompanyInput) => call<WithResult<null>>('update_company', { ...c }),
   tutorial: (step: number) => call<WithResult<null>>('tutorial', { step }),
+  dailyClaim: (code: string) => call<WithResult<string>>('daily_claim', { code }),
   profile: () => call<{ profile: MyProfile; bot_username: string | null }>('profile'),
   settings: (s: { notify?: boolean; haptics?: boolean }) => call<WithResult<null>>('settings', s),
   company: (id: string) => call<{ company: PublicProfile }>('company', { id }),
@@ -521,3 +528,21 @@ export const api = {
     call<WithResult<string> & { dev: DevInfo }>('dev', { op, ...params }),
   leaderboard: (kind: LeaderKind) => call<{ leaderboard: Leaderboard }>('leaderboard', { kind }),
 };
+
+export type DailyCode = 'sell' | 'revenue' | 'market_buy' | 'market_sell' | 'build' | 'decision';
+export interface DailyTasks {
+  reward: number; // коп. за одно задание
+  bonus: number; // коп. сверху за все три
+  items: { code: DailyCode; target: number; progress: number; claimed: boolean }[];
+}
+export interface CityEvent {
+  id: number;
+  kind: string;
+  district: string;
+  types: string[] | null;
+  mult: number;
+  title: string;
+  body: string;
+  starts_at: string;
+  ends_at: string;
+}
