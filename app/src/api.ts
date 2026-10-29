@@ -301,6 +301,18 @@ export interface GameState {
   daily?: DailyTasks;
   /** Текущее и следующее событие в городе. */
   events?: CityEvent[];
+  /** Своя лига: место, размер, зоны повышения и вылета. */
+  league_info?: {
+    tier: number;
+    name: string;
+    place: number | null;
+    size: number;
+    moves: number; // сколько поднимутся и сколько опустятся по итогам сезона
+    up_name: string | null;
+    down_name: string | null;
+    gap_up: number | null; // сколько не хватает до зоны повышения
+    ahead: { name: string; gap: number } | null;
+  };
   /** Заказы города: товар со склада своего бизнеса за награду. */
   orders?: CityOrder[];
   /** Лента новостей города. */

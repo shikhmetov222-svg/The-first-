@@ -137,20 +137,35 @@ function Sparkline({ points, current, serverOffset }: { points: [number, number]
   );
 }
 
-/** Ближняя цель: сколько до игрока выше в лиге или до следующей лиги. */
+/** «Золотая лига» → «в Золотую лигу». */
+const toLeague = (name: string) => 'в ' + name.replace(/ая лига$/, 'ую лигу');
+
+/** Ближняя цель: зона повышения или вылета в лиге и сколько до игрока выше. */
 function RivalLine({ game }: { game: GameState }) {
+  const lg = game.league_info;
   const r = game.rival;
-  if (!r) return null;
   const place = game.league_place;
-  const text = r.ahead
-    ? `До ${place && place > 1 ? `#${place - 1}` : 'места выше'} — ${money(r.ahead.gap)} · ${r.ahead.name}`
-    : r.next_league
-      ? `Ты первый в лиге. До «${r.next_league.name}» — ${money(r.next_league.gap)}`
-      : null;
-  if (!text) return null;
+  const lines: { cls: string; icon: string; text: string }[] = [];
+  if (lg && lg.place && lg.moves > 0) {
+    if (lg.up_name && lg.place <= lg.moves) {
+      lines.push({ cls: 'up', icon: '▲', text: `Зона повышения: в новом сезоне перейдёшь ${toLeague(lg.up_name)}` });
+    } else if (lg.down_name && lg.place > lg.size - lg.moves) {
+      lines.push({ cls: 'down', icon: '▼', text: `Зона вылета: если сезон закончится сейчас, опустишься ${toLeague(lg.down_name)}` });
+    } else if (lg.up_name && lg.gap_up) {
+      lines.push({ cls: '', icon: '▲', text: `До зоны повышения — ${money(lg.gap_up)}` });
+    }
+  }
+  const ahead = lg?.ahead ?? r?.ahead;
+  if (ahead) lines.push({ cls: '', icon: '', text: `До ${place && place > 1 ? `#${place - 1}` : 'места выше'} — ${money(ahead.gap)} · ${ahead.name}` });
+  else if (!lg && r?.next_league) lines.push({ cls: '', icon: '', text: `Ты первый в лиге. До «${r.next_league.name}» — ${money(r.next_league.gap)}` });
+  if (!lines.length) return null;
   return (
-    <div className="rival-line">
-      <Target size={14} aria-hidden /> {text}
-    </div>
+    <>
+      {lines.map((l) => (
+        <div key={l.text} className={`rival-line ${l.cls}`}>
+          {l.icon ? <span aria-hidden>{l.icon}</span> : <Target size={14} aria-hidden />} {l.text}
+        </div>
+      ))}
+    </>
   );
 }

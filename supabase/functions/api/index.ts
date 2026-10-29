@@ -291,6 +291,7 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       daily_reset: () => rpc('dev_daily_reset', { p_admin: id }),
       new_order: () => rpc('dev_new_order', { p_admin: id }),
       engage: () => rpc('dev_engage', { p_admin: id }),
+      league: () => rpc('dev_league', { p_admin: id, p_tier: int(b, 'tier') }),
     };
     if (!Object.hasOwn(ops, op)) throw new ApiError(400, 'Неизвестное действие разработчика');
     const result = await ops[op]();

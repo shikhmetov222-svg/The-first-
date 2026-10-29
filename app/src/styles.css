@@ -3306,3 +3306,9 @@ h2.section-title {
 .news-list li .stat-label {
   flex: none;
 }
+.rival-line.up {
+  color: var(--up);
+}
+.rival-line.down {
+  color: var(--down);
+}

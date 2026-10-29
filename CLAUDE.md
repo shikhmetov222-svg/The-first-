@@ -57,8 +57,8 @@ app/src/
                      здания бизнесов и детали берёт из street/gen
 app/public/street2d/ СГЕНЕРИРОВАНО: PNG каждого бизнеса на каждом уровне — node scripts/render-street2d.mjs (из app/)
 supabase/
-  migrations/        0001…0025, по порядку; каждая следующая переопределяет функции целиком (create or replace).
-                     get_state — обёртка (0022): основное состояние в get_state_base, обёртка добавляет daily, events, rival, orders, news;
+  migrations/        0001…0026, по порядку; каждая следующая переопределяет функции целиком (create or replace).
+                     get_state — обёртка (0022): основное состояние в get_state_base, обёртка добавляет daily, events, rival, orders, news и лигу (0026: league_tier игрока, переходы по итогам сезона — триггер league_rollover);
                      company_card — обёртка (0023): company_card_base + city (город компании для просмотра)
   functions/api/     Edge Function: проверка initData, вызов SQL-функций через rpc
   sim/               симуляция баланса (локальная копия базы, настоящие функции тика)

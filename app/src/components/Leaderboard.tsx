@@ -41,6 +41,16 @@ export function Leaderboard({ season, serverOffset, game }: { season: Season | n
           <p className="hint small">
             В конце сезона все начинают заново со 100&nbsp;000&nbsp;₽. Боты в рейтинге не участвуют.
           </p>
+          {game.league_info && (
+            <p className="hint small">
+              Ты: {game.league_info.name}{game.league_info.place ? `: #${game.league_info.place} из ${game.league_info.size}` : ''}.
+              {game.league_info.moves > 0
+                ? game.league_info.moves === 1
+                  ? ' По итогам сезона первый поднимется в лигу выше, последний опустится.'
+                  : ` По итогам сезона первые ${game.league_info.moves} поднимутся в лигу выше, последние ${game.league_info.moves} опустятся.`
+                : ' Когда в лиге будет больше игроков, лучшие начнут подниматься выше.'}
+            </p>
+          )}
         </section>
       )}
 

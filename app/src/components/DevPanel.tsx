@@ -45,6 +45,7 @@ const ACTIONS: Record<string, string> = {
   new_event: 'Событие в городе',
   daily_reset: 'Новые задания дня',
   new_order: 'Новый заказ города',
+  league: 'Лига',
   engage: 'Проверка поводов для бота',
   build_speed: 'Скорость строек',
   set_level: 'Уровень бизнеса',
@@ -258,6 +259,14 @@ export function DevPanel({ game, onState, onToast }: Props) {
           <button className="button small secondary" disabled={busy} onClick={() => run('engage')}>
             Поводы для бота
           </button>
+        </div>
+        <p className="hint small">Твоя лига: {game.league ?? '—'}. Поставить:</p>
+        <div className="actions">
+          {[1, 2, 3, 4].map((t) => (
+            <button key={t} className="button small secondary" disabled={busy} onClick={() => run('league', { tier: t })}>
+              {['Брилл.', 'Золото', 'Серебро', 'Бронза'][t - 1]}
+            </button>
+          ))}
         </div>
       </DevSection>
 
