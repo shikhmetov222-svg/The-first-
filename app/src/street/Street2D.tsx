@@ -89,7 +89,7 @@ export default function Street2D({
     const now: Partial<Record<GameType, string | null>> = {};
     SLOT_TYPES.forEach((s, i) => {
       const sale = data.life.sales[s.game];
-      now[s.game] = sale.at;
+      now[s.game] = sale.at ?? prev?.[s.game] ?? null; // во время стройки at = null — прошлую продажу помним
       if (prev && sale.at && sale.at !== prev[s.game] && sale.amount > 0 && data.views[s.game].level > 0)
         float(i, `+${money(sale.amount)}`, 'coin');
     });

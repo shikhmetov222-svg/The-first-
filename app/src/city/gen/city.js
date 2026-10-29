@@ -9,7 +9,7 @@ import * as THREE from 'three';
  */
 export function createCity(k, types, ctx) {
   const { scene, hemi, dir } = ctx;
-  const { M, add, addAnim, box, brickMat, bricks, bulbMat, cafeTable, clamp, concreteMat, cone, cyl, darkMat, eaveRoof, excavator, front, gable, glassMat, glow, glowMat, leafMat, mixerTruck, pallet, panel, parcelStack, person, pick, pool, poolMat, poster, rand, ribs, rollDoor, roofSign, rr, sandPile, sign, signTex, steelMat, towerCrane, tree, van, wheel, whiteMat, winMat, woodMat } = k;
+  const { M, add, addAnim, box, brickMat, bricks, bulbMat, cafeTable, clamp, concreteMat, cone, cyl, darkMat, eaveRoof, excavator, front, gable, glassMat, glow, glowMat, leafMat, mixerTruck, pallet, panel, parcelStack, person, pool, poolMat, poster, rand, ribs, rollDoor, roofSign, rr, sandPile, sign, signTex, steelMat, towerCrane, tree, van, wheel, whiteMat, winMat, woodMat } = k;
   const { TYPES, buildLot, makeFor, disposeGroup } = types;
   /* ===================== YOUR CITY ===================== */
   let seed = ctx.seed;
@@ -934,11 +934,7 @@ export function createCity(k, types, ctx) {
   const tweens = [];
   function tween(dur, fn, done){ tweens.push({ t: 0, dur, fn, done }); }
   const puffGeo = new THREE.SphereGeometry(1, 7, 5);
-  function puff(x, y, z, color, size, rise, life){
-    const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .45, depthWrite: false });
-    const s = new THREE.Mesh(puffGeo, m); s.scale.setScalar(size); s.position.set(x, y, z); scene.add(s);
-    tween(life, p => { s.position.y = y + p * rise; s.position.x = x + p * .35; s.scale.setScalar(size * (1 + p * 1.6)); m.opacity = .45 * (1 - p); }, () => { scene.remove(s); m.dispose(); });
-  }
+  function puff(x, y, z, color, size, rise, life){ ctx.particles.puff(x, y, z, color, size, rise, life); }
   function coinSprite(amount){
     const c = document.createElement('canvas'); c.width = 256; c.height = 96;
     const g = c.getContext('2d');
@@ -953,7 +949,7 @@ export function createCity(k, types, ctx) {
   const myPlots = plots.filter(p => p.owner && p.owner.me);
 
   /* ---------- construction by stages ---------- */
-  const BUILD_STAGES = [['Котлован', 2.6], ['Фундамент', 2.6], ['Каркас', 3.6], ['Фасад и окна', 3.2], ['Благоустройство', 1.6]];
+  const BUILD_STAGES = [['Котлован', .19], ['Фундамент', .19], ['Каркас', .27], ['Фасад и окна', .23], ['Благоустройство', .12]];
   const BUILD_TOTAL = BUILD_STAGES.reduce((a, s2) => a + s2[1], 0);
   const BRIGADES = ['Прораб Плюс', 'СтройКом', 'Мастер и Ко'];
   function progressSprite(){
@@ -1019,20 +1015,12 @@ export function createCity(k, types, ctx) {
       add(g, cone(.35, .5, M(0x5a4636), 8), 2.3, .25, .8);
     }
   }
-  function confetti(x, y, z){
-    const cols = [0xd4a73a, 0xf07167, 0x3fbf8f, 0x60a5fa, 0xffffff];
-    for (let i = 0; i < 36; i++) {
-      const m = new THREE.MeshBasicMaterial({ color: pick(cols), transparent: true });
-      const s = new THREE.Mesh(puffGeo, m); s.scale.set(.09, .03, .09); s.position.set(x, y, z); scene.add(s);
-      const vx = rand(-2.5, 2.5), vy = rand(3, 6), vz = rand(-2.5, 2.5), spin = rand(4, 10);
-      tween(1.8, q => { const t = q * 1.8; s.position.set(x + vx * t, y + vy * t - 4.5 * t * t, z + vz * t); s.rotation.x = t * spin; m.opacity = 1 - q * q; }, () => { scene.remove(s); m.dispose(); });
-    }
-  }
+  function confetti(x, y, z){ ctx.particles.confetti(x, y, z); }
   function finishConstruction(p){
     const B = p.build;
     scene.remove(B.site); disposeGroup(B.site); scene.remove(B.prog.sprite); B.prog.dispose();
     const wasLot = p.level === 0;
-    if (wasLot) { p.owner = ctx.me; p.lot = false; myPlots.push(p); }
+    if (wasLot) { p.owner = B.owner || ctx.me; p.lot = false; if (p.owner.me) myPlots.push(p); }
     p.type = B.type; p.level = B.level; p.build = null;
     const old = p.group; scene.remove(old); disposeGroup(old);
     const g = buildPlotVisual(p);
@@ -1045,11 +1033,14 @@ export function createCity(k, types, ctx) {
   function updateConstruction(dt){
     plots.forEach(p => {
       const B = p.build; if (!B) return;
-      B.t += dt;
+      B.t = Math.min(1, ctx.progress(p)) * BUILD_TOTAL;
       let acc = 0, idx = 0;
       for (; idx < BUILD_STAGES.length; idx++) { if (B.t < acc + BUILD_STAGES[idx][1]) break; acc += BUILD_STAGES[idx][1]; }
       if (idx >= BUILD_STAGES.length) { finishConstruction(p); return; }
-      if (idx !== B.idx) { B.idx = idx; stageVisual(p, idx); }
+      if (idx !== B.idx) {
+        if (B.idx >= 0) for (let i = 0; i < 8; i++) puff(p.x + rand(-2.4, 2.4), .3, p.z - rand(.5, 3.5), 0xb5a68a, .35, 1.0, 1.0);
+        B.idx = idx; stageVisual(p, idx); ctx.onStage(p, idx);
+      }
       const local = (B.t - acc) / BUILD_STAGES[idx][1], pct = B.t / BUILD_TOTAL;
       if (B.slabs) { const n = Math.floor(local * (B.slabs.length + 1)); B.slabs.forEach((sl, i) => { sl.visible = i < n; }); }
       if (B.fb && idx === 3) B.fb.scale.y = .3 + .7 * local;

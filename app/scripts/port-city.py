@@ -121,6 +121,26 @@ city = sub(city, "      const g = p.level === 0 ? buildLot(fmt(p.price)) : makeF
 city = sub(city, "      const heat = new THREE.Mesh(new THREE.PlaneGeometry(PW - .5, 1.9),",
            "      mergeStatic(g); g.traverse(o => { o.userData.plot = p; });\n"
            "      const heat = new THREE.Mesh(new THREE.PlaneGeometry(PW - .5, 1.9),")
+# Стройка идёт по времени сервера: доли этапов — из задания (19/19/27/23/12%), прогресс — ctx.progress(p).
+city = sub(city, "    const BUILD_STAGES = [['Котлован', 2.6], ['Фундамент', 2.6], ['Каркас', 3.6], ['Фасад и окна', 3.2], ['Благоустройство', 1.6]];",
+           "    const BUILD_STAGES = [['Котлован', .19], ['Фундамент', .19], ['Каркас', .27], ['Фасад и окна', .23], ['Благоустройство', .12]];")
+city = sub(city, "        B.t += dt;\n", "        B.t = Math.min(1, ctx.progress(p)) * BUILD_TOTAL;\n")
+# Смена этапа — облачко пыли.
+city = sub(city, "        if (idx !== B.idx) { B.idx = idx; stageVisual(p, idx); }",
+           "        if (idx !== B.idx) {\n"
+           "          if (B.idx >= 0) for (let i = 0; i < 8; i++) puff(p.x + rand(-2.4, 2.4), .3, p.z - rand(.5, 3.5), 0xb5a68a, .35, 1.0, 1.0);\n"
+           "          B.idx = idx; stageVisual(p, idx); ctx.onStage(p, idx);\n"
+           "        }")
+# Новый бизнес на участке становится своим только у меня; у конкурента — его.
+city = sub(city, "      if (wasLot) { p.owner = ctx.me; p.lot = false; myPlots.push(p); }",
+           "      if (wasLot) { p.owner = B.owner || ctx.me; p.lot = false; if (p.owner.me) myPlots.push(p); }")
+# Дым, пыль и конфетти — общие инстансы (city/particles.ts): никаких новых мешей и материалов в кадре.
+i = city.index('    function puff(x, y, z, color, size, rise, life){')
+j = city.index('    function coinSprite(amount){', i)
+city = city[:i] + '    function puff(x, y, z, color, size, rise, life){ ctx.particles.puff(x, y, z, color, size, rise, life); }\n' + city[j:]
+i = city.index('    function confetti(x, y, z){')
+j = city.index('    function finishConstruction(p){', i)
+city = city[:i] + '    function confetti(x, y, z){ ctx.particles.confetti(x, y, z); }\n' + city[j:]
 assert 'document.getElementById' not in city and 'document.querySelector' not in city, 'в модуле города остался DOM макета'
 
 # Имена набора деталей (kit) — берём из готового модуля улицы.

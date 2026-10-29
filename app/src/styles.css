@@ -2974,3 +2974,96 @@ h2.section-title {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* ---------- Стройки ---------- */
+
+.builds {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.builds-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fb923c;
+}
+
+.builds-head b {
+  color: var(--text);
+}
+
+.builds-head .stat-label {
+  margin-left: auto;
+}
+
+.build-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.build-row .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.build-row .bar-track {
+  display: block;
+}
+
+.bar-fill.build {
+  display: block;
+  background: #fb923c;
+}
+
+.build-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.build-time b {
+  color: #fb923c;
+}
+
+.brigades {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.brigade {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.brigade.chip-active {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}

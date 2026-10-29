@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Business, type BusinessType, type CatalogItem, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
+import { api, type BrigadeId, type Business, type BusinessType, type CatalogItem, type GameState, type LoginResult, type Product, type SeasonResult, type Source } from './api';
 import { BusinessCard } from './components/BusinessCard';
 import { ActionSheet, type SheetKind } from './components/ActionSheet';
 import { AwaySummary } from './components/AwaySummary';
@@ -18,6 +18,7 @@ import { CatalogSheet } from './components/CatalogSheet';
 import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
 import { MapTab } from './components/MapTab';
+import { BuildsCard } from './components/Builds';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
 import { RepairCard, UpgradeSheet, UpgradeStrip } from './components/Repair';
 import { streetLife, streetVan, streetViews } from './street/views';
@@ -47,6 +48,8 @@ function Game() {
   const [summary, setSummary] = useState<LoginResult['summary']>(null);
   const [seasonResult, setSeasonResult] = useState<SeasonResult | null>(null);
   const [tab, setTab] = useState<Tab>('empire');
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   const [serverOffset, setServerOffset] = useState(0);
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,6 +71,8 @@ function Game() {
   const graphics = useGraphics();
   // Карта строится при первом открытии вкладки и дальше живёт скрытой, чтобы не строить город заново.
   const [mapOpened, setMapOpened] = useState(false);
+  // «Следить за стройкой» из «Империи»: открыть карту и наехать на участок.
+  const [mapFocus, setMapFocus] = useState<{ i: number; j: number; k: number; n: number } | null>(null);
   useEffect(() => {
     if (tab === 'map') setMapOpened(true);
   }, [tab]);
@@ -92,8 +97,11 @@ function Game() {
   useEffect(() => {
     if (!newestNotif) return;
     if (lastNotif.current !== null && newestNotif.id > lastNotif.current && !newestNotif.read) {
-      showToast(newestNotif.text);
-      feel('collect');
+      // Конец стройки на открытой карте показывает сама карта (конфетти и тост «Готово»).
+      if (!(tabRef.current === 'map' && newestNotif.text.startsWith('Стройка завершена'))) {
+        showToast(newestNotif.text);
+        feel('collect');
+      }
     }
     lastNotif.current = Math.max(lastNotif.current ?? 0, newestNotif.id);
   }, [newestNotif, showToast]);
@@ -124,6 +132,16 @@ function Game() {
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [game !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Стройка подошла к концу — обновляем состояние сразу, не дожидаясь минутного опроса.
+  const nextBuildEnd = game?.builds?.reduce((m, b) => Math.min(m, new Date(b.ends_at).getTime()), Infinity) ?? Infinity;
+  useEffect(() => {
+    if (!Number.isFinite(nextBuildEnd)) return;
+    const wait = Math.max(1000, nextBuildEnd - (Date.now() + serverOffset) + 1500);
+    if (wait > 2 ** 31 - 1) return;
+    const id = window.setTimeout(() => api.state().then(setGame).catch(() => {}), wait);
+    return () => window.clearTimeout(id);
+  }, [nextBuildEnd, serverOffset]);
 
   /** Выполнить действие на сервере и показать новое состояние. */
   const run = useCallback(
@@ -392,11 +410,14 @@ function Game() {
             game={game}
             active={tab === 'map'}
             isAdmin={isAdmin}
-            onSlow={onSlowStreet}
-            onBuy={(type, plot) =>
+            focus={mapFocus}
+            onToast={showToast}
+            serverOffset={serverOffset}
+            onSlow={graphics === 'auto' ? onSlowStreet : undefined}
+            onBuy={(type, plot, brigade) =>
               run(
-                () => api.openBusiness(type, plot),
-                () => `Открыт новый бизнес: ${bizNames[type] ?? type}`,
+                () => api.openBusiness(type, plot, brigade),
+                (r) => r || `Открыт новый бизнес: ${bizNames[type] ?? type}`,
                 'purchase',
               )
             }
@@ -434,6 +455,16 @@ function Game() {
       {tab === 'empire' && (
       <>
       <CapitalCard game={game} serverOffset={serverOffset} pending={pending} busy={busy} onCollect={collect} />
+
+      <BuildsCard
+        game={game}
+        serverOffset={serverOffset}
+        onShow={(b) => {
+          if (b.i === null || b.j === null || b.k === null) return;
+          setMapFocus({ i: b.i, j: b.j, k: b.k, n: Date.now() });
+          setTab('map');
+        }}
+      />
 
       {game.effects.length > 0 && (
         <div className="effects">
@@ -489,9 +520,10 @@ function Game() {
           game={game}
           busy={busy}
           onClose={() => setSheet(null)}
-          onOpenBusiness={async (type: BusinessType) => {
+          onOpenBusiness={async (type: BusinessType, brigade?: BrigadeId) => {
             const name = game.catalog.find((c) => c.type === type)?.name;
-            if (await run(() => api.openBusiness(type), () => `Бизнес «${name}» открыт!`, 'purchase')) setSheet(null);
+            // Сервер отвечает текстом («Стройка началась…»); старый сервер — ничем.
+            if (await run(() => api.openBusiness(type, undefined, brigade), (r) => r || `Бизнес «${name}» открыт!`, 'purchase')) setSheet(null);
           }}
           onRestock={async (type, qty) => {
             if (await run(() => api.restock(type, qty), () => 'Склад пополнен', 'purchase')) {

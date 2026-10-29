@@ -1,13 +1,15 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Flame, Home, Lock, MapPin, Store, X } from 'lucide-react';
-import { api, type BusinessType, type GameState } from '../api';
+import { Flame, HardHat, Home, Lock, MapPin, Store, X } from 'lucide-react';
+import { api, type BrigadeId, type BusinessType, type GameState } from '../api';
 import {
-  BEST_DISTRICT, DISTRICTS, STAGE_OF, cityPlots, cityStage, districtOf, type CityData, type CityPlot, type DistrictKey,
+  BEST_DISTRICT, DISTRICTS, STAGE_OF, STREET_KEY, cityPlots, cityStage, districtOf, type CityData, type CityPlot, type DistrictKey,
 } from '../city/views';
 import type { CityRequest, MapPick } from '../city/City';
-import { money } from '../format';
+import { duration, money } from '../format';
 import { useSimpleStreet } from '../graphics';
 import { BizIcon } from './BizIcon';
+import { BrigadePicker, brigadeOffer, buildProgress } from './Builds';
+import { useNow } from './useTick';
 
 const City = lazy(() => import('../city/City'));
 const REFRESH_MS = 120_000;
@@ -16,16 +18,20 @@ interface Props {
   game: GameState;
   active: boolean;
   isAdmin: boolean;
-  onBuy: (type: BusinessType, plot: { i: number; j: number; k: number }) => Promise<boolean>;
+  serverOffset: number;
+  /** Наехать на участок (из списка строек в «Империи»). */
+  focus: { i: number; j: number; k: number; n: number } | null;
+  onToast: (text: string) => void;
+  onBuy: (type: BusinessType, plot: { i: number; j: number; k: number }, brigade: BrigadeId) => Promise<boolean>;
   onUpgrade: (type: BusinessType) => void;
   onOpenCard: (type: BusinessType) => void;
-  onSlow: () => void;
+  onSlow?: () => void;
 }
 
 const demandWord = (d: number) => (d > 0.66 ? 'высокий' : d > 0.38 ? 'средний' : 'низкий');
 
 /** Вкладка «Карта»: город игрока, районы по капиталу, свои бизнесы, конкуренты и свободные участки. */
-export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, onSlow }: Props) {
+export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, onBuy, onUpgrade, onOpenCard, onSlow }: Props) {
   const simple = useSimpleStreet();
   const [data, setData] = useState<CityData | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -54,6 +60,21 @@ export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, on
   }, [active]);
 
   const plots = useMemo(() => cityPlots(game, data), [game, data]);
+
+  // Монетки над своими бизнесами — по настоящей выручке на тике (во время стройки их нет).
+  const [coin, setCoin] = useState<{ type: string; amount: number; n: number } | undefined>(undefined);
+  const lastSale = useRef<Record<string, string | null> | null>(null);
+  useEffect(() => {
+    const prev = lastSale.current;
+    const now: Record<string, string | null> = {};
+    game.businesses.forEach((b) => {
+      now[b.type] = b.last_sale_at ?? null;
+      const building = game.builds?.some((x) => !x.new && x.type === b.type);
+      if (prev && b.last_sale_at && b.last_sale_at !== prev[b.type] && (b.last_revenue ?? 0) > 0 && !building)
+        setCoin((c) => ({ type: STREET_KEY[b.type], amount: b.last_revenue ?? 0, n: (c?.n ?? 0) + 1 }));
+    });
+    lastSale.current = now;
+  }, [game.businesses, game.builds]);
   const stage = cityStage(game);
   const caps = game.city?.caps ?? [0, 30_000_000, 100_000_000, 250_000_000];
   const me = useMemo(() => ({ name: game.company?.name ?? game.player.first_name, color: '#D4A73A', me: true }), [game.company?.name, game.player.first_name]);
@@ -65,6 +86,22 @@ export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, on
     setPick(p);
     setWhatHere(false);
   }, []);
+
+  // «Следить за стройкой» из «Империи».
+  useEffect(() => {
+    if (focus) setRequest((r) => ({ focus: { i: focus.i, j: focus.j, k: focus.k }, n: r.n + 1 }));
+  }, [focus]);
+
+  // Стройка закончилась у тебя на глазах: здание выпрыгивает, конфетти — и тост.
+  const names0 = Object.fromEntries(game.catalog.map((c) => [c.type, c.name])) as Record<string, string>;
+  const onFinished = useCallback(
+    (p: CityPlot, wasLot: boolean) => {
+      if (!p.owner?.me) return;
+      onToast(`${wasLot ? 'Открыт новый бизнес' : 'Готово'}: ${names0[p.game ?? ''] ?? ''}, ур. ${p.level}`);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onToast],
+  );
 
   // Пока сервер не прислал конкурентов, город не строим: иначе его пришлось бы сразу пересобрать.
   const ready = loaded || !active;
@@ -112,6 +149,9 @@ export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, on
             heat={heat}
             request={request}
             onPick={onPick}
+            serverOffset={serverOffset}
+            onFinished={onFinished}
+            coin={coin}
             active={active}
             showFps={isAdmin}
             onSlow={onSlow}
@@ -150,6 +190,8 @@ export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, on
           pick={pick}
           names={names}
           caps={caps}
+          serverOffset={serverOffset}
+          onFollow={(p) => setRequest({ focus: { i: p.i, j: p.j, k: p.k }, n: request.n + 1 })}
           whatHere={whatHere}
           onWhatHere={() => setWhatHere(!whatHere)}
           onClose={() => setPick(null)}
@@ -165,8 +207,8 @@ export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, on
           plot={buying}
           names={names}
           onClose={() => setBuying(null)}
-          onConfirm={async (type) => {
-            const ok = await onBuy(type, { i: buying.i, j: buying.j, k: buying.k });
+          onConfirm={async (type, brigade) => {
+            const ok = await onBuy(type, { i: buying.i, j: buying.j, k: buying.k }, brigade);
             if (ok) {
               setBuying(null);
               setPick(null);
@@ -179,11 +221,13 @@ export function MapTab({ game, active, isAdmin, onBuy, onUpgrade, onOpenCard, on
 }
 
 function PickCard({
-  game, pick, names, caps, whatHere, onWhatHere, onClose, onBuy, onUpgrade, onOpenCard,
+  game, pick, names, caps, serverOffset, onFollow, whatHere, onWhatHere, onClose, onBuy, onUpgrade, onOpenCard,
 }: {
   game: GameState;
   pick: MapPick;
   names: Record<string, string>;
+  serverOffset: number;
+  onFollow: (p: CityPlot) => void;
   caps: number[];
   whatHere: boolean;
   onWhatHere: () => void;
@@ -258,6 +302,11 @@ function PickCard({
   const p = pick.plot;
   const D = DISTRICTS[pick.district];
   const best = D.best;
+  if (p.srv) {
+    return (
+      <BuildCard plot={p} names={names} district={D.name} serverOffset={serverOffset} onFollow={onFollow} onClose={onClose} close={close} r={ref} />
+    );
+  }
   if (p.lot) {
     const left = game.catalog.filter((c) => !game.businesses.some((b) => b.type === c.type));
     return (
@@ -345,7 +394,7 @@ function BuyPlotSheet({
   plot: CityPlot;
   names: Record<string, string>;
   onClose: () => void;
-  onConfirm: (type: BusinessType) => void;
+  onConfirm: (type: BusinessType, brigade: BrigadeId) => void;
 }) {
   const d = districtOf(plot.i, plot.j);
   const D = d === 'park' ? null : DISTRICTS[d];
@@ -356,9 +405,12 @@ function BuyPlotSheet({
     return items.some((c) => c.type === best) ? (best as BusinessType) : items[0]?.type ?? null;
   });
   const item = items.find((c) => c.type === type);
+  const [brigade, setBrigade] = useState<BrigadeId>('standard');
+  const offer = item ? brigadeOffer(game, brigade, 1, item.open_cost) : null;
+  const full = (game.builds?.length ?? 0) >= (game.build?.max_active ?? 2);
   // Как на сервере: штраф, если лучший район этого бизнеса уже открыт, а ставишь его в другой.
   const offBest = !!type && BEST_DISTRICT[type] !== d && STAGE_OF[BEST_DISTRICT[type]] <= cityStage(game);
-  const enough = item ? game.player.cash >= item.open_cost : false;
+  const enough = offer ? game.player.cash >= offer.price : false;
 
   return (
     <div className="backdrop" onClick={onClose}>
@@ -393,9 +445,20 @@ function BuyPlotSheet({
             ▼ Не по профилю района: продажи на {Math.round((1 - (game.city?.other_mult ?? 0.9)) * 100)}% меньше, чем в лучшем районе.
           </p>
         )}
-        {item && !enough && <p className="warning small">Не хватает денег: нужно {money(item.open_cost)}, у тебя {money(game.player.cash)}.</p>}
-        <button className="button" disabled={!item || !enough} onClick={() => type && onConfirm(type)}>
-          {item ? `Открыть за ${money(item.open_cost)}` : 'Выбери бизнес'}
+        {item && (
+          <>
+            <div className="overline">Бригада</div>
+            <BrigadePicker game={game} level={1} base={item.open_cost} value={brigade} onChange={setBrigade} />
+            <p className="hint small" style={{ margin: 0 }}>
+              Деньги списываются сразу. Бизнес заработает, когда бригада закончит: котлован, фундамент, каркас, фасад,
+              благоустройство.
+            </p>
+          </>
+        )}
+        {full && <p className="warning small">Сейчас идут {game.builds?.length} стройки — это максимум. Дождись, пока одна закончится.</p>}
+        {offer && !enough && <p className="warning small">Не хватает денег: нужно {money(offer.price)}, у тебя {money(game.player.cash)}.</p>}
+        <button className="button" disabled={!item || !enough || full} onClick={() => type && onConfirm(type, brigade)}>
+          {offer ? `Начать стройку за ${money(offer.price)} · ≈ ${duration(offer.minutes * 60000)}` : 'Выбери бизнес'}
         </button>
         <button className="button ghost" onClick={onClose}>
           Закрыть
@@ -448,5 +511,61 @@ function Stat({ label, value }: { label: string; value: string }) {
       <span className="stat-label">{label}</span>
       <b>{value}</b>
     </div>
+  );
+}
+
+/** Карточка стройки: что строится, бригада, этап и процент (живьём). Чужая — без кнопок. */
+function BuildCard({
+  plot, names, district, serverOffset, onFollow, onClose, close, r,
+}: {
+  plot: CityPlot;
+  names: Record<string, string>;
+  district: string;
+  serverOffset: number;
+  onFollow: (p: CityPlot) => void;
+  onClose: () => void;
+  close: React.ReactNode;
+  r: React.RefObject<HTMLElement>;
+}) {
+  const now = useNow(serverOffset, 1000);
+  const b = plot.srv!;
+  const pr = buildProgress({ started_at: b.started_at, ends_at: b.ends_at, queued: !!b.queued }, now);
+  const mine = !b.owner;
+  return (
+    <section className="card map-card" ref={r}>
+      <div className="map-card-head">
+        <HardHat size={20} className="build-icon" />
+        <div className="grow">
+          <b>
+            Стройка: {names[b.game] ?? b.game}, ур. {b.level}
+          </b>
+          <div className="stat-label">
+            {mine ? `Бригада «${b.brigade}»` : `${b.owner?.name} · конкурент`} · {district}
+          </div>
+        </div>
+        {close}
+      </div>
+      <div className="stats-grid">
+        <Stat label="Этап" value={b.queued ? 'в очереди' : pr.stageName} />
+        <Stat label="Готово" value={`${Math.round(pr.pct * 100)}%`} />
+      </div>
+      <div className="bar-track" aria-hidden>
+        <div className="bar-fill build" style={{ width: `${Math.round(pr.pct * 100)}%` }} />
+      </div>
+      <p className="hint small">
+        {pr.left > 0 ? `До конца ≈ ${duration(pr.left)}.` : 'Почти готово.'} Этапы: котлован, фундамент, каркас, фасад,
+        благоустройство.
+      </p>
+      {mine && (
+        <div className="actions">
+          <button className="button small" onClick={() => onFollow(plot)}>
+            Следить за стройкой
+          </button>
+          <button className="button small secondary" onClick={onClose}>
+            Закрыть
+          </button>
+        </div>
+      )}
+    </section>
   );
 }

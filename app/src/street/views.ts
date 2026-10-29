@@ -65,7 +65,9 @@ export function streetLife(game: GameState, now = Date.now()): StreetLife {
   let ad: StreetLife['billboard'] | null = null;
   for (const s of SLOT_TYPES) {
     const b = game.businesses.find((x) => x.type === s.game);
-    sales[s.game] = { at: b?.last_sale_at ?? null, amount: b?.last_revenue ?? 0 };
+    // Во время стройки монеток над бизнесом нет.
+    const building = game.builds?.some((x) => !x.new && x.type === s.game);
+    sales[s.game] = { at: building ? null : b?.last_sale_at ?? null, amount: b?.last_revenue ?? 0 };
     if (!b) {
       crowd[s.game] = 0;
       continue;

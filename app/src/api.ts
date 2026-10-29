@@ -173,6 +173,8 @@ export interface RepairOffer {
   done?: number;
   queue: number;
   full: boolean;
+  time_mult?: number; // бригады города: время и цена относительно «Стандарта»
+  price_mult?: number;
 }
 
 export interface RepairOffers {
@@ -183,6 +185,8 @@ export interface RepairOffers {
   capacity_step: number;
   sales_step: number;
   active: boolean;
+  builds?: number; // сколько строек идёт сейчас
+  max_builds?: number;
   offers: RepairOffer[];
 }
 
@@ -281,6 +285,9 @@ export interface GameState {
   ads?: AdsConfig;
   upgrade?: UpgradeConfig;
   npc_niches?: { marketplace?: string[]; pvz?: string[] } | null; // NPC-конкуренты в новых нишах
+  /** Активные стройки игрока (бригады-NPC и заказы у бригад игроков); у старого сервера их нет. */
+  builds?: Build[];
+  build?: BuildConfig;
   /** Город игрока для карты; у старого сервера его нет. */
   city?: {
     seed: number;
@@ -293,6 +300,30 @@ export interface GameState {
     district: [number, number]; // капитал (коп.), с которого «Район» и «Центр»
     weather: { kind: 'clear' | 'rain' | 'snow'; until: string }; // одна погода на весь город
   };
+}
+
+/** Стройка: новый бизнес на участке (new) или улучшение до level. Этап и процент считаются по времени. */
+export interface Build {
+  id: string;
+  type: BusinessType;
+  level: number;
+  new: boolean;
+  i: number | null;
+  j: number | null;
+  k: number | null;
+  brigade: string;
+  started_at: string;
+  ends_at: string;
+  queued: boolean; // ждёт в очереди у бригады игрока
+}
+
+export type BrigadeId = 'econom' | 'standard' | 'express';
+
+export interface BuildConfig {
+  max_active: number;
+  minutes: number[]; // минут до ур. 1…5 у «Стандарта»
+  speed: number; // ускорение строек администратора
+  brigades: { id: BrigadeId; name: string; time: number; price: number }[];
 }
 
 export interface DevInfo {
@@ -448,9 +479,9 @@ type WithResult<R> = GameState & { result: R };
 export const api = {
   login: () => call<LoginResult>('login'),
   state: () => call<WithResult<null>>('state'),
-  /** plot — участок на карте; без него сервер выберет участок сам. */
-  openBusiness: (type: BusinessType, plot?: { i: number; j: number; k: number }) =>
-    call<WithResult<null>>('open_business', plot ? { type, plot } : { type }),
+  /** Открытие — стройка. plot — участок на карте (без него сервер выберет сам), brigade — бригада. */
+  openBusiness: (type: BusinessType, plot?: { i: number; j: number; k: number }, brigade?: BrigadeId) =>
+    call<WithResult<string | null>>('open_business', { type, ...(plot ? { plot } : {}), ...(brigade ? { brigade } : {}) }),
   city: () => call<{ city: CityData }>('city'),
   restock: (type: BusinessType, qty: number) => call<WithResult<null>>('restock', { type, qty }),
   transferBread: (qty: number) => call<WithResult<null>>('transfer_bread', { qty }),

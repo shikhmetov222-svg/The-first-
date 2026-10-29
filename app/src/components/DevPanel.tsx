@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
-  BarChart3, Bot, CalendarClock, Map as MapIcon, Package, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
+  BarChart3, Bot, CalendarClock, HardHat, Map as MapIcon, Package, ShieldAlert, Clock, Coins, Eye, FastForward, Play, RotateCcw, ScrollText, Store, UserPlus, Users,
   Warehouse, Wrench,
 } from 'lucide-react';
 import { api, type DevInfo, type GameState } from '../api';
@@ -41,6 +41,8 @@ const ACTIONS: Record<string, string> = {
   campaigns_add: 'Выданы кампании',
   parcels_add: 'Фоновые посылки',
   finish_repairs: 'Ремонты завершены',
+  finish_builds: 'Стройки достроены',
+  build_speed: 'Скорость строек',
   set_level: 'Уровень бизнеса',
   ticks: 'Тики рынка',
   new_decision: 'Новое решение дня',
@@ -214,6 +216,25 @@ export function DevPanel({ game, onState, onToast }: Props) {
               ))}
             </div>
           ))}
+      </DevSection>
+
+      <DevSection icon={<HardHat size={18} />} title="Стройки">
+        <p className="hint small">
+          Идёт строек: {(game.builds ?? []).length} из {game.build?.max_active ?? 2}. Скорость твоих новых строек: ×
+          {game.build?.speed ?? 1}.
+        </p>
+        <div className="actions">
+          <button className="button small" disabled={busy || !(game.builds ?? []).length} onClick={() => run('finish_builds')}>
+            Достроить сейчас
+          </button>
+          <button
+            className="button small secondary"
+            disabled={busy}
+            onClick={() => run('build_speed', { fast: (game.build?.speed ?? 1) === 1 })}
+          >
+            {(game.build?.speed ?? 1) === 1 ? 'Стройки ×60' : 'Обычная скорость'}
+          </button>
+        </div>
       </DevSection>
 
       <DevStreet game={game} />

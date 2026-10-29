@@ -160,14 +160,21 @@ function marketAction(run: (id: string, body: Body) => Promise<unknown>) {
 const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknown>> = {
   login,
   state: action(async () => null),
-  // С картой: участок (i, j, k) — квартал и место; без участка сервер выберет его сам (старые версии игры).
-  open_business: action((id, b) =>
-    b.plot === undefined || b.plot === null
-      ? rpc('open_business', { p_player_id: id, p_type: str(b, 'type') })
-      : rpc('open_business_at', {
-          p_player_id: id, p_type: str(b, 'type'),
-          p_i: int(b.plot as Body, 'i'), p_j: int(b.plot as Body, 'j'), p_k: int(b.plot as Body, 'k'),
-        })),
+  // Открытие бизнеса — это стройка. plot — участок на карте (квартал i, j и место k); без него сервер выберет
+  // участок сам. brigade — бригада: econom, standard (по умолчанию) или express.
+  open_business: action((id, b) => {
+    const brigade = typeof b.brigade === 'string' ? { p_brigade: str(b, 'brigade') } : {};
+    if (b.plot === undefined || b.plot === null) {
+      return rpc('open_business_with', {
+        p_player_id: id, p_type: str(b, 'type'), p_brigade: typeof b.brigade === 'string' ? b.brigade : 'standard',
+      });
+    }
+    return rpc('open_business_at', {
+      p_player_id: id, p_type: str(b, 'type'),
+      p_i: int(b.plot as Body, 'i'), p_j: int(b.plot as Body, 'j'), p_k: int(b.plot as Body, 'k'),
+      ...brigade,
+    });
+  }),
   restock: action((id, b) =>
     rpc('restock', { p_player_id: id, p_type: str(b, 'type'), p_qty: int(b, 'qty') })),
   transfer_bread: action((id, b) => rpc('transfer_bread', { p_player_id: id, p_qty: int(b, 'qty') })),
@@ -266,6 +273,8 @@ const actions: Record<string, (user: TelegramUser, body: Body) => Promise<unknow
       open_business: () => rpc('dev_open_business', { p_admin: id, p_type: str(b, 'type') }),
       campaigns: () => rpc('dev_campaigns', { p_admin: id, p_n: int(b, 'n') }),
       finish_repairs: () => rpc('dev_finish_repairs', { p_admin: id }),
+      finish_builds: () => rpc('dev_finish_builds', { p_admin: id }),
+      build_speed: () => rpc('dev_build_speed', { p_admin: id, p_fast: bool(b, 'fast') ?? false }),
       parcels: () => rpc('dev_parcels', { p_admin: id, p_n: int(b, 'n') }),
       set_level: () => rpc('dev_set_level', { p_admin: id, p_type: str(b, 'type'), p_level: int(b, 'level') }),
       ticks: () => rpc('dev_ticks', { p_admin: id, p_n: int(b, 'n') }),

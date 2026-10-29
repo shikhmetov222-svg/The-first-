@@ -134,7 +134,7 @@ export function createLifeController(world: World, slots: Slots, scene: THREE.Sc
     SLOT_TYPES.forEach((s) => {
       const sale = data.sales[s.game];
       if (!firstData && sale.at && sale.at !== lastSale[s.game] && sale.amount > 0) coin(s.game, sale.amount);
-      lastSale[s.game] = sale.at;
+      if (sale.at) lastSale[s.game] = sale.at; // во время стройки at = null — прошлую продажу помним
     });
     firstData = false;
     people.sync();

@@ -1,6 +1,6 @@
 // Карта города: что показать по состоянию игры. Без three.js — чтобы не тянуть 3D в основной файл.
 // Схема города (кварталы, районы, стадии) — как в docs/city-mockup.html; проверяет её сервер (0020_city.sql).
-import type { CatalogItem, GameState } from '../api';
+import type { Build, CatalogItem, GameState } from '../api';
 import type { GameType } from '../street/views';
 import { LOGO_COLORS } from '../company';
 
@@ -78,6 +78,20 @@ export interface CityPlot {
   lot?: boolean;
   /** Свободный участок: сколько стоит открыть здесь лучший для района бизнес (коп.). */
   price?: number;
+  /** Идёт стройка (данные сервера): что строится, кем, начало и конец. */
+  srv?: PlotBuild;
+}
+
+export interface PlotBuild {
+  game: GameType;
+  type: string; // тип здания в макете
+  level: number;
+  brigade: string;
+  started_at: string;
+  ends_at: string;
+  queued?: boolean;
+  /** Чья стройка (у конкурента), чтобы достроенный бизнес остался его. */
+  owner?: Owner;
 }
 
 export interface Rival {
@@ -91,9 +105,22 @@ export interface Rival {
   color: string | null;
 }
 
+export interface RivalBuild {
+  player: string;
+  business: string | null;
+  type: string;
+  level: number;
+  i: number;
+  j: number;
+  k: number;
+  started_at: string;
+  ends_at: string;
+}
+
 export interface CityData {
-  rivals: Rival[];
+  rivals: (Rival & { player?: string })[];
   bots: { name: string; type: string }[];
+  builds?: RivalBuild[];
 }
 
 const isGame = (t: string): t is GameType => t in STREET_KEY;
@@ -134,12 +161,32 @@ export function cityPlots(game: GameState, data: CityData | null): CityPlot[] {
     return spots[0] ?? null;
   };
 
+  const srv = (b: Pick<Build, 'type' | 'level' | 'brigade' | 'started_at' | 'ends_at' | 'queued'>, owner?: Owner): PlotBuild => ({
+    game: b.type, type: STREET_KEY[b.type], level: b.level, brigade: b.brigade,
+    started_at: b.started_at, ends_at: b.ends_at, queued: b.queued, owner,
+  });
+  const builds = game.builds ?? [];
+
   for (const p of game.city?.plots ?? []) {
     const b = game.businesses.find((x) => x.type === p.type);
     if (!b || !isGame(b.type)) continue;
-    take({ i: p.i, j: p.j, k: p.k, game: b.type, type: STREET_KEY[b.type], level: Math.max(1, Math.min(5, b.level ?? 1)), owner: me });
+    const up = builds.find((x) => !x.new && x.type === b.type);
+    take({
+      i: p.i, j: p.j, k: p.k, game: b.type, type: STREET_KEY[b.type], level: Math.max(1, Math.min(5, b.level ?? 1)), owner: me,
+      srv: up ? srv(up) : undefined,
+    });
+  }
+  // Свои новые бизнесы, которые ещё строятся: на участке — стройка, после неё — твой бизнес.
+  for (const b of builds) {
+    if (!b.new || b.i === null || b.j === null || b.k === null || used.has(key(b.i, b.j, b.k))) continue;
+    take({ i: b.i, j: b.j, k: b.k, lot: true, level: 0, price: openCost(game.catalog, b.type), srv: srv(b) });
   }
 
+  const rivalBuilds = data?.builds ?? [];
+  const ownerOf = (player: string | undefined) => {
+    const r = (data?.rivals ?? []).find((x) => x.player === player);
+    return { name: r?.owner || 'Игрок', color: LOGO_COLORS[r?.color ?? ''] ?? '#F07167' };
+  };
   for (const r of data?.rivals ?? []) {
     if (!isGame(r.type)) continue;
     const d = districtOf(r.i, r.j);
@@ -147,7 +194,24 @@ export function cityPlots(game: GameState, data: CityData | null): CityPlot[] {
     if (!spot && STAGE_OF[d] <= stage) spot = freeIn(d, strHash(r.id));
     if (!spot) continue;
     const owner: Owner = { name: r.owner || 'Игрок', color: LOGO_COLORS[r.color ?? ''] ?? '#F07167' };
-    take({ i: spot[0], j: spot[1], k: spot[2], game: r.type, type: STREET_KEY[r.type], level: Math.max(1, Math.min(5, r.level ?? 1)), owner });
+    const rb = rivalBuilds.find((x) => x.business === r.id);
+    take({
+      i: spot[0], j: spot[1], k: spot[2], game: r.type, type: STREET_KEY[r.type], level: Math.max(1, Math.min(5, r.level ?? 1)), owner,
+      srv: rb && isGame(rb.type) ? srv({ ...rb, type: rb.type, brigade: 'бригада конкурента', queued: false }, owner) : undefined,
+    });
+  }
+  // Новые бизнесы конкурентов, которые ещё строятся.
+  for (const rb of rivalBuilds) {
+    if (rb.business || !isGame(rb.type)) continue;
+    const d = districtOf(rb.i, rb.j);
+    let spot: [number, number, number] | null = blockOpen(rb.i, rb.j, stage) && !used.has(key(rb.i, rb.j, rb.k)) ? [rb.i, rb.j, rb.k] : null;
+    if (!spot && STAGE_OF[d] <= stage) spot = freeIn(d, strHash(rb.player + rb.type));
+    if (!spot) continue;
+    const owner = ownerOf(rb.player);
+    take({
+      i: spot[0], j: spot[1], k: spot[2], level: 0, owner,
+      srv: srv({ ...rb, type: rb.type, brigade: 'бригада конкурента', queued: false }, owner),
+    });
   }
 
   for (const bt of data?.bots ?? []) {

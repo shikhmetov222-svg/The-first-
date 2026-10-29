@@ -7,6 +7,7 @@ import { createCity } from './gen/city.js';
 import { LEGACY_LIGHT } from '../street/world';
 import { findMutable, instancePeople, mergeSprites, mergeStatic } from '../street/merge';
 import { hash01, hashInt, rub, type CityPlot, type Owner } from './views';
+import { createParticles } from './particles';
 
 THREE.ColorManagement.enabled = false;
 
@@ -23,6 +24,8 @@ export interface CityBuild {
   plots: CityPlot[];
   me: Owner;
   camera: THREE.OrthographicCamera;
+  /** Доля готовности стройки на участке (0…1) — по времени сервера. */
+  progress: (p: unknown) => number;
   onFinished?: (p: unknown, wasLot: boolean) => void;
 }
 
@@ -75,6 +78,7 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
   const mutable = new Set<THREE.Material>([base.winMat, base.bulbMat, base.glowMat, base.poolMat] as THREE.Material[]);
   let clock = 0;
   let heat = false;
+  let shadowsDirty = true;
 
   // Склейка как на улице; для кварталов (pairs) у каждого квартала свои копии материалов — чтобы он мог стать
   // прозрачным, когда закрывает твой бизнес.
@@ -96,12 +100,13 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
     });
   };
 
+  const particles = createParticles(scene);
   const rand = Math.random;
   Math.random = seeded(hashInt(b.seed, 1));
   let city: ReturnType<typeof createCity>;
   try {
     city = createCity(k, types, {
-      scene, hemi, dir, camera: b.camera, mutable,
+      scene, hemi, dir, camera: b.camera, mutable, particles,
       seed: b.seed,
       stage: b.stage,
       stageCap: { 1: rub(b.caps[0] ?? 0), 2: rub(b.caps[1] ?? 0), 3: rub(b.caps[2] ?? 0), 4: rub(b.caps[3] ?? 0) },
@@ -112,7 +117,14 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
       slotSeed: (i: number, j: number, kk: number, f: number) => hashInt(b.seed, 3, i, j, kk, f),
       clock: () => clock,
       heatOn: () => heat,
-      onFinished: (p: unknown, wasLot: boolean) => b.onFinished?.(p, wasLot),
+      progress: (p: unknown) => b.progress(p),
+      onStage: () => {
+        shadowsDirty = true;
+      },
+      onFinished: (p: unknown, wasLot: boolean) => {
+        shadowsDirty = true;
+        b.onFinished?.(p, wasLot);
+      },
     });
   } finally {
     Math.random = rand;
@@ -167,7 +179,6 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
 
   // Карта теней: рисуется по теневым копиям (один меш на квартал или участок) отдельным проходом в крошечную
   // картинку — так в обычных кадрах тени не стоят ни одного вызова отрисовки.
-  let shadowsDirty = true;
   let shadowAge = 0;
   const tiny = new THREE.WebGLRenderTarget(1, 1);
   function updateShadows(gl: THREE.WebGLRenderer, camera: THREE.Camera, dt: number) {
@@ -192,8 +203,10 @@ export function createCityWorld(scene: THREE.Scene, b: CityBuild) {
     markShadows: () => {
       shadowsDirty = true;
     },
+    particles,
     tick: (dt: number) => {
       clock += dt;
+      particles.update(dt);
       return clock;
     },
     /** После движения машин и прохожих — перенести их положение в инстансы. */

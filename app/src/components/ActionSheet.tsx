@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import type { BusinessType, GameState, Market } from '../api';
+import type { BrigadeId, BusinessType, CatalogItem, GameState, Market } from '../api';
 import { BOT_KIND, BUSINESS_INFO, demandLabel } from '../content';
 import { count, money } from '../format';
 import { capOf, rawCapOf } from '../market';
 import { selectionTick } from '../telegram';
 import { BizIcon } from './BizIcon';
+import { BrigadePicker, brigadeOffer } from './Builds';
 
 export type SheetKind =
   | { kind: 'open'; type: BusinessType }
@@ -17,7 +18,7 @@ interface Props {
   game: GameState;
   busy: boolean;
   onClose: () => void;
-  onOpenBusiness: (type: BusinessType) => void;
+  onOpenBusiness: (type: BusinessType, brigade?: BrigadeId) => void;
   onRestock: (type: BusinessType, qty: number) => void;
   onTransfer: (qty: number) => void;
   onSetPrice: (type: BusinessType, price: number) => void;
@@ -42,26 +43,7 @@ function SheetBody({ sheet, game, busy, onOpenBusiness, onRestock, onTransfer, o
   const business = game.businesses.find((b) => b.type === sheet.type);
   const cash = game.player.cash;
 
-  if (sheet.kind === 'open') {
-    return (
-      <>
-        <h2>
-          <BizIcon type={item.type} /> {item.name}
-        </h2>
-        <p className="hint">{BUSINESS_INFO[item.type].about}</p>
-        <p className="hint">
-          {item.type === 'pvz'
-            ? 'Посылки начнут приходить сами — от маркетплейсов игроков и жителей города.'
-            : item.type === 'marketplace'
-              ? 'После открытия перевези на его склад товар со своих бизнесов или купи на рынке.'
-              : `После открытия склад будет пустым — не забудь закупить ${item.production_rate > 0 ? 'муку' : 'товар'}.`}
-        </p>
-        <button className="button" disabled={busy || cash < item.open_cost} onClick={() => onOpenBusiness(item.type)}>
-          Открыть за {money(item.open_cost)}
-        </button>
-      </>
-    );
-  }
+  if (sheet.kind === 'open') return <OpenBody item={item} game={game} busy={busy} onOpen={onOpenBusiness} />;
 
   if (!business) return null;
 
@@ -247,5 +229,60 @@ function Competitors({ market }: { market: Market }) {
         <p className="hint small">Ботов нет — в городе достаточно живых игроков.</p>
       )}
     </div>
+  );
+}
+
+/** Открыть бизнес. Самый первый открывается сразу, следующие — строит выбранная бригада. */
+function OpenBody({
+  item, game, busy, onOpen,
+}: {
+  item: CatalogItem;
+  game: GameState;
+  busy: boolean;
+  onOpen: (type: BusinessType, brigade?: BrigadeId) => void;
+}) {
+  const [brigade, setBrigade] = useState<BrigadeId>('standard');
+  const builds = !!game.build && (game.businesses.length > 0 || (game.builds?.length ?? 0) > 0);
+  const offer = builds ? brigadeOffer(game, brigade, 1, item.open_cost) : null;
+  const price = offer?.price ?? item.open_cost;
+  const full = builds && (game.builds?.length ?? 0) >= (game.build?.max_active ?? 2);
+  const building = game.builds?.some((b) => b.new && b.type === item.type);
+  return (
+    <>
+      <h2>
+        <BizIcon type={item.type} /> {item.name}
+      </h2>
+      <p className="hint">{BUSINESS_INFO[item.type].about}</p>
+      <p className="hint">
+        {item.type === 'pvz'
+          ? 'Посылки начнут приходить сами — от маркетплейсов игроков и жителей города.'
+          : item.type === 'marketplace'
+            ? 'После открытия перевези на его склад товар со своих бизнесов или купи на рынке.'
+            : `После открытия склад будет пустым — не забудь закупить ${item.production_rate > 0 ? 'муку' : 'товар'}.`}
+      </p>
+      {builds && (
+        <>
+          <p className="hint small">
+            Бизнес построит бригада — он заработает, когда стройку закончат. Участок выберется в лучшем свободном
+            районе; выбрать место можно на карте.
+          </p>
+          <BrigadePicker game={game} level={1} base={item.open_cost} value={brigade} onChange={setBrigade} />
+        </>
+      )}
+      {building && <p className="warning small">Такой бизнес уже строится.</p>}
+      {full && !building && (
+        <p className="warning small">Сейчас идут {game.builds?.length} стройки — это максимум. Дождись, пока одна закончится.</p>
+      )}
+      {game.player.cash < price && (
+        <p className="warning small">Не хватает денег: нужно {money(price)}, у тебя {money(game.player.cash)}.</p>
+      )}
+      <button
+        className="button"
+        disabled={busy || game.player.cash < price || full || building}
+        onClick={() => onOpen(item.type, builds ? brigade : undefined)}
+      >
+        {builds ? `Начать стройку за ${money(price)}` : `Открыть за ${money(price)}`}
+      </button>
+    </>
   );
 }

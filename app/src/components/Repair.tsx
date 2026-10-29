@@ -7,6 +7,7 @@ import { selectionTick } from '../telegram';
 import { BizIcon } from './BizIcon';
 import { CompanyLogo } from './CompanyLogo';
 import { DevBadge } from './DevBadge';
+import { buildProgress } from './Builds';
 
 /** «ур. 2» рядом с названием бизнеса. */
 export function LevelTag({ business }: { business: Business | undefined }) {
@@ -26,6 +27,20 @@ export function UpgradeStrip({
 }) {
   const cfg = game.upgrade;
   if (!cfg || business.type === 'repair' || business.level === undefined) return null;
+  // Стройка бригадой города: этап и процент по времени сервера.
+  const b = game.builds?.find((x) => !x.new && x.type === business.type);
+  if (b && !business.repair) {
+    const p = buildProgress(b, Date.now() + serverOffset);
+    return (
+      <div className="ad-strip repair-on">
+        <Hammer size={15} />
+        <span>
+          Стройка до ур. {b.level} · {p.stageName} · {Math.round(p.pct * 100)}%
+        </span>
+        <span className="ad-timer">{p.left > 0 ? `≈ ${duration(p.left)}` : 'вот-вот'}</span>
+      </div>
+    );
+  }
   const r = business.repair;
   if (r) {
     const left = new Date(r.finish_at).getTime() - (Date.now() + serverOffset);
@@ -51,7 +66,7 @@ export function UpgradeStrip({
 }
 
 function ratingText(o: RepairOffer): string {
-  if (o.kind === 'npc') return 'всегда свободен';
+  if (o.kind === 'npc') return o.time_mult ? `бригада города · время ×${String(o.time_mult).replace('.', ',')}` : 'всегда свободен';
   if (o.rating === null) return 'новая бригада';
   return `вовремя ${Math.round(o.rating * 100)}%${o.done ? ` · ${count(o.done)} заказов` : ''}`;
 }
@@ -98,7 +113,7 @@ export function UpgradeSheet({
         ) : !data ? (
           <p className="hint center">Ищем подрядчиков…</p>
         ) : data.active ? (
-          <p className="warning">Этот бизнес уже ждёт ремонта.</p>
+          <p className="warning">Этот бизнес уже строится.</p>
         ) : (
           <>
             <div className="calc">
@@ -123,7 +138,12 @@ export function UpgradeSheet({
                 <b>{money(data.cost)}</b>
               </div>
             </div>
-            <div className="overline">Подрядчик для ремонта</div>
+            <div className="overline">Бригада для стройки</div>
+            {data.max_builds !== undefined && (data.builds ?? 0) >= data.max_builds && (
+              <p className="warning small" style={{ margin: 0 }}>
+                Сейчас идут {data.builds} стройки — это максимум. Дождись, пока одна закончится.
+              </p>
+            )}
             <div className="ad-options">
               {data.offers.map((o) => {
                 const total = data.cost + o.fee;
@@ -162,25 +182,27 @@ export function UpgradeSheet({
                     </span>
                     <span className="right">
                       <b>{money(o.fee)}</b>
-                      <span className="stat-label">{Math.round(o.pct * 100)}%</span>
+                      <span className="stat-label">
+                        {o.price_mult ? `цена ×${String(o.price_mult).replace('.', ',')}` : `${Math.round(o.pct * 100)}%`}
+                      </span>
                     </span>
                   </button>
                 );
               })}
             </div>
             <p className="hint small" style={{ margin: 0 }}>
-              <Info size={13} /> Деньги списываются сразу. Бизнес работает и во время ремонта, уровень повысится, когда
-              бригада закончит.
+              <Info size={13} /> Деньги списываются сразу. Стройка идёт по этапам: котлован, фундамент, каркас, фасад,
+              благоустройство. Бизнес работает на старом уровне, новый уровень — когда бригада закончит.
             </p>
             {pick && (
               <button
                 className="button"
-                disabled={busy || cash < data.cost + pick.fee}
-                onClick={() => onOrder(pick.kind === 'crew' ? pick.id! : pick.kind)}
+                disabled={busy || cash < data.cost + pick.fee || (data.max_builds !== undefined && (data.builds ?? 0) >= data.max_builds)}
+                onClick={() => onOrder(pick.kind === 'crew' ? pick.id! : pick.kind === 'npc' ? pick.id ?? 'npc' : pick.kind)}
               >
                 {cash < data.cost + pick.fee
                   ? `Не хватает ${money(data.cost + pick.fee - cash)}`
-                  : `Заказать за ${money(data.cost + pick.fee)}`}
+                  : `Начать стройку за ${money(data.cost + pick.fee)}`}
               </button>
             )}
           </>

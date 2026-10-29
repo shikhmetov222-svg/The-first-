@@ -21,8 +21,13 @@ export interface MapPlot extends CityPlot {
   group: THREE.Group;
   pin?: THREE.Sprite;
   ped?: THREE.Group;
-  build?: unknown;
+  /** Стройка в макете (gen/city.js): этап, леса, плашка прогресса. */
+  build?: { brigade: string; owner?: Owner; idx: number };
   heat?: THREE.Mesh;
+  /** Сервер сказал, что стройка закончена, — доводим визуал до конца. */
+  srvDone?: boolean;
+  /** Срок стройки, которую карта уже довела до конца (пока сервер не прислал новое состояние). */
+  finishedEnds?: string;
 }
 
 /** Что выбрано на карте — карточку показывает React. */
@@ -50,12 +55,17 @@ interface Props {
   heat: boolean;
   /** Монетка над своим бизнесом: тип и сумма (коп.). */
   coin?: { type: string; amount: number; n: number };
+  /** Разница часов телефона и сервера, мс — стройка идёт по времени сервера. */
+  serverOffset: number;
+  /** Стройка на участке закончилась на карте (конфетти уже показаны). */
+  onFinished?: (p: CityPlot, wasLot: boolean) => void;
 }
 
 const slotKey = (plots: CityPlot[]) => plots.map((p) => `${p.i}:${p.j}:${p.k}`).sort().join('|');
+/** Облик участка на карте сейчас (у объекта из gen/city.js те же поля). */
 const plotKey = (p: CityPlot) => `${p.type ?? ''}:${p.level ?? 0}:${p.lot ? 1 : 0}:${p.owner?.name ?? ''}:${p.owner?.me ? 1 : 0}:${p.price ?? 0}`;
 
-function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin }: Props) {
+function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin, serverOffset, onFinished }: Props) {
   const { scene, camera, gl, size } = useThree();
   const cam = camera as THREE.OrthographicCamera;
   const world = useRef<CityWorld | null>(null);
@@ -67,8 +77,30 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin }
   const homeZoom = () => (size.width / Math.max(1, size.height) < 1 ? 0.5 : 0.4);
   const timers = useRef({ occ: 0, smoke: 0 });
 
+  const offsetRef = useRef(serverOffset);
+  offsetRef.current = serverOffset;
+  const finishedRef = useRef(onFinished);
+  finishedRef.current = onFinished;
   if (!world.current) {
-    world.current = createCityWorld(scene, { seed, stage, caps, plots, me, camera: cam });
+    world.current = createCityWorld(scene, {
+      seed, stage, caps, plots, me, camera: cam,
+      progress: (pp) => {
+        const p = pp as MapPlot;
+        if (p.srvDone || !p.srv) return 1;
+        if (p.srv.queued) return 0;
+        const a = new Date(p.srv.started_at).getTime(), e = new Date(p.srv.ends_at).getTime();
+        return Math.max(0, Math.min(1, (Date.now() + offsetRef.current - a) / Math.max(1, e - a)));
+      },
+      onFinished: (pp, wasLot) => {
+        const p = pp as MapPlot;
+        p.game = p.srv?.game ?? p.game;
+        p.finishedEnds = p.srv?.ends_at;
+        p.srv = undefined;
+        p.srvDone = false;
+        p.price = undefined;
+        finishedRef.current?.(p, wasLot);
+      },
+    });
     world.current.applyTime(dev.day ?? isDaytime());
     // Для замеров на стенде (только в режиме разработки, в игру не попадает).
     if (import.meta.env.DEV) (window as unknown as { __city: unknown }).__city = { world: world.current, scene, gl, cam, THREE };
@@ -120,17 +152,31 @@ function CityScene({ seed, stage, caps, plots, me, onPick, request, heat, coin }
     world.current!.markShadows();
   }, [stage, city]);
 
-  // Участки: тот же набор мест — перерисовываем только изменившиеся (новый уровень, владелец, куплен участок).
-  const shown = useRef(new Map(plots.map((p) => [`${p.i}:${p.j}:${p.k}`, plotKey(p)])));
+  // Участки: тот же набор мест — перерисовываем только изменившиеся (новый уровень, владелец, куплен участок);
+  // идёт стройка — на участке забор, леса и плашка с этапом и процентом (визуал — из gen/city.js).
   useEffect(() => {
     plots.forEach((np) => {
-      const key = `${np.i}:${np.j}:${np.k}`;
-      const nk = plotKey(np);
-      if (shown.current.get(key) === nk) return;
       const p = (city.plots as MapPlot[]).find((q) => q.i === np.i && q.j === np.j && q.k === np.k);
       if (!p) return; // нового места в этом городе нет — появится при следующем открытии карты
-      shown.current.set(key, nk);
-      if (p.build) return; // идёт стройка — облик сменится, когда она закончится
+      if (np.srv) {
+        // Эту стройку карта уже показала законченной — ждём, пока сервер пришлёт новое состояние.
+        if (np.srv.ends_at === p.finishedEnds) return;
+        p.srv = np.srv;
+        p.srvDone = false;
+        if (!p.build) {
+          city.startConstruction(p, np.srv.type, np.srv.level);
+          p.build!.brigade = np.srv.brigade;
+          p.build!.owner = np.srv.owner;
+          world.current!.markShadows();
+        }
+        return;
+      }
+      if (p.build) {
+        // Сервер уже достроил — визуал доходит до конца сам (с конфетти).
+        p.srvDone = true;
+        return;
+      }
+      if (plotKey(p) === plotKey(np)) return;
       scene.remove(p.group);
       world.current!.types.disposeGroup(p.group);
       if (!np.owner?.me) {
