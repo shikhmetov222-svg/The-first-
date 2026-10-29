@@ -44,6 +44,8 @@ const ACTIONS: Record<string, string> = {
   finish_builds: 'Стройки достроены',
   new_event: 'Событие в городе',
   daily_reset: 'Новые задания дня',
+  new_order: 'Новый заказ города',
+  engage: 'Проверка поводов для бота',
   build_speed: 'Скорость строек',
   set_level: 'Уровень бизнеса',
   ticks: 'Тики рынка',
@@ -239,7 +241,7 @@ export function DevPanel({ game, onState, onToast }: Props) {
         </div>
       </DevSection>
 
-      <DevSection icon={<CalendarCheck size={18} />} title="Задания и события">
+      <DevSection icon={<CalendarCheck size={18} />} title="Задания, события, заказы">
         <p className="hint small">
           Событие: {(game.events ?? [])[0]?.title ?? 'нет'}. Заданий сегодня: {game.daily?.items.length ?? 0}.
         </p>
@@ -249,6 +251,12 @@ export function DevPanel({ game, onState, onToast }: Props) {
           </button>
           <button className="button small secondary" disabled={busy} onClick={() => run('daily_reset')}>
             Новые задания
+          </button>
+          <button className="button small secondary" disabled={busy} onClick={() => run('new_order')}>
+            Новый заказ
+          </button>
+          <button className="button small secondary" disabled={busy} onClick={() => run('engage')}>
+            Поводы для бота
           </button>
         </div>
       </DevSection>

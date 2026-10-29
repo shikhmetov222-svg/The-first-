@@ -1,4 +1,6 @@
-import { CalendarCheck, CircleCheck, PartyPopper, TrafficCone } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarCheck, CircleCheck, ClipboardList, Newspaper, PartyPopper, TrafficCone } from 'lucide-react';
+import { BizIcon } from './BizIcon';
 import type { CityEvent, DailyCode, DailyTasks, GameState } from '../api';
 import { duration, money } from '../format';
 import { useNow } from './useTick';
@@ -118,6 +120,96 @@ export function EventCard({ game, serverOffset, compact = false, onShow }: {
         <p className="hint small" style={{ margin: 0 }}>
           Бизнесы этого типа в районе события продают больше — пополни склад заранее.
         </p>
+      )}
+    </section>
+  );
+}
+
+/** «Империя»: заказы города — отдать товар со склада за награду выше рынка. */
+export function OrdersCard({ game, serverOffset, busy, onFulfill }: {
+  game: GameState;
+  serverOffset: number;
+  busy: boolean;
+  onFulfill: (id: number) => void;
+}) {
+  const now = useNow(serverOffset, 30_000);
+  const orders = (game.orders ?? []).filter((o) => new Date(o.ends_at).getTime() > now);
+  if (!orders.length) return null;
+  const names = Object.fromEntries(game.catalog.map((c) => [c.type, c.name]));
+  return (
+    <section className="card daily">
+      <div className="builds-head">
+        <ClipboardList size={18} />
+        <b>Заказы города</b>
+        <span className="stat-label">награда выше рынка</span>
+      </div>
+      {orders.map((o) => {
+        const has = o.stock !== null && o.stock !== undefined;
+        const enough = has && (o.stock ?? 0) >= o.qty;
+        return (
+          <div key={o.id} className={`daily-row ${o.done ? 'claimed' : ''}`}>
+            <BizIcon type={o.type} />
+            <span className="grow">
+              <b>{o.title}</b>
+              <span className="stat-label">
+                {o.qty} шт. со склада: {(names[o.type] ?? o.type).toLowerCase()} · ещё {duration(new Date(o.ends_at).getTime() - now)}
+              </span>
+              {!o.done && (
+                <span className="stat-label">
+                  {!has ? `Нужен бизнес: ${(names[o.type] ?? o.type).toLowerCase()}` : enough ? `На складе ${o.stock} — хватает` : `На складе ${o.stock} из ${o.qty} — пополни склад`}
+                </span>
+              )}
+            </span>
+            {o.done ? (
+              <span className="daily-done">
+                <CircleCheck size={18} /> Готово
+              </span>
+            ) : (
+              <button className={`button small daily-claim ${enough ? '' : 'secondary'}`} disabled={!enough || busy} onClick={() => onFulfill(o.id)}>
+                +{money(o.reward)}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/** Сколько прошло: «только что», «12 мин», «3 ч». */
+function ago(at: string, now: number) {
+  const min = Math.max(0, Math.round((now - new Date(at).getTime()) / 60000));
+  if (min < 2) return 'только что';
+  if (min < 60) return `${min} мин`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `${h} ч` : `${Math.round(h / 24)} д`;
+}
+
+/** Лента новостей города: кто что открыл, улучшил, кто поднялся в рейтинге, события. */
+export function NewsCard({ game, serverOffset }: { game: GameState; serverOffset: number }) {
+  const now = useNow(serverOffset, 60_000);
+  const [all, setAll] = useState(false);
+  const news = game.news ?? [];
+  if (!news.length) return null;
+  const shown = all ? news : news.slice(0, 4);
+  return (
+    <section className="card daily">
+      <div className="builds-head">
+        <Newspaper size={18} />
+        <b>Новости города</b>
+      </div>
+      <ul className="news-list">
+        {shown.map((n) => (
+          <li key={n.id}>
+            <span>{n.text}</span>
+            <span className="stat-label">{ago(n.at, now)}</span>
+          </li>
+        ))}
+      </ul>
+      {news.length > 4 && (
+        <button className="link-button" onClick={() => setAll(!all)}>
+          {all ? 'Свернуть' : `Ещё ${news.length - 4}`}
+        </button>
       )}
     </section>
   );

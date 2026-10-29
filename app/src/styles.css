@@ -3288,3 +3288,21 @@ h2.section-title {
 .cup-3 {
   color: #c98a5a;
 }
+.news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.news-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.news-list li .stat-label {
+  flex: none;
+}

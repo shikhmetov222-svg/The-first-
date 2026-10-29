@@ -19,7 +19,7 @@ import { MarketplaceCard, PvzCard } from './components/OnlineCards';
 import { TransferSheet } from './components/TransferSheet';
 import { MapTab } from './components/MapTab';
 import { BuildsCard } from './components/Builds';
-import { DailyCard, EventCard } from './components/Daily';
+import { DailyCard, EventCard, NewsCard, OrdersCard } from './components/Daily';
 import { DMAP } from './city/views';
 import { play } from './sound';
 import { AdStrip, AgencyCard, CampaignSheet } from './components/Ads';
@@ -480,6 +480,13 @@ function Game() {
         />
       )}
 
+      <OrdersCard
+        game={game}
+        serverOffset={serverOffset}
+        busy={busy}
+        onFulfill={(id) => run(() => api.fulfillOrder(id), (text) => text, 'collect')}
+      />
+
       {game.effects.length > 0 && (
         <div className="effects">
           {game.effects.map((e, i) => (
@@ -503,6 +510,8 @@ function Game() {
           }
         />
       )}
+
+      <NewsCard game={game} serverOffset={serverOffset} />
 
       <h2 className="section-title">
         <span>Мои бизнесы</span>

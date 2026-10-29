@@ -301,6 +301,10 @@ export interface GameState {
   daily?: DailyTasks;
   /** Текущее и следующее событие в городе. */
   events?: CityEvent[];
+  /** Заказы города: товар со склада своего бизнеса за награду. */
+  orders?: CityOrder[];
+  /** Лента новостей города. */
+  news?: { id: number; at: string; kind: string; text: string }[];
   /** Ближайший соперник выше в лиге и сколько до следующей лиги. */
   rival?: { ahead: { name: string; gap: number } | null; next_league: { name: string; gap: number } | null };
   /** Город игрока для карты; у старого сервера его нет. */
@@ -507,6 +511,7 @@ export const api = {
   updateCompany: (c: CompanyInput) => call<WithResult<null>>('update_company', { ...c }),
   tutorial: (step: number) => call<WithResult<null>>('tutorial', { step }),
   dailyClaim: (code: string) => call<WithResult<string>>('daily_claim', { code }),
+  fulfillOrder: (order: number) => call<WithResult<string>>('fulfill_order', { order }),
   profile: () => call<{ profile: MyProfile; bot_username: string | null }>('profile'),
   settings: (s: { notify?: boolean; haptics?: boolean }) => call<WithResult<null>>('settings', s),
   company: (id: string) => call<{ company: PublicProfile }>('company', { id }),
@@ -554,4 +559,14 @@ export interface CityEvent {
   body: string;
   starts_at: string;
   ends_at: string;
+}
+export interface CityOrder {
+  id: number;
+  type: BusinessType;
+  title: string;
+  qty: number;
+  reward: number;
+  ends_at: string;
+  done: boolean;
+  stock: number | null; // сколько у тебя на складе этого бизнеса; null — бизнеса нет
 }
