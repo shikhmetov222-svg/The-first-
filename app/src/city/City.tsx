@@ -468,6 +468,7 @@ function DistrictLabels({ city, stage, caps, cam }: {
   cam: THREE.OrthographicCamera;
 }) {
   const els = useRef<(HTMLDivElement | null)[]>([]);
+  const ndc = useRef(new THREE.Vector3());
   const items = (Object.keys(DISTRICTS) as Exclude<DistrictKey, 'park'>[]).map((key) => {
     const [x, z] = city.districtCenter(key) as [number, number];
     const need = city.STAGE_OF[key] as number;
@@ -485,10 +486,15 @@ function DistrictLabels({ city, stage, caps, cam }: {
     (city.labels as THREE.Sprite[]).forEach((l) => l.layers.set(31));
     const display = cam.zoom < 0.8 ? '' : 'none';
     const transform = `scale(${Math.round(Math.max(0.7, Math.min(1, cam.zoom / 0.65)) * 20) / 20})`;
-    els.current.forEach((el) => {
+    els.current.forEach((el, n) => {
       if (!el) return;
       if (el.style.display !== display) el.style.display = display;
       if (el.style.transform !== transform) el.style.transform = transform;
+      // У края карты название не обрезаем, а плавно прячем.
+      const it = items[n];
+      const v = ndc.current.set(it.x, 1.5, it.z).project(cam);
+      const opacity = Math.abs(v.x) < 0.62 && Math.abs(v.y) < 0.8 ? '1' : '0';
+      if (el.style.opacity !== opacity) el.style.opacity = opacity;
     });
   });
   return (

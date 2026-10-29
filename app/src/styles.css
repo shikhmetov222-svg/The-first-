@@ -3107,3 +3107,65 @@ h2.section-title {
   margin-right: 4px;
   vertical-align: -1px;
 }
+
+/* Вкладка «Карта»: карта почти на весь экран, сводка и кнопки — поверх неё. */
+.map-wrap {
+  position: relative;
+}
+.map-wrap .city-stage {
+  height: clamp(380px, calc(100dvh - var(--nav-height) - 92px - env(safe-area-inset-bottom)), 920px);
+}
+.map-head-pill {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 14px 7px;
+  border-radius: 14px;
+  background: rgba(11, 12, 15, 0.82);
+  border: 1px solid var(--border);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 4;
+}
+.map-head-pill b {
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+.map-head-pill span {
+  font-size: 11px;
+  color: var(--muted, #9aa0aa);
+}
+.map-tools {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  z-index: 4;
+}
+.map-tools .chip {
+  background: rgba(21, 23, 28, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.map-wrap .street-hint {
+  bottom: 66px;
+}
+.map-wrap .street-fps {
+  top: 64px;
+}
+.map-tools .chip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.district-label {
+  transition: opacity 0.2s;
+}

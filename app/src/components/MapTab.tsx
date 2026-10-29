@@ -41,6 +41,7 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
   const [request, setRequest] = useState<CityRequest>({ n: 0 });
   const [buying, setBuying] = useState<CityPlot | null>(null);
   const [whatHere, setWhatHere] = useState(false);
+  const mineAt = useRef(0);
 
   // Конкуренты в городе — с сервера; обновляем, пока вкладка открыта.
   useEffect(() => {
@@ -111,73 +112,84 @@ export function MapTab({ game, active, isAdmin, serverOffset, focus, onToast, on
     return <p className="hint center">Карта появится после обновления игры. Закрой и открой игру заново.</p>;
   }
 
+  const mine = plots.filter((p) => p.owner?.me);
+  const head = (
+    <div className="map-head-pill">
+      <b>
+        Районов: {openDistricts.length} из 6
+      </b>
+      <span>{nextCap !== null ? `следующий при ${money(nextCap)}` : 'открыт весь город'}</span>
+    </div>
+  );
+  const placeholder = (
+    <div className="city-stage street-placeholder">
+      <span>Строим твой город…</span>
+    </div>
+  );
+
   return (
     <>
-      <section className="card map-head">
-        <div className="grow">
-          <div className="stat-label">Твой город</div>
-          <b>
-            Открыто районов: {openDistricts.length} из 6
-          </b>
-          <p className="hint small" style={{ margin: 0 }}>
-            {nextCap !== null
-              ? `Следующий район откроется при капитале ${money(nextCap)}. Сейчас ${money(game.capital)}.`
-              : 'Открыт весь город.'}
-          </p>
-        </div>
-      </section>
-
       {simple ? (
-        <MapList game={game} plots={plots} names={names} onPick={onPick} />
-      ) : !ready ? (
-        <div className="city-stage street-placeholder">
-          <span>Строим твой город…</span>
-        </div>
-      ) : (
-        <Suspense
-          fallback={
-            <div className="city-stage street-placeholder">
-              <span>Строим твой город…</span>
+        <>
+          <section className="card map-head">
+            <div className="grow">
+              <div className="stat-label">Твой город</div>
+              <b>Открыто районов: {openDistricts.length} из 6</b>
+              <p className="hint small" style={{ margin: 0 }}>
+                {nextCap !== null
+                  ? `Следующий район откроется при капитале ${money(nextCap)}. Сейчас ${money(game.capital)}.`
+                  : 'Открыт весь город.'}
+              </p>
             </div>
-          }
-        >
-          <City
-            seed={game.city.seed}
-            stage={stage}
-            caps={caps}
-            plots={plots}
-            me={me}
-            heat={heat}
-            request={request}
-            onPick={onPick}
-            serverOffset={serverOffset}
-            onFinished={onFinished}
-            coin={coin}
-            low={low}
-            active={active}
-            showFps={isAdmin}
-            onSlow={onSlow}
-          />
-        </Suspense>
-      )}
-
-      {!simple && (
-        <div className="chips-row" role="toolbar" aria-label="Карта">
-          <button className="chip" onClick={() => setRequest({ home: true, n: request.n + 1 })}>
-            <Home size={16} /> Обзор
-          </button>
-          <button
-            className="chip"
-            onClick={() => {
-              const mine = plots.find((p) => p.owner?.me);
-              if (mine) setRequest({ focus: { i: mine.i, j: mine.j, k: mine.k, zoom: 0.8 }, n: request.n + 1 });
-            }}
-          >
-            <MapPin size={16} /> Мои
-          </button>
-          <button className={`chip ${heat ? 'chip-active' : ''}`} aria-pressed={heat} onClick={() => setHeat(!heat)}>
-            <Flame size={16} /> Спрос
-          </button>
+          </section>
+          <MapList game={game} plots={plots} names={names} onPick={onPick} />
+        </>
+      ) : (
+        <div className="map-wrap">
+          {!ready ? (
+            placeholder
+          ) : (
+            <Suspense fallback={placeholder}>
+              <City
+                seed={game.city.seed}
+                stage={stage}
+                caps={caps}
+                plots={plots}
+                me={me}
+                heat={heat}
+                request={request}
+                onPick={onPick}
+                serverOffset={serverOffset}
+                onFinished={onFinished}
+                coin={coin}
+                low={low}
+                active={active}
+                showFps={isAdmin}
+                onSlow={onSlow}
+              />
+            </Suspense>
+          )}
+          {head}
+          <div className="map-tools" role="toolbar" aria-label="Карта">
+            <button className="chip" onClick={() => setRequest({ home: true, n: request.n + 1 })}>
+              <Home size={16} /> Обзор
+            </button>
+            <button
+              className="chip"
+              disabled={!mine.length}
+              onClick={() => {
+                // Каждое нажатие — к следующему своему бизнесу.
+                const p = mine[mineAt.current % mine.length];
+                mineAt.current++;
+                if (p) setRequest({ focus: { i: p.i, j: p.j, k: p.k, zoom: 0.8 }, n: request.n + 1 });
+              }}
+            >
+              <MapPin size={16} /> Мои{mine.length > 1 ? ` · ${mine.length}` : ''}
+            </button>
+            <button className={`chip ${heat ? 'chip-active' : ''}`} aria-pressed={heat} onClick={() => setHeat(!heat)}>
+              <Flame size={16} /> Спрос
+            </button>
+          </div>
         </div>
       )}
       {heat && !simple && (
