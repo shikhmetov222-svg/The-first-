@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<!-- Номера не должны превращаться в ссылки для звонка -->
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
+<meta name="theme-color" content="#0c0912">
+<title>Золотой номер</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="pill">Ур. <span id="lvl">1</span><div class="xp"><i id="xpbar"></i></div></div>
+    <div class="pill" title="Номеров в коллекции">📱 <span id="ccount">0</span></div>
+    <div class="bal"><small>Баланс</small><b id="bal">0 ₽</b></div>
+  </div>
+
+  <div class="kassa">
+    <div class="t">Касса салона · <span id="rate">0</span> ₽/ч<b id="acc">0 ₽</b></div>
+    <button class="btn-sm" id="collect">Забрать</button>
+  </div>
+
+  <section id="v-play">
+    <div class="label">Страна</div>
+    <div class="chips" id="countries"></div>
+    <div class="label">Ставка</div>
+    <div class="chips stakes" id="stakes"></div>
+
+    <div class="stage">
+      <div class="card" id="card">
+        <div class="row"><span class="chipicon"></span><span id="cflag"></span><span id="ccode"></span><span class="op" id="opname">—</span></div>
+        <div class="num" id="num"></div>
+        <div class="foot">Игровой номер · не звоните по нему</div>
+      </div>
+      <div class="particles" id="particles"></div>
+    </div>
+
+    <div class="result" id="result"><div class="hint">Жми «Крутить», чтобы получить SIM-карту</div></div>
+  </section>
+
+  <section id="v-coll" class="hidden">
+    <div class="label">Моя коллекция</div>
+    <div class="coll" id="coll"></div>
+  </section>
+
+  <section id="v-rating" class="hidden">
+    <div class="label">Рейтинг коллекций</div>
+    <div class="me-rank" id="me-rank"></div>
+    <div class="coll" id="rating"></div>
+  </section>
+</div>
+
+<div class="dock"><div class="in">
+  <button class="spin" id="spin"><span id="spin-t">Крутить</span> <small id="cost">1 000 ₽</small></button>
+  <nav id="nav">
+    <button data-v="play" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4l13 8-13 8z"/></svg>Играть</button>
+    <button data-v="coll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg>Коллекция</button>
+    <button data-v="rating"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM7 6H4a3 3 0 003 4M17 6h3a3 3 0 01-3 4"/></svg>Рейтинг</button>
+    <button data-soon="Рынок между игроками появится во второй версии"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l2-5h12l2 5M4 9h16v11H4zM9 20v-6h6v6"/></svg>Рынок</button>
+    <button data-soon="Друзья, ивенты и магазин — скоро"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>Ещё</button>
+  </nav>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<div class="sheet hidden" id="share-sheet">
+  <div class="sheet-in">
+    <img id="share-img" alt="Карточка номера">
+    <p>Нажми и удержи картинку, чтобы сохранить или переслать</p>
+    <button class="btn-wide" id="share-close">Закрыть</button>
+  </div>
+</div>
+<div class="splash" id="splash"><div class="splash-in"><div class="logo">📱</div><b>Золотой номер</b><span id="splash-t">Загрузка…</span></div></div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
