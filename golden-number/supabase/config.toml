@@ -2,6 +2,6 @@
 # project_id подставь свой при `supabase link` (CLI сделает это сам).
 project_id = "golden-number"
 
-[functions.api]
+[functions.golden-number]
 # Вход не через Supabase Auth, а через подпись Telegram — её проверяет сама функция.
 verify_jwt = false

@@ -12,7 +12,7 @@ import {
   drawNumber, evaluate, formatLabel, numberValueKop, spinCostKop, xpForSpin, type Rng,
 } from '../_shared/game/logic.ts';
 
-const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
+const BOT_TOKEN = Deno.env.get('GN_TELEGRAM_BOT_TOKEN') ?? '';
 const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Только POST' }, 405);
   try {
-    if (!BOT_TOKEN) throw new Error('TELEGRAM_BOT_TOKEN не задан в секретах функции');
+    if (!BOT_TOKEN) throw new Error('GN_TELEGRAM_BOT_TOKEN не задан в секретах функции');
     const user = await verifyInitData(req.headers.get('x-telegram-init-data') ?? '', BOT_TOKEN);
     if (!user) throw new ApiError(401, 'Открой игру через Telegram');
     const body = (await req.json().catch(() => ({}))) as Body;

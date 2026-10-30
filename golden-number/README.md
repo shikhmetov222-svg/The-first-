@@ -9,7 +9,7 @@ Telegram Mini App: крутишь барабаны и получаешь кра�
 | `supabase/functions/_shared/game/config.ts` | **Весь конфиг игры**: страны, операторы, префиксы с источниками, курсы, тиры, T9-словарь, калибровка экономики |
 | `supabase/functions/_shared/game/logic.ts` | Правила: генерация номера, `evaluate()`, цены, касса, опыт. Используется только на сервере (клиенту — для подписей) |
 | `supabase/functions/_shared/telegram.ts` | Проверка подписи Telegram initData |
-| `supabase/functions/api/index.ts` | Edge Function `api`: проверяет подпись, генерирует номер, вызывает SQL |
+| `supabase/functions/golden-number/index.ts` | Edge Function `golden-number`: проверяет подпись, генерирует номер, вызывает SQL |
 | `supabase/migrations/0001_golden_number.sql` | Таблицы, RLS, атомарные денежные операции |
 | `supabase/tests/money_test.sql` | Проверка денежных операций на настоящем Postgres |
 | `app/` | Фронтенд (Vite + TypeScript) |
@@ -37,26 +37,32 @@ Telegram Mini App: крутишь барабаны и получаешь кра�
 
 | Что | Куда | Секрет? |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | Supabase → Edge Functions → Secrets | **Да.** Никуда больше не вставлять |
+| `GN_TELEGRAM_BOT_TOKEN` | Supabase → Edge Functions → Secrets | **Да.** Никуда больше не вставлять |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase подставляет в функцию сам | **Да.** Ничего делать не нужно |
 | `VITE_API_URL` | Netlify → Environment variables | Нет, это просто адрес |
 
 Файлы `.env*` в git не попадают (см. `app/.gitignore`).
 
-## Деплой по шагам
+## Где развёрнуто сейчас
+
+- База и функция: проект Supabase `cozy-winter-tycoon` (таблицы `gn_*`, функция `golden-number`),
+  адрес API — `https://vufqhvjaonqiplcardiw.supabase.co/functions/v1/golden-number`.
+- Сайт: Netlify, проект `zolotoy-nomer-isl9` → https://zolotoy-nomer-isl9.netlify.app (переменная `VITE_API_URL` уже задана).
+
+## Деплой с нуля по шагам
 
 ### 1. Supabase (база и сервер)
 1. Зайди на supabase.com → **New project**. Имя `golden-number`, регион **Central EU (Frankfurt)**. Пароль базы сохрани в менеджере паролей.
 2. Слева **SQL Editor** → **New query**. Вставь весь файл `supabase/migrations/0001_golden_number.sql` → **Run**. Должно появиться «Success».
 3. Залей Edge Function `api`. Это делается одним из двух способов:
    - проще всего попросить меня: Supabase подключён к нашему чату, и я залью функцию сам;
-   - или на своём компьютере: `npx supabase login`, затем `npx supabase link --project-ref <ID проекта>`, затем `npx supabase functions deploy api --no-verify-jwt` (запускать из папки `golden-number`).
-4. **Edge Functions → api → Details**: выключатель **Enforce JWT verification** должен быть **выключен**. Вход у нас через подпись Telegram, а не через Supabase Auth.
-5. Адрес функции выглядит как `https://<ID проекта>.supabase.co/functions/v1/api`. Он понадобится для Netlify.
+   - или на своём компьютере: `npx supabase login`, затем `npx supabase link --project-ref <ID проекта>`, затем `npx supabase functions deploy golden-number --no-verify-jwt` (запускать из папки `golden-number`).
+4. **Edge Functions → golden-number → Details**: выключатель **Enforce JWT verification** должен быть **выключен**. Вход у нас через подпись Telegram, а не через Supabase Auth.
+5. Адрес функции выглядит как `https://<ID проекта>.supabase.co/functions/v1/golden-number`. Он понадобится для Netlify.
 
 ### 2. @BotFather (бот)
 1. В Telegram открой @BotFather → `/newbot` → придумай имя и username (должен заканчиваться на `bot`).
-2. BotFather пришлёт токен. **Не отправляй его никому, в том числе мне.** Сразу открой Supabase → **Edge Functions → Secrets** → **Add new secret**: имя `TELEGRAM_BOT_TOKEN`, значение — токен → **Save**.
+2. BotFather пришлёт токен. **Не отправляй его никому, в том числе мне.** Сразу открой Supabase → **Edge Functions → Secrets** → **Add new secret**: имя `GN_TELEGRAM_BOT_TOKEN`, значение — токен → **Save**.
 
 ### 3. Netlify (сайт)
 1. app.netlify.com → **Add new site → Import an existing project → GitHub** → выбери репозиторий и ветку `claude/golden-number` (после слияния — `main`).
