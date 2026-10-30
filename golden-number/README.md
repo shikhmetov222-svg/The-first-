@@ -47,7 +47,10 @@ Telegram Mini App: крутишь барабаны и получаешь кра�
 
 - База и функция: проект Supabase `cozy-winter-tycoon` (таблицы `gn_*`, функция `golden-number`),
   адрес API — `https://vufqhvjaonqiplcardiw.supabase.co/functions/v1/golden-number`.
-- Сайт: Netlify, проект `zolotoy-nomer-isl9` → https://zolotoy-nomer-isl9.netlify.app (переменная `VITE_API_URL` уже задана).
+- Сайт: GitHub Pages → https://shikhmetov222-svg.github.io/The-first-/zolotoy/
+  Собирается автоматически вместе с CAPITAL (`.github/workflows/pages.yml`) при каждом изменении в `main`
+  внутри `golden-number/app` или общего игрового модуля. Адрес API зашит в этот workflow (`VITE_API_URL`).
+  Netlify-проект `zolotoy-nomer-isl9` создан, но не используется: в аккаунте Netlify закончился бесплатный лимит.
 
 ## Деплой с нуля по шагам
 
