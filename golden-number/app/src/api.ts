@@ -1,0 +1,36 @@
+// Запросы к Edge Function. Подпись Telegram (initData) уходит в каждом запросе.
+import { initData } from './tg.ts';
+import type { Api } from './types.ts';
+
+export class ApiError extends Error {}
+
+const URL_ = import.meta.env.VITE_API_URL as string | undefined;
+
+async function call<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
+  if (!URL_) throw new ApiError('Не задан адрес сервера (VITE_API_URL)');
+  let res: Response;
+  try {
+    res = await fetch(URL_, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData() },
+      body: JSON.stringify({ action, ...params }),
+    });
+  } catch {
+    throw new ApiError('Нет связи с сервером');
+  }
+  const data = await res.json().catch(() => ({ error: 'Ошибка сервера' }));
+  if (!res.ok) throw new ApiError(data.error ?? 'Ошибка сервера');
+  return data as T;
+}
+
+export const serverApi: Api = {
+  login: () => call('login'),
+  spin: (country, stake) => call('spin', { country, stake }),
+  sell: () => call('sell'),
+  keep: () => call('keep'),
+  sellNumber: (id) => call('sell_number', { id }),
+  collect: () => call('collect'),
+  bailout: () => call('bailout'),
+  collection: () => call('collection'),
+  leaderboard: () => call('leaderboard'),
+};
