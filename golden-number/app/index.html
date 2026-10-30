@@ -10,71 +10,116 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@800&display=swap" rel="stylesheet">
 </head>
 <body>
-<div class="wrap">
-  <div class="top">
-    <div class="pill">Ур. <span id="lvl">1</span><div class="xp"><i id="xpbar"></i></div></div>
-    <div class="pill" title="Номеров в коллекции">📱 <span id="ccount">0</span></div>
-    <div class="bal"><small>Баланс</small><b id="bal">0 ₽</b></div>
-  </div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sim" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z M10 13h5v5h-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 01-8 0zM8 6H5a3 3 0 003 4M16 6h3a3 3 0 01-3 4M12 13v4M9 20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" fill="currentColor"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-2-4-6-3-5 0M12 7c2-4 6-3 5 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cash" viewBox="0 0 24 24"><path d="M3 7h18v10H3z M12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
 
-  <div class="kassa">
-    <div class="t">Касса салона · <span id="rate">0</span> ₽/ч<b id="acc">0 ₽</b></div>
-    <button class="btn-sm" id="collect">Забрать</button>
+<header class="hud">
+  <div class="hud-in">
+    <div class="lvl" id="lvl-ring" aria-label="Уровень">
+      <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" class="ring-bg"/><circle cx="20" cy="20" r="17" class="ring-fg" id="xpring"/></svg>
+      <b id="lvl">1</b>
+    </div>
+    <div class="hud-meta">
+      <small>Витрина</small>
+      <span id="slots">0/6</span>
+    </div>
+    <div class="bal"><small>Баланс</small><b id="bal" class="num-t">0 ₽</b></div>
   </div>
+</header>
+
+<main class="wrap">
+  <section class="kassa" id="kassa">
+    <span class="kassa-ico"><svg><use href="#i-cash"/></svg></span>
+    <div class="kassa-t">
+      <span class="cap">Касса · <span id="rate" class="num-t">0</span> ₽/ч</span>
+      <b id="acc" class="num-t">0 ₽</b>
+      <span class="kassa-bar"><i id="kassa-fill"></i></span>
+    </div>
+    <button class="btn btn-secondary btn-m" id="collect">Забрать</button>
+  </section>
+
+  <section class="daily hidden" id="daily">
+    <span class="daily-ico"><svg><use href="#i-gift"/></svg></span>
+    <div class="daily-t"><b>Ежедневный бонус</b><span id="daily-sub">День 1</span></div>
+    <button class="btn btn-primary btn-m" id="daily-btn">Забрать</button>
+  </section>
 
   <section id="v-play">
     <div class="label">Страна</div>
-    <div class="chips" id="countries"></div>
+    <div class="chips fade" id="countries"></div>
     <div class="label">Ставка</div>
-    <div class="chips stakes" id="stakes"></div>
+    <div class="chips" id="stakes"></div>
+
+    <div class="luck" id="luck"></div>
 
     <div class="stage">
-      <div class="card" id="card">
-        <div class="row"><span class="chipicon"></span><span id="cflag"></span><span id="ccode"></span><span class="op" id="opname">—</span></div>
-        <div class="num" id="num"></div>
-        <div class="foot">Игровой номер · не звоните по нему</div>
+      <div class="card-wrap" id="card-wrap">
+        <div class="card" id="card">
+          <div class="card-row"><span class="chipicon"></span><span id="cflag"></span><span id="ccode" class="card-code"></span><span class="op" id="opname">—</span></div>
+          <div class="num" id="num"></div>
+          <div class="card-foot">Игровой номер · не звоните по нему</div>
+        </div>
       </div>
       <div class="particles" id="particles"></div>
     </div>
 
-    <div class="result" id="result"><div class="hint">Жми «Крутить», чтобы получить SIM-карту</div></div>
+    <div class="result" id="result"></div>
   </section>
 
   <section id="v-coll" class="hidden">
-    <div class="label">Моя коллекция</div>
-    <div class="coll" id="coll"></div>
+    <div class="panel coll-head" id="coll-head"></div>
+    <div class="list" id="coll"></div>
   </section>
 
   <section id="v-rating" class="hidden">
-    <div class="label">Рейтинг коллекций</div>
-    <div class="me-rank" id="me-rank"></div>
-    <div class="coll" id="rating"></div>
+    <div class="panel me-rank" id="me-rank"></div>
+    <div class="list" id="rating"></div>
   </section>
-</div>
+</main>
 
-<div class="dock"><div class="in">
-  <button class="spin" id="spin"><span id="spin-t">Крутить</span> <small id="cost">1 000 ₽</small></button>
+<div class="dock"><div class="dock-in">
+  <button class="btn btn-spin" id="spin">
+    <span class="spin-labels"><span class="spin-l on" id="spin-l1">Крутить</span><span class="spin-l" id="spin-l2">Пропустить</span></span>
+    <span class="plaque num-t" id="cost">1 000 ₽</span>
+  </button>
   <nav id="nav">
-    <button data-v="play" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4l13 8-13 8z"/></svg>Играть</button>
-    <button data-v="coll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg>Коллекция</button>
-    <button data-v="rating"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM7 6H4a3 3 0 003 4M17 6h3a3 3 0 01-3 4"/></svg>Рейтинг</button>
-    <button data-soon="Рынок между игроками появится во второй версии"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l2-5h12l2 5M4 9h16v11H4zM9 20v-6h6v6"/></svg>Рынок</button>
-    <button data-soon="Друзья, ивенты и магазин — скоро"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>Ещё</button>
+    <button data-v="play" class="on"><svg><use href="#i-play"/></svg>Играть</button>
+    <button data-v="coll"><svg><use href="#i-sim"/></svg>Коллекция</button>
+    <button data-v="rating"><svg><use href="#i-cup"/></svg>Рейтинг</button>
+    <button data-soon="Рынок, друзья, ивенты и магазин — скоро"><svg><use href="#i-more"/></svg>Скоро</button>
   </nav>
 </div></div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sheet hidden" id="sheet">
+  <div class="sheet-in" id="sheet-in"></div>
+</div>
+
 <div class="sheet hidden" id="share-sheet">
-  <div class="sheet-in">
+  <div class="sheet-in share-in">
     <img id="share-img" alt="Карточка номера">
     <p>Нажми и удержи картинку, чтобы сохранить или переслать</p>
-    <button class="btn-wide" id="share-close">Закрыть</button>
+    <button class="btn btn-secondary btn-l" id="share-close">Закрыть</button>
   </div>
 </div>
-<div class="splash" id="splash"><div class="splash-in"><div class="logo">📱</div><b>Золотой номер</b><span id="splash-t">Загрузка…</span></div></div>
+
+<div class="splash" id="splash"><div class="splash-in"><div class="logo"><svg><use href="#i-sim"/></svg></div><b>Золотой номер</b><span id="splash-t">Загрузка…</span></div></div>
 
 <script type="module" src="/src/main.ts"></script>
 </body>

@@ -8,22 +8,68 @@
 //
 // КУРСЫ ВАЛЮТ — игровые константы (сколько ₽ стоит 1 единица местной валюты), не биржевые.
 
+// ======================= БАЛАНС =======================
+// Все числа баланса — здесь. Проверка: в папке app `npm run sim` (отдача) и `node scripts/balance.ts` (30 дней).
+// Сервер передаёт нужные константы в SQL-функции параметрами; две, что зашиты в SQL (касса), сверяет тест.
+
+// --- Прокрутка ---
 export const BASE_COST_RUB = 1000; // цена прокрутки при ставке ×1 и множителе страны ×1
 export const BASE_VALUE_RUB = 380; // цена обычного номера при тех же условиях
 export const STAKES = [1, 2, 5, 10] as const;
-// Калибровка под среднюю отдачу ≈90% ставки (проверка: npm run sim в папке app).
-export const PATTERN_CHANCE = 0.066; // доля «узорных» номеров при генерации (~7%)
+/** Ставка открывается на уровне. Отдача у всех ставок одинаковая; высокая даёт больше опыта. */
+export const STAKE_LEVEL: Record<number, number> = { 1: 1, 2: 2, 5: 4, 10: 7 };
+/** Множитель опыта за ставку (меньше самой ставки — опыт за рубль у ×1 выгоднее, но медленнее). */
+export const STAKE_XP: Record<number, number> = { 1: 1, 2: 1.6, 5: 3, 10: 5 };
+// Доля «узорных» номеров. 5,8% → обычная прокрутка ≈83% ставки; вместе с удачей (100-я ×10) ≈86%
+// у обычного игрока и ≈92% у того, кто заходит в счастливые часы.
+export const PATTERN_CHANCE = 0.058;
 /** Шанс выпадения кода из одинаковых цифр (777, 999, 44…) — одинаковый во всех странах, иначе
  *  отдача зависела бы от того, сколько таких кодов у страны. */
 export const BEAUTIFUL_CODE_CHANCE = 0.02;
 export const SUB_LEN = 7; // длина абонентской части во всех странах игры
 
-export const KASSA_RATE_PER_HOUR = 0.03; // 3% цены номера в час
-export const KASSA_CAP_HOURS = 8; // касса копится максимум 8 часов
+// --- Удача: узорные номера выпадают в N раз чаще, цены не меняются ---
+/** Счастливые часы по Москве (час начала): 13:00–14:00 и 20:00–21:00. */
+export const HAPPY_HOURS_MSK = [13, 20];
+export const HAPPY_LUCK = 2;
+/** Удача счастливого часа действует на первые N прокруток в каждом таком часе. */
+export const HAPPY_SPINS = 10;
+/** Каждая N-я прокрутка — удача ×LUCKY_LUCK (только она, следующая снова обычная). */
+export const LUCKY_EVERY = 100;
+export const LUCKY_LUCK = 10;
+/** Защита от «99 раз по минимуму, потом ×10»: на прокрутке с удачей ставка не выше средней
+ *  за последние ~100 прокруток (скользящее среднее с весом 1/100). */
+export const AVG_BET_WEIGHT = 0.01;
+export const AVG_BET_START_RUB = 1000;
 
+// --- Начало игры ---
 export const START_BALANCE_RUB = 10_000;
-export const BAILOUT_RUB = 5_000; // помощь, если игрок разорился (раз в BAILOUT_COOLDOWN_H)
-export const BAILOUT_COOLDOWN_H = 4;
+/** Гарантии первых прокруток: N-я прокрутка аккаунта не ниже указанного тира. */
+export const ONBOARDING_GUARANTEE: Record<number, 'nice' | 'rare'> = { 2: 'nice', 6: 'rare' };
+
+// --- Касса и витрина ---
+export const KASSA_RATE_PER_HOUR = 0.01; // 1% цены номера в час (ЗАШИТО В SQL: gn_kassa_total)
+export const KASSA_CAP_HOURS = 12; // копится максимум 12 часов — переживает ночь (ЗАШИТО В SQL)
+export const SLOTS_START = 6; // мест на витрине у нового игрока
+export const SLOTS_MAX = 24;
+/** Цена следующего места витрины, ₽: 4 000, 5 800, 8 410… (×1,45 за каждое купленное). */
+export const slotPriceRub = (extraBought: number) => Math.round(4000 * Math.pow(1.45, extraBought));
+/** Продажа номера из коллекции — 70% цены (оставлять выгодно, если номер пролежит > 30 ч). */
+export const SELL_BACK = 0.7;
+
+// --- Ежедневный бонус, бесплатные прокрутки, помощь ---
+export const DAILY_BASE_RUB = 1500; // +500 за каждый день подряд, максимум +3000 (на 7-й день)
+export const DAILY_STEP_RUB = 500;
+export const DAILY_MAX_STREAK = 6;
+export const FREE_SPIN_EVERY_H = 4; // бесплатная прокрутка (ставка ×1) раз в 4 часа
+export const FREE_SPIN_MAX = 2; // копится не больше двух
+export const BAILOUT_RUB = 3_000; // помощь, если денег нет совсем и продавать нечего
+export const BAILOUT_COOLDOWN_H = 24;
+
+// --- Опыт и уровни ---
+/** Опыта до следующего уровня: 80, 226, 416, 640, 894, … */
+export const XP_BASE = 80;
+export const XP_POW = 1.5;
 
 export interface PrefixRule {
   code: string;
@@ -122,7 +168,7 @@ export const COUNTRIES: Country[] = [
   {
     // Источник: план нумерации ОАЭ (TDRA), https://en.wikipedia.org/wiki/Telephone_numbers_in_the_United_Arab_Emirates
     // e& (Etisalat): 50, 54, 56; du: 52, 55, 58.
-    id: 'ae', name: 'ОАЭ', flag: '🇦🇪', code: '+971', cur: 'AED', rate: 22, mul: 5, lvl: 8,
+    id: 'ae', name: 'ОАЭ', flag: '🇦🇪', code: '+971', cur: 'AED', rate: 22, mul: 5, lvl: 9,
     grp: [' ', 4],
     ops: [
       { name: 'e&', prefixes: p('50', '54', '56') },
@@ -134,11 +180,13 @@ export const COUNTRIES: Country[] = [
 export const countryById = (id: string): Country | undefined => COUNTRIES.find((c) => c.id === id);
 
 /** Множители узоров для evaluate(). Берётся самый дорогой сработавший узор. */
+// Легендарные (≥500) выпадают чаще (см. GEN_WEIGHTS), но стоят меньше, чем в прототипе
+// (было ×1500/×800): игрок их видит (≈1 из 1000 прокруток), а один номер не ломает экономику.
 export const RARITY = {
-  round: 1500, // 0000001 / 7000000
-  allSame: 800, // 7777777
-  ladder: 150, // 1234567 / 9876543
-  run6: 200, // 6–7 одинаковых подряд
+  round: 600, // 0000001 / 7000000
+  allSame: 500, // 7777777
+  ladder: 120, // 1234567 / 9876543
+  run6: 150, // 6–7 одинаковых подряд
   run5: 40,
   run4: 5,
   mirror: 12, // 1238321
@@ -154,7 +202,7 @@ export type Rarity = typeof RARITY;
 
 /** Веса шаблонов «узорных» номеров (порядок — как GEN в logic.ts). */
 export const GEN_WEIGHTS = {
-  run4: 40, tail3: 30, mirror: 12, pairs: 8, twoDigits: 6, t9: 12, run5: 5, ladder: 1.2, run6: 0.8, allSame: 0.25, round: 0.08,
+  run4: 40, tail3: 30, mirror: 12, pairs: 8, twoDigits: 6, t9: 12, run5: 5, ladder: 1.5, run6: 0.8, allSame: 1, round: 0.3,
 };
 export type GenWeights = typeof GEN_WEIGHTS;
 

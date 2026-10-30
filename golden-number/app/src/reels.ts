@@ -127,12 +127,17 @@ export class Card {
     }, SKIP_DELAY);
   }
 
+  readonly wrap = $('card-wrap');
+
+  /** Свечение по тиру: еле заметное у Красивого, яркое у Эпического и Легендарного (см. .card-wrap.t-*). */
   glow(tier: string) {
-    this.el.style.setProperty('--tc', `var(--t-${tier})`);
-    this.el.classList.add('glow');
+    this.clearGlow();
+    if (tier === 'common') return;
+    this.wrap.style.setProperty('--tc', `var(--t-${tier})`);
+    this.wrap.classList.add('t-' + tier);
   }
 
-  clearGlow() { this.el.classList.remove('glow'); }
+  clearGlow() { this.wrap.classList.remove('t-nice', 't-rare', 't-epic', 't-legend'); }
 
   burst(tier: string, n: number) {
     const p = $('particles'); p.style.setProperty('--tc', `var(--t-${tier})`); p.innerHTML = '';

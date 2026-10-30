@@ -25,9 +25,11 @@ async function call<T>(action: string, params: Record<string, unknown> = {}): Pr
 
 export const serverApi: Api = {
   login: () => call('login'),
-  spin: (country, stake) => call('spin', { country, stake }),
+  spin: (country, stake, o) => call('spin', { country, stake, free: o.free, autosell_ok: o.autosellOk }),
   sell: () => call('sell'),
-  keep: () => call('keep'),
+  keep: (replaceId) => call('keep', replaceId ? { replace_id: replaceId } : {}),
+  buySlot: () => call('buy_slot'),
+  daily: () => call('daily'),
   sellNumber: (id) => call('sell_number', { id }),
   collect: () => call('collect'),
   bailout: () => call('bailout'),

@@ -5,6 +5,8 @@
 import {
   BASE_COST_RUB, BASE_VALUE_RUB, BEAUTIFUL_CODE_CHANCE, KASSA_CAP_HOURS, KASSA_RATE_PER_HOUR, PATTERN_CHANCE, SUB_LEN,
   GEN_WEIGHTS, RARITY, WORDS, tierFor, type Country, type GenWeights, type Rarity, type Operator, type PrefixRule, type Tier, type T9Word,
+  DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS,
+  LUCKY_EVERY, LUCKY_LUCK, ONBOARDING_GUARANTEE, SELL_BACK, STAKE_XP, TIERS, XP_BASE, XP_POW,
 } from './config.ts';
 
 /** Возвращает число в [0, 1). */
@@ -151,8 +153,99 @@ export function kassaTotalKop(accKop: number, collectionValueKop: number, hoursS
   return Math.max(accKop, Math.min(accKop + rate * Math.max(0, hoursSince), rate * KASSA_CAP_HOURS));
 }
 
-export const xpForSpin = (mul: number) => 10 + Math.min(90, Math.round(Math.log10(mul) * 25));
-export const xpToNext = (level: number) => level * 100;
+/** Опыт за прокрутку: 10…100 от редкости, умножается на бонус ставки (STAKE_XP). */
+export const xpForSpin = (mul: number, stake = 1) =>
+  Math.round((10 + Math.min(90, Math.round(Math.log10(mul) * 25))) * (STAKE_XP[stake] ?? 1));
+/** Та же формула в SQL (gn_spin получает XP_BASE и XP_POW параметрами). */
+export const xpToNext = (level: number) => Math.round(XP_BASE * Math.pow(level, XP_POW));
+
+/** Цена номера от фактической ставки в копейках. Для обычной прокрутки равна numberValueKop. */
+export const valueByBetKop = (betKop: number, mul: number) => Math.round((BASE_VALUE_RUB / BASE_COST_RUB) * betKop * mul);
+/** Сколько игрок получит, продав номер из коллекции. Та же формула в SQL (floor). */
+export const sellBackKop = (valueKop: number) => Math.floor(valueKop * SELL_BACK);
+
+// ---------- удача и гарантии ----------
+
+/** 0 — обычный … 4 — легендарный. */
+export const tierRank = (id: string) => TIERS.length - 1 - TIERS.findIndex((t) => t.id === id);
+
+export interface SpinLuck {
+  luck: number; // во сколько раз чаще узорные номера
+  lucky: boolean; // это каждая 100-я
+  happyUsed: boolean; // расходует попытку счастливого часа
+}
+
+/** Удача для прокрутки с номером spinNo (счёт с 1) при оставшихся попытках счастливого часа. */
+export function spinLuck(spinNo: number, happyLeft: number): SpinLuck {
+  if (spinNo % LUCKY_EVERY === 0) return { luck: LUCKY_LUCK, lucky: true, happyUsed: false };
+  if (happyLeft > 0) return { luck: HAPPY_LUCK, lucky: false, happyUsed: true };
+  return { luck: 1, lucky: false, happyUsed: false };
+}
+
+/** Минимальный тир для первых прокруток аккаунта (0 — без гарантии). */
+export const guaranteeRank = (spinNo: number) => {
+  const t = ONBOARDING_GUARANTEE[spinNo];
+  return t ? tierRank(t) : 0;
+};
+
+export interface LuckyDraw extends Draw {
+  ev: Evaluation;
+}
+
+/** Номер с учётом удачи (узорные чаще в `luck` раз) и гарантии (не ниже minRank). */
+export function drawLucky(rng: Rng, c: Country, luck = 1, minRank = 0): LuckyDraw {
+  for (let i = 0; i < 1000; i++) {
+    const patternChance = minRank > 0 ? 1 : Math.min(1, PATTERN_CHANCE * luck);
+    const d = drawNumber(rng, c, { patternChance });
+    const ev = evaluate(d.prefix, d.sub);
+    if (tierRank(ev.tier.id) >= minRank) return { ...d, ev };
+  }
+  throw new Error('Не удалось подобрать номер');
+}
+
+// ---------- время по Москве (UTC+3 круглый год) ----------
+
+const pad = (n: number) => String(n).padStart(2, '0');
+export function msk(now: Date) {
+  const m = new Date(now.getTime() + 3 * 3600e3);
+  const date = `${m.getUTCFullYear()}-${pad(m.getUTCMonth() + 1)}-${pad(m.getUTCDate())}`;
+  return { hour: m.getUTCHours(), date, key: `${date}T${pad(m.getUTCHours())}` };
+}
+
+/** Счастливый час сейчас: сколько попыток осталось и когда начнётся следующий. Та же логика в SQL (gn_happy_now). */
+export function happyNow(happyKey: string | null, happyUsed: number, now: Date) {
+  const t = msk(now);
+  const active = HAPPY_HOURS_MSK.includes(t.hour);
+  const left = !active ? 0 : happyKey === t.key ? Math.max(0, HAPPY_SPINS - happyUsed) : HAPPY_SPINS;
+  // ближайшее начало счастливого часа (в будущем)
+  let next: Date | null = null;
+  for (let h = 1; h <= 24 && !next; h++) {
+    const d = new Date(now.getTime() + h * 3600e3);
+    if (HAPPY_HOURS_MSK.includes(msk(d).hour)) next = new Date(Math.floor(d.getTime() / 3600e3) * 3600e3);
+  }
+  return { active, left, next };
+}
+
+/** Бесплатные прокрутки сейчас. Та же логика в SQL (gn_free_now). */
+export function freeNow(charges: number, freeAt: Date, now: Date) {
+  if (charges >= FREE_SPIN_MAX) return { charges: FREE_SPIN_MAX, nextAt: null as Date | null };
+  const every = FREE_SPIN_EVERY_H * 3600e3;
+  const n = Math.floor(Math.max(0, now.getTime() - freeAt.getTime()) / every);
+  const c = Math.min(FREE_SPIN_MAX, charges + n);
+  return { charges: c, nextAt: c >= FREE_SPIN_MAX ? null : new Date(freeAt.getTime() + (n + 1) * every) };
+}
+
+/** Ежедневный бонус: доступен ли сегодня (по Москве) и сколько даст. Та же логика в SQL (gn_daily). */
+export function dailyNow(dailyDay: string | null, streak: number, now: Date) {
+  const today = msk(now).date;
+  const yesterday = msk(new Date(now.getTime() - 86400e3)).date;
+  const nextStreak = dailyDay === yesterday ? streak + 1 : 0;
+  return {
+    available: dailyDay !== today,
+    streak: nextStreak,
+    amountKop: (DAILY_BASE_RUB + DAILY_STEP_RUB * Math.min(nextStreak, DAILY_MAX_STREAK)) * 100,
+  };
+}
 
 // ---------- форматирование ----------
 

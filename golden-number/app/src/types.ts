@@ -12,6 +12,8 @@ export interface Sim {
   tags: string[];
   stake: number;
   value: number;
+  luck: number;
+  is_free: boolean;
   created_at: string;
 }
 
@@ -24,6 +26,14 @@ export interface State {
   kassa_acc: number;
   server_now: string;
   bailout_at: string | null;
+  total_spins: number;
+  free_charges: number;
+  free_at: string;
+  happy_key: string | null;
+  happy_used: number;
+  daily_day: string | null;
+  daily_streak: number;
+  extra_slots: number;
   pending: Sim | null;
 }
 
@@ -39,12 +49,19 @@ export interface Leaderboard {
   me: { place: number; value: number; count: number } | null;
 }
 
+export interface SpinOptions {
+  free: boolean;
+  autosellOk: boolean;
+}
+
 export interface Api {
   login(): Promise<State>;
-  spin(country: string, stake: number): Promise<SpinResult>;
+  spin(country: string, stake: number, o: SpinOptions): Promise<SpinResult>;
   sell(): Promise<{ sold: number; state: State }>;
-  keep(): Promise<{ kept: number; state: State }>;
+  keep(replaceId?: string): Promise<{ kept: number; replaced_sold: number; state: State }>;
   sellNumber(id: string): Promise<{ sold: number; state: State }>;
+  buySlot(): Promise<{ paid: number; state: State }>;
+  daily(): Promise<{ amount: number; streak: number; state: State }>;
   collect(): Promise<{ collected: number; state: State }>;
   bailout(): Promise<{ granted: number; state: State }>;
   collection(): Promise<Sim[]>;

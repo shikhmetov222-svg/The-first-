@@ -5,6 +5,9 @@
 import {
   COUNTRIES, GEN_WEIGHTS, PATTERN_CHANCE, BEAUTIFUL_CODE_CHANCE, RARITY, STAKES, TIERS,
   type Country, type GenWeights, type Rarity,
+  BAILOUT_COOLDOWN_H, BAILOUT_RUB, BASE_VALUE_RUB, DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB, FREE_SPIN_EVERY_H,
+  FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS, KASSA_CAP_HOURS, KASSA_RATE_PER_HOUR, LUCKY_EVERY, LUCKY_LUCK,
+  SELL_BACK, SLOTS_MAX, SLOTS_START, STAKE_LEVEL, STAKE_XP, XP_BASE, XP_POW, slotPriceRub,
 } from '../../supabase/functions/_shared/game/config.ts';
 import { drawNumber, evaluate, type Rng } from '../../supabase/functions/_shared/game/logic.ts';
 import { seeded } from '../tests/seeded.ts';
@@ -40,53 +43,55 @@ interface Rules {
 
 const xpBase = (mul: number) => 10 + Math.min(90, Math.round(Math.log10(mul) * 25));
 
+// Правила первой версии (зафиксированы для сравнения).
 export const BEFORE: Rules = {
   name: 'было',
-  patternChance: PATTERN_CHANCE, beautifulCodeChance: BEAUTIFUL_CODE_CHANCE, weights: GEN_WEIGHTS, rarity: RARITY,
+  patternChance: 0.066, beautifulCodeChance: 0.02,
+  weights: { ...GEN_WEIGHTS, allSame: 0.25, round: 0.08, ladder: 1.2 },
+  rarity: { ...RARITY, round: 1500, allSame: 800, ladder: 150, run6: 200 },
   baseValue: 380, kassaRate: 0.03, kassaCapH: 8, slots: null, sellBack: 1,
   daily: null, freeSpin: null, pity: null,
   xp: (m) => xpBase(m), xpToNext: (l) => l * 100,
   stakeLevel: { 1: 1, 2: 1, 5: 1, 10: 1 },
-  countryLevel: Object.fromEntries(COUNTRIES.map((c) => [c.id, c.lvl])),
+  countryLevel: { ru: 1, kz: 1, by: 2, uz: 3, tr: 5, ae: 8 },
   bailoutRub: 5000,
   bailoutCooldownH: 4,
   happy: null, lucky: null, capBet: false,
 };
 
+// Текущие правила из config.ts без удачи.
 export const AFTER: Rules = {
   name: 'стало',
-  patternChance: 0.064,
-  beautifulCodeChance: 0.02,
-  // легендарные чаще (×4), но дешевле — чтобы игрок их видел, а отдача не выросла
-  weights: { ...GEN_WEIGHTS, allSame: 1, round: 0.3, ladder: 1.5 },
-  rarity: { ...RARITY, round: 600, allSame: 500, ladder: 120, run6: 150 },
-  baseValue: 380,
-  kassaRate: 0.01, kassaCapH: 12,
-  slots: { start: 6, max: 24, cost: (k) => Math.round(4000 * Math.pow(1.45, k)) },
-  sellBack: 0.7,
-  daily: (streak) => 1500 + 500 * Math.min(streak, 6),
-  freeSpin: { everyH: 4, max: 2 },
+  patternChance: PATTERN_CHANCE,
+  beautifulCodeChance: BEAUTIFUL_CODE_CHANCE,
+  weights: GEN_WEIGHTS,
+  rarity: RARITY,
+  baseValue: BASE_VALUE_RUB,
+  kassaRate: KASSA_RATE_PER_HOUR, kassaCapH: KASSA_CAP_HOURS,
+  slots: { start: SLOTS_START, max: SLOTS_MAX, cost: slotPriceRub },
+  sellBack: SELL_BACK,
+  daily: (streak) => DAILY_BASE_RUB + DAILY_STEP_RUB * Math.min(streak, DAILY_MAX_STREAK),
+  freeSpin: { everyH: FREE_SPIN_EVERY_H, max: FREE_SPIN_MAX },
   pity: { niceAt: 2, rareAt: 6, rareEvery: Infinity },
-  xp: (m, s) => Math.round(xpBase(m) * ({ 1: 1, 2: 1.6, 5: 3, 10: 5 } as Record<number, number>)[s]),
-  xpToNext: (l) => Math.round(80 * Math.pow(l, 1.5)),
-  stakeLevel: { 1: 1, 2: 2, 5: 4, 10: 7 },
-  countryLevel: { ru: 1, kz: 1, by: 2, uz: 3, tr: 5, ae: 9 },
-  bailoutRub: 3000,
-  bailoutCooldownH: 24,
-  happy: null, lucky: null, capBet: false,
+  xp: (m, s) => Math.round(xpBase(m) * STAKE_XP[s]),
+  xpToNext: (l) => Math.round(XP_BASE * Math.pow(l, XP_POW)),
+  stakeLevel: STAKE_LEVEL,
+  countryLevel: Object.fromEntries(COUNTRIES.map((c) => [c.id, c.lvl])),
+  bailoutRub: BAILOUT_RUB,
+  bailoutCooldownH: BAILOUT_COOLDOWN_H,
+  happy: null, lucky: null, capBet: true,
 };
 
-// Удача «как просили»: 2 счастливых часа ×2 без ограничений + каждая 100-я ×10, без защиты от хитростей.
+// Удача без ограничений: счастливые часы ×2 на все прокрутки + каждая 100-я ×10, без защиты ставки.
 export const NAIVE: Rules = {
   ...AFTER, name: 'удача без защиты',
-  happy: { hours: [13, 20], luck: 2, spins: Infinity }, lucky: { every: 100, luck: 10 }, capBet: false,
+  happy: { hours: HAPPY_HOURS_MSK, luck: HAPPY_LUCK, spins: Infinity }, lucky: { every: LUCKY_EVERY, luck: LUCKY_LUCK }, capBet: false,
 };
 
-// Предложение: та же удача, но ×2 — на первые 10 прокруток часа, ставка удачной прокрутки ≤ средней, база ниже.
+// Как в игре: ×2 на первые HAPPY_SPINS прокруток часа, ставка удачной прокрутки ≤ средней.
 export const LUCK: Rules = {
-  ...AFTER, name: 'удача с защитой',
-  patternChance: 0.058,
-  happy: { hours: [13, 20], luck: 2, spins: 10 }, lucky: { every: 100, luck: 10 }, capBet: true,
+  ...AFTER, name: 'стало (с удачей)',
+  happy: { hours: HAPPY_HOURS_MSK, luck: HAPPY_LUCK, spins: HAPPY_SPINS }, lucky: { every: LUCKY_EVERY, luck: LUCKY_LUCK }, capBet: true,
 };
 
 const tierRank = (id: string) => TIERS.length - 1 - TIERS.findIndex((t) => t.id === id); // common 0 … legend 4
@@ -304,7 +309,7 @@ function luckPlayer(R: Rules, seed: number, who: Gamer, days = 30) {
   return { rtp: won / paid, won, paid, lvl, bal, coll: coll.reduce((a, b) => a + b, 0), rate: rate(), spins, legends, luckyShare: luckyWon / won, happyShare: happyWon / won };
 }
 
-const LUCK_VARIANTS: Rules[] = [AFTER, NAIVE, LUCK, { ...LUCK, name: 'защита, база 6.2%', patternChance: 0.062 }];
+const LUCK_VARIANTS: Rules[] = [{ ...BEFORE, name: 'было' }, NAIVE, LUCK];
 function luckReport(n = 200) {
   console.log('\n### Удача: 30 дней, медиана по ' + n + ' игрокам (отдача = выигрыш / заплаченное, без бонусов)');
   console.log('правила             игрок       отдача  ур.  прокруток  легенд.  коллекция         касса/ч       баланс');
@@ -327,5 +332,5 @@ function luckRtp(R: Rules, N = 400_000) {
 
 const mode = process.argv[1]?.endsWith("balance.ts") ? process.argv[2] : "none";
 if (!mode || mode === 'rtp') for (const R of [BEFORE, AFTER]) rtpTable(R, Number(process.argv[3] ?? 300_000));
-if (!mode || mode === 'luck') { console.log('\n### Отдача одной прокрутки по видам удачи'); for (const R of [AFTER, LUCK]) luckRtp(R); luckReport(); }
+if (!mode || mode === 'luck') { console.log('\n### Отдача одной прокрутки по видам удачи'); for (const R of [BEFORE, LUCK]) luckRtp(R); luckReport(); }
 if (!mode || mode === 'player') for (const R of [BEFORE, AFTER]) for (const p of ['keep-nice', 'keep-all', 'sell-all'] as Policy[]) playerReport(R, p);
