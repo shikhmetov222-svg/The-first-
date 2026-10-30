@@ -133,6 +133,31 @@ export const COUNTRIES: Country[] = [
 
 export const countryById = (id: string): Country | undefined => COUNTRIES.find((c) => c.id === id);
 
+/** Множители узоров для evaluate(). Берётся самый дорогой сработавший узор. */
+export const RARITY = {
+  round: 1500, // 0000001 / 7000000
+  allSame: 800, // 7777777
+  ladder: 150, // 1234567 / 9876543
+  run6: 200, // 6–7 одинаковых подряд
+  run5: 40,
+  run4: 5,
+  mirror: 12, // 1238321
+  pairs: 8, // x121212
+  twoDigits: 6, // только две разные цифры
+  tailLadder: 2, // хвост 4 цифр лесенкой
+  tail3: 1.5, // три одинаковые в конце
+  t9Short: 2, // T9-слово до 5 букв
+  t9Long: 3, // T9-слово от 6 букв
+  beautifulCode: 2, // код из одинаковых цифр
+};
+export type Rarity = typeof RARITY;
+
+/** Веса шаблонов «узорных» номеров (порядок — как GEN в logic.ts). */
+export const GEN_WEIGHTS = {
+  run4: 40, tail3: 30, mirror: 12, pairs: 8, twoDigits: 6, t9: 12, run5: 5, ladder: 1.2, run6: 0.8, allSame: 0.25, round: 0.08,
+};
+export type GenWeights = typeof GEN_WEIGHTS;
+
 export interface Tier {
   id: 'legend' | 'epic' | 'rare' | 'nice' | 'common';
   min: number;

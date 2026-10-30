@@ -20,6 +20,8 @@ const state = (): State => ({
   balance: P.balance, xp: P.xp, level: P.level, collection_value: collValue(), collection_count: P.coll.length,
   kassa_acc: kassa(), server_now: new Date().toISOString(), bailout_at: null, pending: P.pending,
 });
+// ?mock&seq=7777777,1234567 — следующие прокрутки выдадут эти номера (для проверки анимаций тиров)
+const seq = (new URLSearchParams(location.search).get('seq') ?? '').split(',').filter((x) => /^\d{7}$/.test(x));
 const ok = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 250));
 
 export const mockApi: Api = {
@@ -30,7 +32,9 @@ export const mockApi: Api = {
     const auto = P.pending?.value ?? 0;
     const cost = spinCostKop(c, stake);
     if (P.balance + auto < cost) return fail('Не хватает денег');
-    const { op, prefix, sub } = drawNumber(Math.random, c);
+    const d = drawNumber(Math.random, c);
+    const { op, prefix } = d;
+    const sub = seq.shift() ?? d.sub;
     const ev = evaluate(prefix, sub);
     P.balance += auto - cost;
     P.xp += xpForSpin(ev.mul);
