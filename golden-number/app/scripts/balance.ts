@@ -30,6 +30,12 @@ interface Rules {
   countryLevel: Record<string, number>;
   bailoutRub: number;
   bailoutCooldownH: number;
+  /** Счастливые часы: удача ×luck на первые `spins` прокруток каждого часа (Infinity — без ограничения). */
+  happy: { hours: number[]; luck: number; spins: number } | null;
+  /** Каждая `every`-я прокрутка — удача ×luck (только она). */
+  lucky: { every: number; luck: number } | null;
+  /** Ставка на удачной прокрутке не выше средней ставки за последние ~100 прокруток. */
+  capBet: boolean;
 }
 
 const xpBase = (mul: number) => 10 + Math.min(90, Math.round(Math.log10(mul) * 25));
@@ -44,6 +50,7 @@ export const BEFORE: Rules = {
   countryLevel: Object.fromEntries(COUNTRIES.map((c) => [c.id, c.lvl])),
   bailoutRub: 5000,
   bailoutCooldownH: 4,
+  happy: null, lucky: null, capBet: false,
 };
 
 export const AFTER: Rules = {
@@ -66,13 +73,28 @@ export const AFTER: Rules = {
   countryLevel: { ru: 1, kz: 1, by: 2, uz: 3, tr: 5, ae: 9 },
   bailoutRub: 3000,
   bailoutCooldownH: 24,
+  happy: null, lucky: null, capBet: false,
+};
+
+// Удача «как просили»: 2 счастливых часа ×2 без ограничений + каждая 100-я ×10, без защиты от хитростей.
+export const NAIVE: Rules = {
+  ...AFTER, name: 'удача без защиты',
+  happy: { hours: [13, 20], luck: 2, spins: Infinity }, lucky: { every: 100, luck: 10 }, capBet: false,
+};
+
+// Предложение: та же удача, но ×2 — на первые 10 прокруток часа, ставка удачной прокрутки ≤ средней, база ниже.
+export const LUCK: Rules = {
+  ...AFTER, name: 'удача с защитой',
+  patternChance: 0.058,
+  happy: { hours: [13, 20], luck: 2, spins: 10 }, lucky: { every: 100, luck: 10 }, capBet: true,
 };
 
 const tierRank = (id: string) => TIERS.length - 1 - TIERS.findIndex((t) => t.id === id); // common 0 … legend 4
 
-function draw(rng: Rng, c: Country, R: Rules, minRank = 0) {
+function draw(rng: Rng, c: Country, R: Rules, minRank = 0, luck = 1) {
   for (let i = 0; i < 500; i++) {
-    const d = drawNumber(rng, c, { weights: R.weights, patternChance: minRank ? 1 : R.patternChance, beautifulCodeChance: R.beautifulCodeChance });
+    const pc = minRank ? 1 : Math.min(1, R.patternChance * luck);
+    const d = drawNumber(rng, c, { weights: R.weights, patternChance: pc, beautifulCodeChance: R.beautifulCodeChance });
     const ev = evaluate(d.prefix, d.sub, R.rarity);
     if (tierRank(ev.tier.id) >= minRank) return { d, ev };
   }
@@ -81,6 +103,8 @@ function draw(rng: Rng, c: Country, R: Rules, minRank = 0) {
 
 const costRub = (c: Country, s: number) => 1000 * c.mul * s;
 const valueRub = (R: Rules, c: Country, mul: number, s: number) => R.baseValue * c.mul * mul * s;
+/** Цена номера от фактически заплаченной ставки (₽). Без удачи совпадает с valueRub. */
+const valueByBet = (R: Rules, bet: number, mul: number) => (R.baseValue / 1000) * bet * mul;
 
 // ---------- 1. отдача по странам и ставкам ----------
 function rtpTable(R: Rules, N: number) {
@@ -207,6 +231,101 @@ function playerReport(R: Rules, policy: Policy, n = 300) {
   console.log(`Пустых заходов (<5 прокруток): ${med((r) => r.emptySessions)} из 90 · первый «Красивый» на прокрутке №${med((r) => r.firstNiceSpin)}` + (R.slots ? ` · слотов витрины: ${med((r) => r.slots)}, потрачено на слоты ${rub(med((r) => r.slotSpent))}` : ''));
 }
 
+// ---------- 3. удача: три типа игроков ----------
+type Gamer = 'обычный' | 'активный' | 'хитрый';
+// обычный — заходит в 9, 15, 22 (мимо счастливых часов); активный — в 9, 13, 20 (оба счастливых часа);
+// хитрый — только в счастливые часы, крутит без остановки на максимальной ставке, а перед 100-й поднимает ставку.
+function luckPlayer(R: Rules, seed: number, who: Gamer, days = 30) {
+  const rng = seeded(seed);
+  let bal = 10_000, xp = 0, lvl = 1, kassa = 0, streak = 0, free = 0, lastFree = 0, spins = 0, avgBet = 1000, bailoutAt = -99;
+  let paid = 0, won = 0, luckyWon = 0, happyWon = 0, legends = 0, extraSlots = 0;
+  const coll: number[] = [];
+  const hours = who === 'обычный' ? [9, 15, 22] : who === 'активный' ? [9, 13, 20] : [13, 20];
+  let last = hours[0];
+  const rate = () => coll.reduce((a, b) => a + b, 0) * R.kassaRate;
+  const cap = () => (R.slots ? R.slots.start + extraSlots : Infinity);
+  for (let day = 1; day <= days; day++) {
+    for (const h of hours) {
+      const t = (day - 1) * 24 + h;
+      kassa = Math.max(kassa, Math.min(kassa + rate() * (t - last), rate() * R.kassaCapH));
+      if (R.freeSpin) { free = Math.min(R.freeSpin.max, free + Math.floor((t - lastFree) / R.freeSpin.everyH)); lastFree = t - ((t - lastFree) % R.freeSpin.everyH); }
+      last = t; bal += Math.floor(kassa); kassa = 0;
+      if (R.daily && h === hours[0]) { bal += R.daily(streak); streak++; }
+      const inHappy = !!R.happy && R.happy.hours.includes(h);
+      let happyLeft = inHappy ? R.happy!.spins : 0;
+      const maxSpins = who === 'хитрый' ? (inHappy && R.happy!.spins === Infinity ? 400 : Math.max(happyLeft, 0) + 15) : 40;
+      for (let i = 0; i < maxSpins; i++) {
+        const stakes = STAKES.filter((x) => R.stakeLevel[x] <= lvl);
+        const open = COUNTRIES.filter((c) => R.countryLevel[c.id] <= lvl);
+        const isLucky = !!R.lucky && (spins + 1) % R.lucky.every === 0;
+        const boosted = happyLeft > 0 || isLucky;
+        let c = open.reduce((a, b) => (b.mul > a.mul && costRub(b, 1) <= bal * 0.25 ? b : a), open[0]);
+        let st = 1;
+        const share = who === 'хитрый' ? (boosted ? 0.5 : 0.02) : 0.1;
+        for (const x of stakes) if (costRub(c, x) <= bal * share) st = x;
+        if (!boosted && who === 'хитрый') { c = open[0]; st = 1; } // между удачами крутит по минимуму
+        const isFree = free > 0 && !boosted;
+        if (isFree) st = 1;
+        let bet = costRub(c, st);
+        if (boosted && R.capBet) bet = Math.min(bet, avgBet);
+        if (!isFree && bal < bet) {
+          c = open[0]; st = 1; bet = Math.min(costRub(c, 1), boosted && R.capBet ? avgBet : Infinity);
+          if (bal < bet) {
+            if (!coll.length && t - bailoutAt >= R.bailoutCooldownH) { bal += R.bailoutRub; bailoutAt = t; i--; continue; }
+            break;
+          }
+        }
+        if (isFree) { free--; bet = costRub(c, 1); } else { bal -= bet; paid += bet; }
+        avgBet = avgBet * 0.99 + bet * 0.01;
+        spins++;
+        const luck = isLucky ? R.lucky!.luck : happyLeft > 0 ? R.happy!.luck : 1;
+        if (happyLeft > 0) happyLeft--;
+        let minRank = 0;
+        if (R.pity && (spins === R.pity.niceAt)) minRank = 1;
+        if (R.pity && (spins === R.pity.rareAt)) minRank = 2;
+        const { ev } = draw(rng, c, R, minRank, luck);
+        const rank = tierRank(ev.tier.id);
+        if (rank === 4) legends++;
+        const v = valueByBet(R, bet, ev.mul);
+        if (!isFree) { won += v; if (isLucky) luckyWon += v; else if (luck > 1) happyWon += v; }
+        xp += R.xp(ev.mul, st);
+        while (xp >= R.xpToNext(lvl)) { xp -= R.xpToNext(lvl); lvl++; }
+        if (rank < 1) { bal += v; continue; }
+        if (coll.length < cap()) { coll.push(v); continue; }
+        coll.sort((a, b) => a - b);
+        if (v > coll[0]) { bal += coll[0] * R.sellBack; coll[0] = v; } else bal += v;
+      }
+      if (R.slots && cap() < R.slots.max && coll.length >= cap()) {
+        const price = R.slots.cost(extraSlots);
+        if (bal >= price * 4) { bal -= price; extraSlots++; }
+      }
+    }
+  }
+  return { rtp: won / paid, won, paid, lvl, bal, coll: coll.reduce((a, b) => a + b, 0), rate: rate(), spins, legends, luckyShare: luckyWon / won, happyShare: happyWon / won };
+}
+
+const LUCK_VARIANTS: Rules[] = [AFTER, NAIVE, LUCK, { ...LUCK, name: 'защита, база 6.2%', patternChance: 0.062 }];
+function luckReport(n = 200) {
+  console.log('\n### Удача: 30 дней, медиана по ' + n + ' игрокам (отдача = выигрыш / заплаченное, без бонусов)');
+  console.log('правила             игрок       отдача  ур.  прокруток  легенд.  коллекция         касса/ч       баланс');
+  for (const R of LUCK_VARIANTS) {
+    for (const who of ['обычный', 'активный', 'хитрый'] as Gamer[]) {
+      const runs = Array.from({ length: n }, (_, i) => luckPlayer(R, 9000 + i, who));
+      const med = (f: (r: (typeof runs)[0]) => number) => { const a = runs.map(f).sort((x, y) => x - y); return a[a.length >> 1]; };
+      const rub = (x: number) => Math.round(x).toLocaleString('ru-RU') + ' ₽';
+      const tot = runs.reduce((a, r) => a + r.won, 0) / runs.reduce((a, r) => a + r.paid, 0);
+      console.log(`${R.name.padEnd(19)} ${who.padEnd(10)} ${(tot * 100).toFixed(1).padStart(6)}%  ${String(med((r) => r.lvl)).padStart(3)}  ${String(med((r) => r.spins)).padStart(9)}  ${String(med((r) => r.legends)).padStart(7)}  ${rub(med((r) => r.coll)).padStart(16)} ${rub(med((r) => r.rate)).padStart(13)} ${rub(med((r) => r.bal)).padStart(16)}`);
+    }
+  }
+}
+
+function luckRtp(R: Rules, N = 400_000) {
+  const rng = seeded(77); const ru = COUNTRIES[0];
+  const one = (luck: number) => { let v = 0; for (let i = 0; i < N; i++) v += draw(rng, ru, R, 0, luck).ev.mul; return (v / N) * R.baseValue / 1000; };
+  console.log(`${R.name}: обычная ${(one(1) * 100).toFixed(1)}% · счастливый час ×2 ${(one(2) * 100).toFixed(1)}% · 100-я ×10 ${(one(10) * 100).toFixed(0)}%`);
+}
+
 const mode = process.argv[1]?.endsWith("balance.ts") ? process.argv[2] : "none";
 if (!mode || mode === 'rtp') for (const R of [BEFORE, AFTER]) rtpTable(R, Number(process.argv[3] ?? 300_000));
+if (!mode || mode === 'luck') { console.log('\n### Отдача одной прокрутки по видам удачи'); for (const R of [AFTER, LUCK]) luckRtp(R); luckReport(); }
 if (!mode || mode === 'player') for (const R of [BEFORE, AFTER]) for (const p of ['keep-nice', 'keep-all', 'sell-all'] as Policy[]) playerReport(R, p);
