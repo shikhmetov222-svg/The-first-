@@ -150,15 +150,16 @@ describe('экономика', () => {
     expect(spinCostKop(countryById('ae')!, 10)).toBe(BASE_COST_RUB * 5 * 10 * 100);
   });
 
-  it('цена = 380 ₽ × страна × редкость × ставка', () => {
-    expect(numberValueKop(countryById('ru')!, 1, 1)).toBe(38_000);
-    expect(numberValueKop(countryById('tr')!, 12, 2)).toBe(380 * 2.5 * 12 * 2 * 100);
-    expect(numberValueKop(countryById('by')!, 1.5, 1)).toBe(85_500);
+  it('цена = ставка × (0,75 + 0,17 × (множитель − 1))', () => {
+    expect(numberValueKop(countryById('ru')!, 1, 1)).toBe(75_000);
+    expect(numberValueKop(countryById('tr')!, 12, 2)).toBe(Math.round(500_000 * (0.75 + 0.17 * 11)));
+    expect(numberValueKop(countryById('by')!, 1.5, 1)).toBe(125_250);
+    expect(numberValueKop(countryById('ru')!, 500, 1) / 100).toBeCloseTo(85_580, 0);
   });
 
-  it('касса: 1% в час, не больше 12 часов', () => {
-    expect(kassaTotalKop(0, 100_000, 1)).toBeCloseTo(1000);
-    expect(kassaTotalKop(0, 100_000, 30)).toBeCloseTo(1000 * KASSA_CAP_HOURS);
+  it('касса: 2% в час, не больше 12 часов', () => {
+    expect(kassaTotalKop(0, 100_000, 1)).toBeCloseTo(2000);
+    expect(kassaTotalKop(0, 100_000, 30)).toBeCloseTo(2000 * KASSA_CAP_HOURS);
     expect(KASSA_CAP_HOURS).toBe(12);
     expect(kassaTotalKop(500, 100_000, 0)).toBe(500);
     // после продажи номеров накопленное не сгорает
@@ -189,7 +190,7 @@ describe('экономика', () => {
     expect(formatLabel(countryById('ae')!, '50', '1234567')).toBe('+971 (50) 123 4567');
   });
 
-  it('отдача: обычная ≈83%, с каждой 100-й ×10 ≈86%, одинакова по ставкам', () => {
+  it('отдача: обычная ≈95%, с каждой 100-й ×10 ≈97%, одинакова по ставкам', () => {
     const rng = seeded(6);
     let cost = 0, value = 0, luckyValue = 0, luckyCost = 0;
     for (const c of COUNTRIES) {
@@ -206,11 +207,11 @@ describe('экономика', () => {
       }
     }
     const base = value / cost, lucky = luckyValue / luckyCost;
-    expect(base).toBeGreaterThan(0.79);
-    expect(base).toBeLessThan(0.87);
+    expect(base).toBeGreaterThan(0.92);
+    expect(base).toBeLessThan(0.98);
     const avg = (base * 99 + lucky) / 100;
-    expect(avg).toBeGreaterThan(0.83);
-    expect(avg).toBeLessThan(0.9);
+    expect(avg).toBeGreaterThan(0.94);
+    expect(avg).toBeLessThan(1.0);
   });
 });
 
@@ -287,7 +288,7 @@ describe('витрина', () => {
     expect(valueByBetKop(spinCostKop(tr, 5), 12)).toBe(numberValueKop(tr, 12, 5));
   });
   it('константы кассы в SQL совпадают с config.ts', () => {
-    const sql = readFileSync(new URL('../../supabase/migrations/0002_balance_v2.sql', import.meta.url), 'utf8');
+    const sql = readFileSync(new URL('../../supabase/migrations/0005_kassa_2pct.sql', import.meta.url), 'utf8');
     const fn = sql.slice(sql.indexOf('create or replace function gn_kassa_total'), sql.indexOf('$$;', sql.indexOf('create or replace function gn_kassa_total')));
     expect(fn).toContain(`collection_value * ${KASSA_RATE_PER_HOUR} * greatest`);
     expect(fn).toContain(`collection_value * ${KASSA_RATE_PER_HOUR} * ${KASSA_CAP_HOURS}`);

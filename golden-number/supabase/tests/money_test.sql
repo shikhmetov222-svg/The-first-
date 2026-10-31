@@ -98,13 +98,13 @@ begin
   begin perform gn_buy_slot(tg, 0, 400000, 18); perform pg_temp.check(false, 'двойная покупка');
   exception when raise_exception then perform pg_temp.check(sqlerrm = 'GN_RETRY', 'цена места сверяется со снимком'); end;
 
-  -- касса: 1% в час, не больше 12 часов
+  -- касса: 2% в час, не больше 12 часов
   update gn_players set kassa_acc = 0, kassa_at = now() - interval '3 hours' where telegram_id = tg;
   r := gn_state((select id from gn_players where telegram_id = tg));
-  perform pg_temp.check(abs((r->>'kassa_acc')::numeric - (r->>'collection_value')::bigint * 0.01 * 3) < 0.01, 'касса 1% в час');
+  perform pg_temp.check(abs((r->>'kassa_acc')::numeric - (r->>'collection_value')::bigint * 0.02 * 3) < 0.01, 'касса 2% в час');
   update gn_players set kassa_at = now() - interval '30 hours' where telegram_id = tg;
   r := gn_collect(tg);
-  perform pg_temp.check((r->>'collected')::bigint = floor((r->'state'->>'collection_value')::bigint * 0.01 * 12), 'касса ограничена 12 часами');
+  perform pg_temp.check((r->>'collected')::bigint = floor((r->'state'->>'collection_value')::bigint * 0.02 * 12), 'касса ограничена 12 часами');
 
   -- ежедневный бонус
   r := gn_daily(tg, 150000, 50000, 6);

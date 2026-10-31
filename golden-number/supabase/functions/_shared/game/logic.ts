@@ -3,8 +3,8 @@
 // чтобы сервер использовал криптостойкий генератор, а тесты — воспроизводимый.
 
 import {
-  BASE_COST_RUB, BASE_VALUE_RUB, BEAUTIFUL_CODE_CHANCE, KASSA_CAP_HOURS, KASSA_RATE_PER_HOUR, PATTERN_CHANCE, SUB_LEN,
-  GEN_WEIGHTS, RARITY, WORDS, tierFor, type Country, type GenWeights, type Rarity, type Operator, type PrefixRule, type Tier, type T9Word,
+  BASE_COST_RUB, BEAUTIFUL_CODE_CHANCE, KASSA_CAP_HOURS, KASSA_RATE_PER_HOUR, PATTERN_CHANCE, SUB_LEN,
+  VALUE_BASE, VALUE_SLOPE, GEN_WEIGHTS, RARITY, WORDS, tierFor, type Country, type GenWeights, type Rarity, type Operator, type PrefixRule, type Tier, type T9Word,
   DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS,
   LUCKY_EVERY, LUCKY_LUCK, ONBOARDING_GUARANTEE, SELL_BACK, STAKE_XP, TIERS, XP_BASE, XP_POW,
   ACHIEVEMENTS, COUNTRIES, MARKET_MAX_PRICE, MARKET_MIN_PRICE, type Achievement, type KeepRule,
@@ -144,8 +144,9 @@ export function evaluate(prefix: string, s: string, R: Rarity = RARITY): Evaluat
 // ---------- экономика (в копейках, целые числа) ----------
 
 export const spinCostKop = (c: Country, stake: number) => Math.round(BASE_COST_RUB * c.mul * stake * 100);
-export const numberValueKop = (c: Country, mul: number, stake: number) =>
-  Math.round(BASE_VALUE_RUB * c.mul * mul * stake * 100);
+/** Доля ставки, которую стоит номер с таким множителем редкости. */
+export const valueFactor = (mul: number) => VALUE_BASE + VALUE_SLOPE * (mul - 1);
+export const numberValueKop = (c: Country, mul: number, stake: number) => valueByBetKop(spinCostKop(c, stake), mul);
 export const incomePerHourKop = (collectionValueKop: number) => collectionValueKop * KASSA_RATE_PER_HOUR;
 
 /** Сколько лежит в кассе. Та же формула в SQL (gn_kassa_total). */
@@ -161,7 +162,7 @@ export const xpForSpin = (mul: number, stake = 1) =>
 export const xpToNext = (level: number) => Math.round(XP_BASE * Math.pow(level, XP_POW));
 
 /** Цена номера от фактической ставки в копейках. Для обычной прокрутки равна numberValueKop. */
-export const valueByBetKop = (betKop: number, mul: number) => Math.round((BASE_VALUE_RUB / BASE_COST_RUB) * betKop * mul);
+export const valueByBetKop = (betKop: number, mul: number) => Math.round(betKop * valueFactor(mul));
 /** Сколько игрок получит, продав номер из коллекции. Та же формула в SQL (floor). */
 export const sellBackKop = (valueKop: number) => Math.floor(valueKop * SELL_BACK);
 

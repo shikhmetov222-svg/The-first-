@@ -5,7 +5,7 @@ import {
   KEEP_RULE_DEFAULT, type KeepRule, ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
-  ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
+  valueFactor, ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
   sellBackKop, spinCostKop, tierRank, xpToNext, type Stats,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { serverApi } from './api.ts';
@@ -202,13 +202,13 @@ function renderTierbar(p: Sim | null) {
     <b>${local(countryById(p.country)!, p.value)}${countryById(p.country)!.cur !== '₽' ? `<small>≈ ${rub(p.value)}</small>` : ''}</b>`;
 }
 
-/** «Почему такая цена»: база × страна × узор × бонусы × ставка. */
+/** «Почему такая цена»: ставка × (75% + 17% за каждый «×» узора). */
 function whyHtml(p: Sim): string {
-  const c = countryById(p.country)!;
-  const parts = priceBreakdown(p.prefix, p.sub).filter((x) => x.mul !== 1 || x.label === 'Без узора');
-  const bet = p.value / Math.max(1, p.mul) / 380 / 100 / c.mul; // фактическая ставка (у удачной может быть ниже)
-  const stakeTxt = Math.abs(bet - Math.round(bet)) < 0.01 ? `×${Math.round(bet)}` : `×${bet.toFixed(2)}`;
-  return `<div class="why">Почему столько: <b>380 ₽</b> · страна <b>×${c.mul}</b> · ${parts.map((x) => `${esc(x.label)} <b>×${fmtMul(x.mul)}</b>`).join(' · ')} · ставка <b>${stakeTxt}</b></div>`;
+  const parts = priceBreakdown(p.prefix, p.sub).filter((x) => x.mul !== 1);
+  const k = valueFactor(p.mul), bet = Math.round(p.value / k);
+  const fx = (x: number) => x.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  return `<div class="why">Почему столько: ставка <b>${rub(bet)}</b> × <b>${fx(k)}</b>${parts.length
+    ? ` · ${parts.map((x) => `${esc(x.label)} <b>×${fmtMul(x.mul)}</b>`).join(' · ')}` : ' · без узора — 75% ставки'}</div>`;
 }
 
 async function renderColl() {

@@ -9,7 +9,7 @@ import {
   FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS, KASSA_CAP_HOURS, KASSA_RATE_PER_HOUR, LUCKY_EVERY, LUCKY_LUCK,
   SELL_BACK, SLOTS_MAX, SLOTS_START, STAKE_LEVEL, STAKE_XP, XP_BASE, XP_POW, slotPriceRub,
 } from '../../supabase/functions/_shared/game/config.ts';
-import { drawNumber, evaluate, type Rng } from '../../supabase/functions/_shared/game/logic.ts';
+import { drawNumber, evaluate, valueFactor, type Rng } from '../../supabase/functions/_shared/game/logic.ts';
 import { seeded } from '../tests/seeded.ts';
 
 // ---------- правила ----------
@@ -39,6 +39,8 @@ interface Rules {
   lucky: { every: number; luck: number } | null;
   /** Ставка на удачной прокрутке не выше средней ставки за последние ~100 прокруток. */
   capBet: boolean;
+  /** Цена номера как доля ставки от множителя редкости. По умолчанию 0,38 × множитель. */
+  curve?: (mul: number) => number;
 }
 
 const xpBase = (mul: number) => 10 + Math.min(90, Math.round(Math.log10(mul) * 25));
@@ -80,6 +82,7 @@ export const AFTER: Rules = {
   bailoutRub: BAILOUT_RUB,
   bailoutCooldownH: BAILOUT_COOLDOWN_H,
   happy: null, lucky: null, capBet: true,
+  curve: valueFactor,
 };
 
 // Удача без ограничений: счастливые часы ×2 на все прокрутки + каждая 100-я ×10, без защиты ставки.
@@ -107,9 +110,9 @@ function draw(rng: Rng, c: Country, R: Rules, minRank = 0, luck = 1) {
 }
 
 const costRub = (c: Country, s: number) => 1000 * c.mul * s;
-const valueRub = (R: Rules, c: Country, mul: number, s: number) => R.baseValue * c.mul * mul * s;
+const valueRub = (R: Rules, c: Country, mul: number, s: number) => (R.curve ? costRub(c, s) * R.curve(mul) : R.baseValue * c.mul * mul * s);
 /** Цена номера от фактически заплаченной ставки (₽). Без удачи совпадает с valueRub. */
-const valueByBet = (R: Rules, bet: number, mul: number) => (R.baseValue / 1000) * bet * mul;
+const valueByBet = (R: Rules, bet: number, mul: number) => (R.curve ? bet * R.curve(mul) : (R.baseValue / 1000) * bet * mul);
 
 // ---------- 1. отдача по странам и ставкам ----------
 function rtpTable(R: Rules, N: number) {
@@ -249,7 +252,9 @@ function luckPlayer(R: Rules, seed: number, who: Gamer, days = 30) {
   let last = hours[0];
   const rate = () => coll.reduce((a, b) => a + b, 0) * R.kassaRate;
   const cap = () => (R.slots ? R.slots.start + extraSlots : Infinity);
+  const capital: number[] = [];
   for (let day = 1; day <= days; day++) {
+    if (day > 1) capital.push(bal + coll.reduce((a, b) => a + b, 0));
     for (const h of hours) {
       const t = (day - 1) * 24 + h;
       kassa = Math.max(kassa, Math.min(kassa + rate() * (t - last), rate() * R.kassaCapH));
@@ -306,7 +311,8 @@ function luckPlayer(R: Rules, seed: number, who: Gamer, days = 30) {
       }
     }
   }
-  return { rtp: won / paid, won, paid, lvl, bal, coll: coll.reduce((a, b) => a + b, 0), rate: rate(), spins, legends, luckyShare: luckyWon / won, happyShare: happyWon / won };
+  capital.push(bal + coll.reduce((a, b) => a + b, 0));
+  return { capital, rtp: won / paid, won, paid, lvl, bal, coll: coll.reduce((a, b) => a + b, 0), rate: rate(), spins, legends, luckyShare: luckyWon / won, happyShare: happyWon / won };
 }
 
 const LUCK_VARIANTS: Rules[] = [{ ...BEFORE, name: 'было' }, NAIVE, LUCK];
@@ -330,7 +336,32 @@ function luckRtp(R: Rules, N = 400_000) {
   console.log(`${R.name}: обычная ${(one(1) * 100).toFixed(1)}% · счастливый час ×2 ${(one(2) * 100).toFixed(1)}% · 100-я ×10 ${(one(10) * 100).toFixed(0)}%`);
 }
 
+// ---------- 4. можно ли выйти в плюс ----------
+function plusReport(variants: Rules[], n = 200) {
+  console.log('\n### Капитал = баланс + коллекция (старт 10 000 ₽), игрок «активный», 3 захода в день, медиана по ' + n);
+  console.log('вариант                        отдача прокрутки   в плюсе на 1-й / 3-й / 7-й / 30-й день     капитал день 7 / 30');
+  for (const R of variants) {
+    const rng = seeded(5); let c = 0, v = 0;
+    for (let i = 0; i < 300_000; i++) { const { ev } = draw(rng, COUNTRIES[0], R); c += 1000; v += valueRub(R, COUNTRIES[0], ev.mul, 1); }
+    const runs = Array.from({ length: n }, (_, i) => luckPlayer(R, 4000 + i, 'активный'));
+    const share = (d: number) => Math.round(runs.filter((r) => r.capital[d - 1] > 10_000).length / n * 100) + '%';
+    const med = (d: number) => { const a = runs.map((r) => r.capital[d - 1]).sort((x, y) => x - y); return Math.round(a[a.length >> 1]).toLocaleString('ru-RU') + ' ₽'; };
+    console.log(`${R.name.padEnd(30)} ${(v / c * 100).toFixed(1).padStart(6)}%            ${[1, 3, 7, 30].map(share).join(' / ').padEnd(22)}         ${med(7)} / ${med(30)}`);
+  }
+}
+
 const mode = process.argv[1]?.endsWith("balance.ts") ? process.argv[2] : "none";
 if (!mode || mode === 'rtp') for (const R of [BEFORE, AFTER]) rtpTable(R, Number(process.argv[3] ?? 300_000));
 if (!mode || mode === 'luck') { console.log('\n### Отдача одной прокрутки по видам удачи'); for (const R of [BEFORE, LUCK]) luckRtp(R); luckReport(); }
+if (mode === 'plus') {
+  const flat = (k: number, base: number) => (m: number) => base + 0.25 * k * (m - 1);
+  plusReport([
+    { ...LUCK, name: 'было (0,38 × множитель, 1%/ч)', curve: undefined, kassaRate: 0.01 },
+    { ...LUCK, name: 'стало (config.ts)' },
+    { ...LUCK, name: 'A: обычный 75%, плавная', curve: flat(0.68, 0.75) },
+    { ...LUCK, name: 'A + касса 2%/ч', curve: flat(0.68, 0.75), kassaRate: 0.02 },
+    { ...LUCK, name: 'B: обычный 85%', curve: flat(0.6, 0.85) },
+    { ...LUCK, name: 'B + касса 2%/ч', curve: flat(0.6, 0.85), kassaRate: 0.02 },
+  ]);
+}
 if (!mode || mode === 'player') for (const R of [BEFORE, AFTER]) for (const p of ['keep-nice', 'keep-all', 'sell-all'] as Policy[]) playerReport(R, p);
