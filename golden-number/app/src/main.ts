@@ -174,17 +174,19 @@ function renderResult(enter = false) {
       <div class="val"><b>${local(c, p.value)}</b>${c.cur !== '₽' ? `<span>≈ ${rub(p.value)}</span>` : ''}</div>
       ${whyHtml(p)}
       <div class="acts">
-        <button class="btn btn-secondary btn-l btn-stack" id="b-sell">Продать<span class="sub">+${rub(p.value)}</span></button>
-        <button class="btn btn-primary btn-l btn-stack" id="b-keep">В коллекцию<span class="sub">${full ? `витрина ${S.collection_count}/${slotsCap()}` : `+${rub(incomePerHourKop(p.value))}/ч`}</span></button>
+        <button class="btn btn-pill btn-pill-dark" id="b-sell">Продать за ${rub(p.value)}</button>
+        <button class="btn btn-pill btn-pill-gold" id="b-keep">В коллекцию</button>
       </div>
-      <button class="btn btn-brag btn-m" id="b-brag">${icon('i-share')}Похвастаться картинкой</button>
+      <div class="acts-note">${full ? `Витрина заполнена · ${S.collection_count}/${slotsCap()}` : `В коллекции принесёт +${rub(incomePerHourKop(p.value))}/ч · витрина ${S.collection_count}/${slotsCap()}`}</div>
     </div>`;
   $('b-sell').onclick = (e) => act(e, async () => {
     const r = await api.sell(); setState(r.state); card.clearGlow(); toast('Продано: +' + rub(r.sold));
   });
   $('b-keep').onclick = (e) => act(e, async () => { await keepPending(); });
+  // обе кнопки — в одну строку: если «Продать за …» не помещается, оставляем «Продать» (цена и так крупно выше)
+  const sell = $('b-sell'), keep = $('b-keep');
+  if (sell.offsetTop !== keep.offsetTop) sell.textContent = 'Продать';
   $('b-share').onclick = () => shareSim(c, p);
-  $('b-brag').onclick = () => shareSim(c, p);
 }
 
 /** Шкала редкости над карточкой: тир, ступени и цена — как только барабаны остановились. */

@@ -88,7 +88,9 @@ svg { width: 20px; height: 20px; flex: none; }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); transition: transform var(--t-fast) var(--ease); }
 
 /* ============================ ШАПКА ============================ */
-.hud { position: fixed; z-index: 5; top: 0; left: 0; right: 0; padding: calc(var(--safe-top) + var(--s3)) var(--s4) var(--s3); background: linear-gradient(var(--bg) 70%, transparent); }
+.hud { position: fixed; z-index: 5; top: 0; left: 0; right: 0; padding: calc(var(--safe-top) + var(--s3)) var(--s4) var(--s3); background: var(--bg); }
+/* мягкий край под шапкой — контент уходит под неё, не просвечивая сквозь цифры */
+.hud::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: var(--s4); background: linear-gradient(var(--bg), transparent); pointer-events: none; }
 .hud-in { max-width: 480px; margin: 0 auto; display: flex; align-items: center; gap: var(--s3); }
 .lvl { position: relative; width: 44px; height: 44px; display: grid; place-items: center; }
 .lvl svg { position: absolute; inset: 0; width: 44px; height: 44px; transform: rotate(-90deg); }
@@ -198,8 +200,13 @@ svg { width: 20px; height: 20px; flex: none; }
 .val { display: flex; align-items: baseline; gap: var(--s2); margin-top: var(--s3); }
 .val b { font-size: var(--f-xl); font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .val span { color: var(--text-2); font-size: var(--f-sm); font-variant-numeric: tabular-nums; }
-.acts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); margin-top: var(--s4); }
-.acts .btn { width: 100%; }
+.acts { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+.acts .btn-pill { flex: 1 1 auto; max-width: 100%; }
+/* кнопки-«таблетки» результата: одна строка, одинаковая высота, ширина по тексту */
+.btn-pill { min-height: 52px; padding: 0 var(--s4); border-radius: 999px; font-size: var(--f-md); font-variant-numeric: tabular-nums; }
+.btn-pill-dark { background: var(--surface-2); color: var(--text); }
+.btn-pill-gold { background: linear-gradient(180deg, #ffe066, #f5c518); color: #2a1d00; box-shadow: 0 6px 18px rgb(245 197 24 / .25); }
+.acts-note { margin-top: var(--s3); text-align: center; color: var(--text-2); font-size: var(--f-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* ============================ СПИСКИ ============================ */
 .list { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
@@ -288,7 +295,6 @@ nav button.on svg { color: var(--accent-2); }
 .tierbar b { margin-left: auto; font-size: var(--f-lg); font-weight: 800; color: var(--tc); font-variant-numeric: tabular-nums; }
 .why { margin-top: var(--s3); padding: var(--s3); border-radius: var(--r-md); background: var(--surface-2); font-size: var(--f-xs); color: var(--text-2); font-weight: 700; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); align-items: center; font-variant-numeric: tabular-nums; }
 .why b { color: var(--text); }
-.btn-brag { width: 100%; margin-top: var(--s2); background: rgb(255 181 71 / .12); border: 1px solid rgb(255 181 71 / .4); color: var(--accent-2); }
 .badge { position: absolute; top: 6px; right: calc(50% - 22px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #ff4d5e; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; display: grid; place-items: center; }
 nav button { position: relative; }
 .seg { display: flex; padding: var(--s1); border-radius: var(--r-md); background: var(--surface-1); border: 1px solid var(--border); margin-bottom: var(--s3); }
