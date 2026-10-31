@@ -269,11 +269,12 @@ function renderAll(enterResult = false) {
 }
 
 // ---------- лист-подтверждение ----------
+const PILL = { primary: 'btn-pill-gold', secondary: 'btn-pill-dark', ghost: 'btn-pill-ghost' } as const;
 interface SheetBtn { id: string; label: string; kind: 'primary' | 'secondary' | 'ghost'; sub?: string; disabled?: boolean }
 function ask(title: string, text: string, buttons: SheetBtn[]): Promise<string | null> {
   const sheet = $('sheet');
   $('sheet-in').innerHTML = `<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="sheet-btns">${buttons.map((b) =>
-    `<button class="btn btn-${b.kind} btn-l ${b.sub ? 'btn-stack' : ''}" data-id="${b.id}" ${b.disabled ? 'disabled' : ''}>${esc(b.label)}${b.sub ? `<span class="sub">${esc(b.sub)}</span>` : ''}</button>`).join('')}</div>`;
+    `<button class="btn btn-pill ${PILL[b.kind]}" data-id="${b.id}" ${b.disabled ? 'disabled' : ''}>${esc(b.label)}${b.sub ? `<span class="pill-sub">${esc(b.sub)}</span>` : ''}</button>`).join('')}</div>`;
   sheet.classList.remove('hidden');
   haptic.medium();
   return new Promise((res) => {
@@ -310,9 +311,9 @@ async function keepPending(): Promise<boolean> {
   const cheapest = list[list.length - 1];
   const price = slotPriceRub(S.extra_slots) * 100, canGrow = slotsCap() < SLOTS_MAX;
   const a = await ask(`Витрина заполнена · ${S.collection_count}/${slotsCap()}`,
-    'Купи ещё место или замени самый дешёвый номер — он продастся за 70% цены.', [
-      ...(canGrow ? [{ id: 'buy', label: 'Ещё место на витрине', sub: rub(price), kind: 'primary' as const, disabled: S.balance < price }] : []),
-      ...(cheapest ? [{ id: 'replace', label: `Заменить ${cheapest.label}`, sub: `продать за ${rub(sellBackKop(cheapest.value))}`, kind: 'secondary' as const }] : []),
+    cheapest ? `Купи ещё место или замени самый дешёвый номер ${cheapest.label} — он продастся за ${rub(sellBackKop(cheapest.value))}.` : 'Купи ещё место на витрине.', [
+      ...(canGrow ? [{ id: 'buy', label: 'Ещё место', sub: rub(price), kind: 'primary' as const, disabled: S.balance < price }] : []),
+      ...(cheapest ? [{ id: 'replace', label: 'Заменить самый дешёвый', kind: 'secondary' as const }] : []),
       { id: 'cancel', label: 'Отмена', kind: 'ghost' },
     ]);
   if (a === 'buy') {
@@ -333,7 +334,7 @@ async function confirmPending(action: string): Promise<{ go: boolean; autosellOk
   const p = S.pending;
   if (!p || !ruleMatches(keepRule(), p) || S.collection_count < slotsCap()) return { go: true, autosellOk: false };
   const a = await ask('Витрина заполнена', `${p.label} · ${tierById(p.tier).name} · ${rub(p.value)} подходит под правило «оставлять», но ему нет места. ${action}`, [
-    { id: 'keep', label: 'Освободить место или купить', kind: 'primary' },
+    { id: 'keep', label: 'Освободить место', kind: 'primary' },
     { id: 'sell', label: `Продать за ${rub(p.value)}`, kind: 'secondary' },
     { id: 'cancel', label: 'Отмена', kind: 'ghost' },
   ]);
@@ -366,8 +367,8 @@ function ruleSheet() {
     <div class="group-title">По цене, в рублях</div>
     <div class="price-row"><input class="field" id="rule-from" type="number" inputmode="numeric" placeholder="Цена от" value="${r.mode === 'price' ? Math.round(r.from / 100) : ''}">
       <input class="field" id="rule-to" type="number" inputmode="numeric" placeholder="до (можно пусто)" value="${r.mode === 'price' && r.to !== null ? Math.round(r.to / 100) : ''}"></div>
-    <div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-gold btn-l" id="rule-price">Оставлять по цене${r.mode === 'price' ? ' ✓' : ''}</button>
-      <button class="btn btn-ghost btn-l" id="rule-close">Закрыть</button></div>`;
+    <div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-gold" id="rule-price">Оставлять по цене${r.mode === 'price' ? ' ✓' : ''}</button>
+      <button class="btn btn-pill btn-pill-ghost" id="rule-close">Закрыть</button></div>`;
   sheet.classList.remove('hidden');
   const close = () => { sheet.classList.add('hidden'); sheet.onclick = null; };
   const save = (rule: KeepRule, btn: HTMLElement) => act(btn, async () => {
@@ -497,8 +498,8 @@ async function numberActions(x: Sim) {
   const c = countryById(x.country)!;
   const a = await ask(x.label, `${tierById(x.tier).name} · ${c.flag} ${x.operator} · оценка ${rub(x.value)}`, [
     { id: 'brag', label: 'Похвастаться картинкой', kind: 'primary' },
-    { id: 'lot', label: 'Выставить на рынок', sub: 'за свою цену, 5% комиссии', kind: 'secondary' },
-    { id: 'sell', label: `Продать игре за ${rub(sellBackKop(x.value))}`, sub: '70% оценки', kind: 'secondary' },
+    { id: 'sell', label: `Продать за ${rub(sellBackKop(x.value))}`, kind: 'secondary' },
+    { id: 'lot', label: 'Выставить на рынок', kind: 'secondary' },
     { id: 'cancel', label: 'Закрыть', kind: 'ghost' },
   ]);
   if (a === 'brag') shareSim(c, x);
@@ -519,7 +520,7 @@ function listSheet(x: Sim) {
     <input class="field" id="lot-price" type="number" inputmode="numeric" min="${Math.ceil(b.min / 100)}" max="${Math.floor(b.max / 100)}" value="${Math.round(x.value * 1.2 / 100)}">
     <div class="quick">${quick.map((k) => `<button data-k="${k}">${k === 1 ? 'оценка' : (k > 1 ? '+' : '−') + Math.round(Math.abs(k - 1) * 100) + '%'}</button>`).join('')}</div>
     <p id="lot-get"></p>
-    <div class="sheet-btns"><button class="btn btn-primary btn-l" id="lot-ok">Выставить</button><button class="btn btn-ghost btn-l" id="lot-cancel">Отмена</button></div>`;
+    <div class="sheet-btns"><button class="btn btn-pill btn-pill-gold" id="lot-ok">Выставить</button><button class="btn btn-pill btn-pill-ghost" id="lot-cancel">Отмена</button></div>`;
   sheet.classList.remove('hidden');
   const input = $('lot-price') as HTMLInputElement;
   const upd = () => { $('lot-get').textContent = `Получишь при продаже: ${rub(Math.floor(Number(input.value) * 100 * (1 - MARKET_FEE)))}`; };

@@ -279,9 +279,9 @@ describe('витрина', () => {
   it('цена мест растёт ×1,45', () => {
     expect([0, 1, 2].map(slotPriceRub)).toEqual([4000, 5800, 8410]);
   });
-  it('продажа из коллекции — 70%', () => {
-    expect(SELL_BACK).toBe(0.7);
-    expect(sellBackKop(100_001)).toBe(70_000);
+  it('продажа из коллекции — 100% оценки', () => {
+    expect(SELL_BACK).toBe(1);
+    expect(sellBackKop(100_001)).toBe(100_001);
   });
   it('цена от ставки совпадает с обычной формулой', () => {
     const tr = countryById('tr')!;

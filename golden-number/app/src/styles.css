@@ -363,3 +363,10 @@ nav button { position: relative; }
 .rule-row b { color: var(--accent-2); }
 .coll-head { flex-wrap: wrap; }
 .coll-head .rule-row b { display: inline; font-size: inherit; color: var(--accent-2); }
+
+/* все кнопки в листах — те же «таблетки», что под номером: одна строка, 52 px */
+.sheet-in { text-align: center; }
+.sheet-in .opts, .sheet-in .price-row, .sheet-in .group-title { text-align: left; }
+.sheet-btns .btn-pill { width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn-pill-ghost { background: transparent; color: var(--text-2); }
+.pill-sub { margin-left: var(--s2); font-weight: 700; opacity: .7; font-variant-numeric: tabular-nums; }
