@@ -1,0 +1,41 @@
+# «Золотой номер»: новые файлы из golden-number/supabase/migrations загружаются в его базу (проект Supabase
+# cozy-winter-tycoon) сами после каждого изменения в main.
+# Нужен секрет репозитория GN_SUPABASE_DB_URL — строка подключения этой базы (Session pooler) с паролем.
+# Файлы 0001 и 0002 загружены вручную раньше и не трогаются.
+# Каждый файл — одна транзакция: если в нём ошибка, база остаётся как была.
+name: Golden Number database
+
+on:
+  push:
+    branches: [main]
+    paths: ['golden-number/supabase/migrations/**', '.github/workflows/golden-db.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: golden-database
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: ${{ secrets.GN_SUPABASE_DB_URL }}
+      BASELINE: '0002'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secret
+        run: |
+          if [ -z "$DB_URL" ]; then echo "::error::Нет секрета GN_SUPABASE_DB_URL"; exit 1; fi
+      - name: Apply new migrations
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "create table if not exists public.gn_deploy_log (name text primary key, applied_at timestamptz not null default now()); alter table public.gn_deploy_log enable row level security; revoke all on public.gn_deploy_log from anon, authenticated;"
+          for f in $(ls golden-number/supabase/migrations/*.sql | sort); do
+            name=$(basename "$f" .sql)
+            [ "${name:0:4}" \> "$BASELINE" ] || continue
+            done_already=$(psql "$DB_URL" -At -c "select 1 from public.gn_deploy_log where name = '$name'")
+            if [ "$done_already" = "1" ]; then echo "skip $name"; continue; fi
+            echo "apply $name"
+            { cat "$f"; echo; echo "insert into public.gn_deploy_log (name) values ('$name');"; } \
+              | psql "$DB_URL" -v ON_ERROR_STOP=1 -q --single-transaction -f -
+          done
+          echo "Готово"
