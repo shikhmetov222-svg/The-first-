@@ -1,0 +1,14 @@
+# Используется, когда на Netlify загружается папка golden-number целиком.
+# (При подключении через GitHub укажи Base directory = golden-number/app — там свой netlify.toml.)
+[build]
+  base = "app"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
