@@ -17,6 +17,7 @@ interface TgWebApp {
     selectionChanged(): void;
   };
   BackButton?: { show(): void; hide(): void; onClick(cb: () => void): void };
+  openTelegramLink?(url: string): void;
 }
 
 const wa: TgWebApp | undefined = (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
@@ -51,9 +52,9 @@ let backHandler: (() => void) | null = null;
 export function backButton(show: boolean, onClick?: () => void) {
   const bb = at('6.1') ? wa?.BackButton : undefined;
   if (!bb) return;
-  if (onClick && !backHandler) {
-    backHandler = onClick;
-    bb.onClick(() => backHandler?.());
+  if (onClick) {
+    if (!backHandler) bb.onClick(() => backHandler?.());
+    backHandler = onClick; // обработчик меняется: из «Рейтинга» назад в «Ещё», из остальных — на «Играть»
   }
   show ? bb.show() : bb.hide();
 }
@@ -61,4 +62,15 @@ export function backButton(show: boolean, onClick?: () => void) {
 export function confirmDialog(msg: string): Promise<boolean> {
   if (wa?.showConfirm && at('6.2')) return new Promise((res) => wa.showConfirm!(msg, res));
   return Promise.resolve(window.confirm(msg));
+}
+
+/** Окно «Переслать» Telegram со ссылкой-приглашением. Вне Telegram — обычная вкладка. */
+export function shareLink(url: string, text: string) {
+  const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  if (wa?.openTelegramLink && at('6.1')) wa.openTelegramLink(share);
+  else window.open(share, '_blank');
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }

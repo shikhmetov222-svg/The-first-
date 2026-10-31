@@ -7,6 +7,7 @@ import {
   GEN_WEIGHTS, RARITY, WORDS, tierFor, type Country, type GenWeights, type Rarity, type Operator, type PrefixRule, type Tier, type T9Word,
   DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS,
   LUCKY_EVERY, LUCKY_LUCK, ONBOARDING_GUARANTEE, SELL_BACK, STAKE_XP, TIERS, XP_BASE, XP_POW,
+  ACHIEVEMENTS, COUNTRIES, MARKET_MAX_PRICE, MARKET_MIN_PRICE, type Achievement,
 } from './config.ts';
 
 /** Возвращает число в [0, 1). */
@@ -256,4 +257,66 @@ export function formatLabel(c: Country, prefix: string, sub: string): string {
     else { out += sub.slice(i, i + g); i += g; }
   }
   return out;
+}
+
+// ---------- достижения ----------
+
+/** Статистика игрока из gn_stats (считает сервер по истории прокруток). */
+export interface Stats {
+  total_spins: number;
+  tiers: Partial<Record<string, number>>; // сколько номеров каждого тира выпадало
+  ops: string[]; // 'ru:МТС', … — какие операторы выпадали
+  t9: number; // разных T9-слов
+  codes: number; // номеров с красивым кодом
+  collection_value: number; // копейки
+  friends: number; // засчитанных друзей
+  claimed: string[];
+}
+
+/** Прогресс достижения: сколько сделано из скольких. */
+export function achProgress(a: Achievement, s: Stats): { have: number; need: number } {
+  const k = a.kind;
+  switch (k.t) {
+    case 'spins': return { have: s.total_spins, need: k.n };
+    case 'tier': {
+      const r = tierRank(k.tier);
+      const have = Object.entries(s.tiers).reduce((n, [id, c]) => n + (tierRank(id) >= r ? c ?? 0 : 0), 0);
+      return { have: Math.min(have, 1), need: 1 };
+    }
+    case 'ops': {
+      const c = COUNTRIES.find((x) => x.id === k.country)!;
+      const names = c.ops.map((o) => `${c.id}:${o.name}`);
+      return { have: names.filter((n) => s.ops.includes(n)).length, need: names.length };
+    }
+    case 'countries': return { have: new Set(s.ops.map((o) => o.split(':')[0])).size, need: k.n };
+    case 't9': return { have: s.t9, need: k.n };
+    case 'code': return { have: s.codes, need: k.n };
+    case 'value': return { have: Math.floor(s.collection_value / 100), need: k.rub };
+    case 'friends': return { have: s.friends, need: k.n };
+  }
+}
+
+export const achDone = (a: Achievement, s: Stats) => { const p = achProgress(a, s); return p.have >= p.need; };
+export const achClaimable = (s: Stats) => ACHIEVEMENTS.filter((a) => achDone(a, s) && !s.claimed.includes(a.id));
+
+// ---------- рынок ----------
+
+export const lotPriceBounds = (valueKop: number) => ({
+  min: Math.ceil(valueKop * MARKET_MIN_PRICE),
+  max: Math.floor(valueKop * MARKET_MAX_PRICE),
+});
+
+// ---------- почему такая цена ----------
+
+/** Разбор цены для экрана: из чего сложился множитель. */
+export function priceBreakdown(prefix: string, sub: string, R: Rarity = RARITY) {
+  const ev = evaluate(prefix, sub, R);
+  const parts: { label: string; mul: number }[] = [];
+  const word = ev.word;
+  let base = ev.mul;
+  if (new Set(prefix).size === 1) { parts.push({ label: 'Код ' + prefix, mul: R.beautifulCode }); base /= R.beautifulCode; }
+  if (word) { const m = word.w.length >= 6 ? R.t9Long : R.t9Short; parts.push({ label: 'T9: ' + word.w, mul: m }); base /= m; }
+  const pattern = ev.tags.find((t) => !t.startsWith('T9:') && !t.startsWith('Код '));
+  parts.unshift({ label: pattern ?? 'Без узора', mul: Math.round(base * 100) / 100 });
+  return parts;
 }

@@ -3,14 +3,14 @@
 // Параметры для проверки состояний: &seq=7777777,1234567 (следующие номера) &spins=99 (сколько уже было
 // прокруток) &level=7 &balance=500 &free=0 &daily=0 (бонус уже забран) &coll=6 (заполнить витрину)
 import {
-  AVG_BET_START_RUB, AVG_BET_WEIGHT, BAILOUT_RUB, BASE_COST_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, SLOTS_MAX, SLOTS_START,
-  STAKE_LEVEL, START_BALANCE_RUB, countryById, slotPriceRub,
+  ACHIEVEMENTS, AVG_BET_START_RUB, AVG_BET_WEIGHT, BAILOUT_RUB, BASE_COST_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, MARKET_FEE,
+  SLOTS_MAX, SLOTS_START, STAKE_LEVEL, START_BALANCE_RUB, countryById, slotPriceRub,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
-  dailyNow, drawLucky, evaluate, formatLabel, freeNow, guaranteeRank, happyNow, kassaTotalKop, msk, sellBackKop,
+  achDone, lotPriceBounds, type Stats, dailyNow, drawLucky, evaluate, formatLabel, freeNow, guaranteeRank, happyNow, kassaTotalKop, msk, sellBackKop,
   spinCostKop, spinLuck, valueByBetKop, xpForSpin, xpToNext,
 } from '../../supabase/functions/_shared/game/logic.ts';
-import type { Api, Sim, State } from './types.ts';
+import type { Api, Lot, Sim, State } from './types.ts';
 
 const q = new URLSearchParams(location.search);
 const num = (k: string, d: number) => (q.has(k) ? Number(q.get(k)) : d);
@@ -22,8 +22,9 @@ const P = {
   freeCharges: num('free', FREE_SPIN_MAX), freeAt: new Date(),
   happyKey: null as string | null, happyUsed: 0,
   dailyDay: q.get('daily') === '0' ? msk(new Date()).date : (null as string | null), dailyStreak: 2,
-  extraSlots: 0, bailoutAt: 0,
-  pending: null as Sim | null, coll: [] as Sim[],
+  extraSlots: 0, bailoutAt: 0, bonus: num('bonus', 0),
+  pending: null as Sim | null, coll: [] as Sim[], history: [] as Sim[], claimed: [] as string[],
+  lots: [] as Lot[], myLots: [] as Lot[],
 };
 const fail = (msg: string) => new Promise<never>((_, r) => setTimeout(() => r(new Error(msg)), 200));
 const collValue = () => P.coll.reduce((s, x) => s + x.value, 0);
@@ -34,7 +35,15 @@ const state = (): State => ({
   kassa_acc: kassa(), server_now: new Date().toISOString(), bailout_at: null,
   total_spins: P.totalSpins, free_charges: P.freeCharges, free_at: P.freeAt.toISOString(),
   happy_key: P.happyKey, happy_used: P.happyUsed, daily_day: P.dailyDay, daily_streak: P.dailyStreak,
-  extra_slots: P.extraSlots, pending: P.pending,
+  extra_slots: P.extraSlots, pending: P.pending, telegram_id: 979901619, bonus_spins: P.bonus, listed_count: P.myLots.length,
+});
+const stats = (): Stats => ({
+  total_spins: P.totalSpins,
+  tiers: P.history.reduce((m, x) => ({ ...m, [x.tier]: (m[x.tier] ?? 0) + 1 }), {} as Record<string, number>),
+  ops: [...new Set(P.history.map((x) => `${x.country}:${x.operator}`))],
+  t9: new Set(P.history.flatMap((x) => x.tags.filter((t) => t.startsWith('T9:')))).size,
+  codes: P.history.filter((x) => x.prefix.length > 1 && new Set(x.prefix).size === 1).length,
+  collection_value: collValue(), friends: 1, claimed: P.claimed,
 });
 const ok = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 250));
 
@@ -54,14 +63,15 @@ for (let i = 0; i < num('coll', 0); i++) {
   P.coll.push(makeSim('ru', 1, 100000, 1, false, 0, ['1234555', '5552555', '1238321', '7121212', '9900990', '1244449'][i % 6]));
 }
 
-export const mockApi: Api = {
+const base: Partial<Api> = {
   login: () => ok(state()),
   spin(countryId, stake, o) {
     const c = countryById(countryId)!;
     const now = new Date();
     const fr = freeNow(P.freeCharges, P.freeAt, now);
     const useFree = o.free && fr.charges > 0;
-    const st = useFree ? 1 : stake;
+    const useBonus = o.free && !useFree && P.bonus > 0;
+    const st = useFree || useBonus ? 1 : stake;
     if (P.level < c.lvl) return fail(`${c.name} откроется на уровне ${c.lvl}`);
     if (P.level < STAKE_LEVEL[st]) return fail(`Ставка ×${st} откроется на уровне ${STAKE_LEVEL[st]}`);
     if (P.pending && ['rare', 'epic', 'legend'].includes(P.pending.tier) && !o.autosellOk) return fail('Сначала реши, что делать с прошлым номером');
@@ -70,13 +80,15 @@ export const mockApi: Api = {
     const luck = spinLuck(spinNo, h.left);
     const nominal = spinCostKop(c, st);
     const bet = luck.luck > 1 ? Math.min(nominal, P.avgBet) : nominal;
-    const cost = useFree ? 0 : bet;
+    const cost = useFree || useBonus ? 0 : bet;
     const auto = P.pending?.value ?? 0;
     if (P.balance + auto < cost) return fail('Не хватает денег');
-    const sim = makeSim(c.id, st, bet, luck.luck, useFree, guaranteeRank(spinNo), seq.shift());
+    const sim = makeSim(c.id, st, bet, luck.luck, useFree || useBonus, guaranteeRank(spinNo), seq.shift());
+    P.history.push(sim);
+    if (useBonus) P.bonus--;
     P.balance += auto - cost;
     P.totalSpins = spinNo;
-    if (!useFree) P.avgBet = Math.round(P.avgBet * (1 - AVG_BET_WEIGHT) + bet * AVG_BET_WEIGHT);
+    if (!useFree && !useBonus) P.avgBet = Math.round(P.avgBet * (1 - AVG_BET_WEIGHT) + bet * AVG_BET_WEIGHT);
     if (useFree) {
       const every = FREE_SPIN_EVERY_H * 3.6e6;
       P.freeAt = fr.charges >= FREE_SPIN_MAX ? now : new Date(P.freeAt.getTime() + Math.floor((now.getTime() - P.freeAt.getTime()) / every) * every);
@@ -151,6 +163,53 @@ export const mockApi: Api = {
     me: P.coll.length ? { place: 4, value: collValue(), count: P.coll.length } : null,
   }),
 };
+
+const others = ['Алексей', 'Мадина', 'Тимур'];
+for (let i = 0; i < 4; i++) {
+  const sim = makeSim(['ru', 'kz', 'tr', 'ae'][i], [1, 2, 5, 1][i], [100000, 240000, 1250000, 500000][i], 1, false, 0, ['7777777', '1234567', '5121212', '9990999'][i]);
+  P.lots.push({ id: crypto.randomUUID(), price: Math.round(sim.value * [1.2, 0.9, 1.5, 1.1][i]), created_at: new Date().toISOString(), mine: false, seller: others[i % 3], sim });
+}
+
+export const mockApi = Object.assign(base, {
+  friends: () => ok({ invited: 2, active: 1, earned: 500_000, list: [{ name: 'Олег', spins: 42, counted: true }, { name: 'Ира', spins: 12, counted: false }] }),
+  stats: () => ok(stats()),
+  claim(id: string) {
+    const a = ACHIEVEMENTS.find((x) => x.id === id);
+    if (!a || !achDone(a, stats())) return fail('Достижение ещё не выполнено');
+    if (P.claimed.includes(id)) return fail('Награда уже получена');
+    P.claimed.push(id); P.balance += a.rewardRub * 100; P.bonus += a.rewardSpins ?? 0;
+    return ok({ reward: a.rewardRub * 100, spins: a.rewardSpins ?? 0, state: state() });
+  },
+  market: (mine: boolean) => ok(mine ? [...P.myLots] : [...P.myLots, ...P.lots]),
+  lotCreate(simId: string, price: number) {
+    const i = P.coll.findIndex((x) => x.id === simId);
+    if (i < 0) return fail('Номер не найден в коллекции');
+    const b = lotPriceBounds(P.coll[i].value);
+    if (price < b.min || price > b.max) return fail('Цена вне границ');
+    settle();
+    const sim = P.coll.splice(i, 1)[0];
+    const lot = { id: crypto.randomUUID(), price, created_at: new Date().toISOString(), mine: true, seller: 'Вы', sim };
+    P.myLots.unshift(lot);
+    return ok({ lot, state: state() });
+  },
+  lotCancel(lotId: string) {
+    const i = P.myLots.findIndex((x) => x.id === lotId);
+    if (i < 0) return fail('Лот не найден');
+    if (P.coll.length >= SLOTS_START + P.extraSlots) return fail('Освободи место на витрине');
+    settle(); P.coll.push(P.myLots.splice(i, 1)[0].sim);
+    return ok({ state: state() });
+  },
+  lotBuy(lotId: string) {
+    const i = P.lots.findIndex((x) => x.id === lotId);
+    if (i < 0) return fail(P.myLots.some((x) => x.id === lotId) ? 'Это твой лот' : 'Этот номер уже купили');
+    const lot = P.lots[i];
+    if (P.coll.length >= SLOTS_START + P.extraSlots) return fail('Освободи место на витрине');
+    if (P.balance < lot.price) return fail('Не хватает денег');
+    settle(); P.balance -= lot.price; P.coll.push(lot.sim); P.lots.splice(i, 1);
+    void MARKET_FEE;
+    return ok({ paid: lot.price, state: state() });
+  },
+}) as Api;
 
 // Для проверки кассы в режиме разработки: в консоли браузера __mockHours(3)
 (window as unknown as Record<string, unknown>).__mockHours = (h: number) => { P.accAt -= h * 3.6e6; };

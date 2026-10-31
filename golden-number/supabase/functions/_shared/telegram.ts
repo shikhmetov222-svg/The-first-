@@ -7,6 +7,8 @@ export interface TelegramUser {
   last_name?: string;
   username?: string;
   language_code?: string;
+  /** Параметр ссылки t.me/<бот>?startapp=… (не часть объекта user — кладём сюда для удобства). */
+  start_param?: string;
 }
 
 const MAX_AGE_SECONDS = 24 * 60 * 60;
@@ -61,5 +63,6 @@ export async function verifyInitData(
   if (!userJson) return null;
   const user = JSON.parse(userJson) as TelegramUser;
   if (typeof user.id !== 'number') return null;
-  return user;
+  const startParam = params.get('start_param');
+  return startParam ? { ...user, start_param: startParam } : user;
 }

@@ -71,6 +71,22 @@ export const BAILOUT_COOLDOWN_H = 24;
 export const XP_BASE = 80;
 export const XP_POW = 1.5;
 
+// --- Друзья ---
+export const BOT_USERNAME = 'simmmcardd_bot';
+/** Ссылка-приглашение открывает игру сразу: t.me/<бот>?startapp=r<telegram id>. */
+export const inviteLink = (telegramId: number) => `https://t.me/${BOT_USERNAME}?startapp=r${telegramId}`;
+export const REF_NEW_SPINS = 10; // бесплатных прокруток приглашённому сразу
+export const REF_AFTER_SPINS = 30; // друг засчитывается, когда сделает столько прокруток (защита от накрутки)
+export const REF_REWARD_RUB = 5000; // пригласившему за каждого засчитанного друга
+export const REF_REWARD_SPINS = 3;
+
+// --- Рынок между игроками ---
+export const MARKET_FEE = 0.05; // комиссия с продажи — сгорает
+export const MARKET_MIN_PRICE = 0.5; // цена лота: от 50% …
+export const MARKET_MAX_PRICE = 5; // … до 500% оценки номера
+export const MARKET_MAX_LOTS = 5; // одновременно выставлено у одного игрока
+export const MARKET_MAX_BUYS_PER_SELLER = 3; // покупок у одного продавца за сутки (против перекачки денег)
+
 export interface PrefixRule {
   code: string;
   /** Если задано — первые цифры номера, которые относятся к этому оператору (код делят несколько операторов).
@@ -245,3 +261,53 @@ export const WORDS: T9Word[] = [
 ]
   .map((w) => ({ w, c: [...w].map((l) => T9[l]).join('') }))
   .sort((a, b) => b.c.length - a.c.length);
+
+// ======================= ДОСТИЖЕНИЯ =======================
+// Прогресс считает сервер по истории прокруток (gn_stats); награду выдаёт только сервер.
+
+export type AchKind =
+  | { t: 'spins'; n: number }
+  | { t: 'tier'; tier: Tier['id'] }
+  | { t: 'ops'; country: string } // все операторы страны
+  | { t: 'countries'; n: number }
+  | { t: 't9'; n: number }
+  | { t: 'code'; n: number } // номера с кодом из одинаковых цифр
+  | { t: 'value'; rub: number } // стоимость коллекции
+  | { t: 'friends'; n: number };
+
+export interface Achievement {
+  id: string;
+  group: 'Прокрутки' | 'Редкость' | 'Коллекции регионов' | 'Узоры' | 'Витрина' | 'Друзья';
+  title: string;
+  kind: AchKind;
+  rewardRub: number;
+  rewardSpins?: number;
+}
+
+export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'spins10', group: 'Прокрутки', title: '10 прокруток', kind: { t: 'spins', n: 10 }, rewardRub: 500 },
+  { id: 'spins100', group: 'Прокрутки', title: '100 прокруток', kind: { t: 'spins', n: 100 }, rewardRub: 3000, rewardSpins: 2 },
+  { id: 'spins500', group: 'Прокрутки', title: '500 прокруток', kind: { t: 'spins', n: 500 }, rewardRub: 15000 },
+  { id: 'spins2000', group: 'Прокрутки', title: '2 000 прокруток', kind: { t: 'spins', n: 2000 }, rewardRub: 50000 },
+  { id: 'tierNice', group: 'Редкость', title: 'Первый «Красивый»', kind: { t: 'tier', tier: 'nice' }, rewardRub: 500 },
+  { id: 'tierRare', group: 'Редкость', title: 'Первый «Редкий»', kind: { t: 'tier', tier: 'rare' }, rewardRub: 2000 },
+  { id: 'tierEpic', group: 'Редкость', title: 'Первый «Эпический»', kind: { t: 'tier', tier: 'epic' }, rewardRub: 10000, rewardSpins: 2 },
+  { id: 'tierLegend', group: 'Редкость', title: 'Первый «Легендарный»', kind: { t: 'tier', tier: 'legend' }, rewardRub: 30000, rewardSpins: 5 },
+  { id: 'opsRu', group: 'Коллекции регионов', title: 'Все операторы России', kind: { t: 'ops', country: 'ru' }, rewardRub: 5000 },
+  { id: 'opsKz', group: 'Коллекции регионов', title: 'Все операторы Казахстана', kind: { t: 'ops', country: 'kz' }, rewardRub: 6000 },
+  { id: 'opsBy', group: 'Коллекции регионов', title: 'Все операторы Беларуси', kind: { t: 'ops', country: 'by' }, rewardRub: 7500 },
+  { id: 'opsUz', group: 'Коллекции регионов', title: 'Все операторы Узбекистана', kind: { t: 'ops', country: 'uz' }, rewardRub: 9000 },
+  { id: 'opsTr', group: 'Коллекции регионов', title: 'Все операторы Турции', kind: { t: 'ops', country: 'tr' }, rewardRub: 15000 },
+  { id: 'opsAe', group: 'Коллекции регионов', title: 'Все операторы ОАЭ', kind: { t: 'ops', country: 'ae' }, rewardRub: 25000 },
+  { id: 'countries6', group: 'Коллекции регионов', title: 'Номер из каждой страны', kind: { t: 'countries', n: 6 }, rewardRub: 20000, rewardSpins: 3 },
+  { id: 't9w1', group: 'Узоры', title: 'Первое T9-слово', kind: { t: 't9', n: 1 }, rewardRub: 1000 },
+  { id: 't9w5', group: 'Узоры', title: '5 разных T9-слов', kind: { t: 't9', n: 5 }, rewardRub: 8000 },
+  { id: 't9w15', group: 'Узоры', title: '15 разных T9-слов', kind: { t: 't9', n: 15 }, rewardRub: 30000, rewardSpins: 3 },
+  { id: 'code1', group: 'Узоры', title: 'Красивый код (777, 44…)', kind: { t: 'code', n: 1 }, rewardRub: 2000 },
+  { id: 'code10', group: 'Узоры', title: '10 красивых кодов', kind: { t: 'code', n: 10 }, rewardRub: 15000 },
+  { id: 'value100k', group: 'Витрина', title: 'Коллекция на 100 000 ₽', kind: { t: 'value', rub: 100_000 }, rewardRub: 5000 },
+  { id: 'value1m', group: 'Витрина', title: 'Коллекция на 1 000 000 ₽', kind: { t: 'value', rub: 1_000_000 }, rewardRub: 30000 },
+  { id: 'friends1', group: 'Друзья', title: 'Первый друг', kind: { t: 'friends', n: 1 }, rewardRub: 3000 },
+  { id: 'friends3', group: 'Друзья', title: '3 друга', kind: { t: 'friends', n: 3 }, rewardRub: 10000, rewardSpins: 3 },
+  { id: 'friends10', group: 'Друзья', title: '10 друзей', kind: { t: 'friends', n: 10 }, rewardRub: 40000, rewardSpins: 10 },
+];

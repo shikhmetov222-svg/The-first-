@@ -2,16 +2,18 @@ import './styles.css';
 import {
   BAILOUT_RUB, COUNTRIES, FREE_SPIN_MAX, KASSA_CAP_HOURS, LUCKY_EVERY, LUCKY_LUCK, HAPPY_LUCK, HAPPY_SPINS, SLOTS_MAX, SLOTS_START,
   STAKES, STAKE_LEVEL, countryById, slotPriceRub, type Country,
+  ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
-  dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, sellBackKop, spinCostKop, tierRank, xpToNext,
+  achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
+  sellBackKop, spinCostKop, tierRank, xpToNext, type Stats,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { serverApi } from './api.ts';
 import { esc, fmt, fmtMul, local, rub, tierById, tierVar } from './format.ts';
 import { Card } from './reels.ts';
 import { shareSim } from './share.ts';
-import { backButton, haptic, initData, setupTelegram } from './tg.ts';
-import type { Api, Sim, State } from './types.ts';
+import { backButton, copyText, haptic, initData, setupTelegram, shareLink } from './tg.ts';
+import type { Api, Lot, Sim, State } from './types.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 const PREFS_KEY = 'zn-prefs';
@@ -29,8 +31,13 @@ let country: Country = COUNTRIES[0];
 let stake: number = STAKES[0];
 let spinning = false;
 let busy = false;
-let view: 'play' | 'coll' | 'rating' = 'play';
+type View = 'play' | 'coll' | 'market' | 'friends' | 'more' | 'rating' | 'ach';
+let view: View = 'play';
 let collCache: Sim[] = [];
+let stats: Stats | null = null;
+let marketMine = false;
+let marketTier = 'all';
+let marketCache: Lot[] = [];
 const card = new Card();
 
 function loadPrefs() {
@@ -57,7 +64,8 @@ const freeInfo = () => freeNow(S.free_charges, new Date(S.free_at), now());
 const happyInfo = () => happyNow(S.happy_key, S.happy_used, now());
 const dailyInfo = () => dailyNow(S.daily_day, S.daily_streak, now());
 const nextIsLucky = () => (S.total_spins + 1) % LUCKY_EVERY === 0;
-const useFree = () => freeInfo().charges > 0;
+const bonusSpins = () => S.bonus_spins ?? 0;
+const useFree = () => freeInfo().charges > 0 || bonusSpins() > 0;
 const cost = () => (useFree() ? 0 : spinCostKop(country, stake));
 /** Время по Москве «13:00» — счастливые часы общие для всех игроков. */
 const mskHm = (d: Date) => { const m = new Date(d.getTime() + 3 * 3600e3); return `${String(m.getUTCHours()).padStart(2, '0')}:${String(m.getUTCMinutes()).padStart(2, '0')}`; };
@@ -99,7 +107,7 @@ function renderKassa() {
 
 function renderDaily() {
   const d = dailyInfo();
-  $('daily').classList.toggle('hidden', !d.available);
+  $('daily').classList.toggle('hidden', !d.available || $('daily').classList.contains('off'));
   if (d.available) $('daily-sub').textContent = `День ${d.streak + 1} подряд · ${rub(d.amountKop)}`;
 }
 
@@ -122,9 +130,9 @@ function renderLuck() {
   const lucky = until === 1
     ? `<span class="pill lucky">${icon('i-star')}Следующая — удача ×${LUCKY_LUCK}</span>`
     : `<span class="pill">${icon('i-star')}До удачи ×${LUCKY_LUCK}: ${until}</span>`;
-  const fr = freeInfo();
-  const free = fr.charges > 0
-    ? `<span class="pill hot">Бесплатных: ${fr.charges}</span>`
+  const fr = freeInfo(), total = fr.charges + bonusSpins();
+  const free = total > 0
+    ? `<span class="pill hot">Бесплатных: ${total}</span>`
     : fr.nextAt ? `<span class="pill">Бесплатная через ${left(fr.nextAt)}</span>` : '';
   $('luck').innerHTML = lucky + happy + free;
 }
@@ -137,12 +145,15 @@ function renderSpin() {
   $('spin-l1').textContent = lucky ? `Удача ×${LUCKY_LUCK}` : free ? 'Крутить бесплатно' : 'Крутить';
   $('spin-l1').classList.toggle('on', !spinning);
   $('spin-l2').classList.toggle('on', spinning);
-  $('cost').textContent = free ? `${freeInfo().charges} из ${FREE_SPIN_MAX}` : rub(spinCostKop(country, stake));
+  $('cost').textContent = free
+    ? (bonusSpins() > 0 && freeInfo().charges === 0 ? `ещё ${bonusSpins()}` : `${freeInfo().charges} из ${FREE_SPIN_MAX}`)
+    : rub(spinCostKop(country, stake));
 }
 
 function renderResult(enter = false) {
   const el = $('result');
   const p = S.pending;
+  renderTierbar(spinning ? null : p);
   if (!p) {
     el.innerHTML = `<div class="hint">${spinning ? 'Крутим… нажми ещё раз, чтобы пропустить' : 'Жми «Крутить», чтобы получить SIM-карту'}</div>`;
     return;
@@ -161,16 +172,40 @@ function renderResult(enter = false) {
       </div>
       <div class="tags">${p.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('') || '<span class="tag">Ничего особенного</span>'}${extra}</div>
       <div class="val"><b>${local(c, p.value)}</b>${c.cur !== '₽' ? `<span>≈ ${rub(p.value)}</span>` : ''}</div>
+      ${whyHtml(p)}
       <div class="acts">
         <button class="btn btn-secondary btn-l btn-stack" id="b-sell">Продать<span class="sub">+${rub(p.value)}</span></button>
         <button class="btn btn-primary btn-l btn-stack" id="b-keep">В коллекцию<span class="sub">${full ? `витрина ${S.collection_count}/${slotsCap()}` : `+${rub(incomePerHourKop(p.value))}/ч`}</span></button>
       </div>
+      <button class="btn btn-brag btn-m" id="b-brag">${icon('i-share')}Похвастаться картинкой</button>
     </div>`;
   $('b-sell').onclick = (e) => act(e, async () => {
     const r = await api.sell(); setState(r.state); card.clearGlow(); toast('Продано: +' + rub(r.sold));
   });
   $('b-keep').onclick = (e) => act(e, async () => { await keepPending(); });
   $('b-share').onclick = () => shareSim(c, p);
+  $('b-brag').onclick = () => shareSim(c, p);
+}
+
+/** Шкала редкости над карточкой: тир, ступени и цена — как только барабаны остановились. */
+function renderTierbar(p: Sim | null) {
+  const el = $('tierbar');
+  if (!p) { el.classList.add('hidden'); return; }
+  const rank = tierRank(p.tier);
+  el.classList.remove('hidden');
+  el.style.setProperty('--tc', tierVar(p.tier));
+  el.innerHTML = `<div><div class="tb-name">${tierById(p.tier).name}</div>
+    <div class="tb-steps">${TIERS.map((_, i) => `<i class="${i <= rank ? 'on' : ''}"></i>`).join('')}</div></div>
+    <b>${rub(p.value)}</b>`;
+}
+
+/** «Почему такая цена»: база × страна × узор × бонусы × ставка. */
+function whyHtml(p: Sim): string {
+  const c = countryById(p.country)!;
+  const parts = priceBreakdown(p.prefix, p.sub).filter((x) => x.mul !== 1 || x.label === 'Без узора');
+  const bet = p.value / Math.max(1, p.mul) / 380 / 100 / c.mul; // фактическая ставка (у удачной может быть ниже)
+  const stakeTxt = Math.abs(bet - Math.round(bet)) < 0.01 ? `×${Math.round(bet)}` : `×${bet.toFixed(2)}`;
+  return `<div class="why">Почему столько: <b>380 ₽</b> · страна <b>×${c.mul}</b> · ${parts.map((x) => `${esc(x.label)} <b>×${fmtMul(x.mul)}</b>`).join(' · ')} · ставка <b>${stakeTxt}</b></div>`;
 }
 
 async function renderColl() {
@@ -186,14 +221,13 @@ async function renderColl() {
     const list = await api.collection();
     if (view !== 'coll') return;
     collCache = list;
-    if (!list.length) { el.innerHTML = '<div class="empty">Пока пусто. Оставляй красивые номера — они приносят доход в кассу.</div>'; return; }
+    if (!list.length) { el.innerHTML = '<div class="empty">Пока пусто. Оставляй красивые номера — они приносят доход в кассу. Нажми на номер, чтобы продать, выставить на рынок или похвастаться.</div>'; return; }
     el.innerHTML = list.map((x) => {
       const c = countryById(x.country)!, tier = tierById(x.tier);
-      return `<div class="row" style="--tc:${tierVar(x.tier)}">
+      return `<div class="row tap" style="--tc:${tierVar(x.tier)}" data-act="${x.id}">
         <div class="m"><div class="n">${esc(x.label)}</div>
-          <div class="s"><span class="dot"></span>${tier.name} · ${c.flag} ${esc(x.operator)} · ${local(c, x.value)}</div></div>
-        <div class="btns"><button class="icon-btn" data-share="${x.id}" aria-label="Поделиться картинкой">${icon('i-share')}</button>
-        <button class="btn btn-secondary btn-m" data-sell="${x.id}">Продать</button></div></div>`;
+          <div class="s"><span class="dot"></span>${tier.name} · ${c.flag} ${esc(x.operator)}</div></div>
+        <div class="price">${rub(x.value)}<small>+${rub(incomePerHourKop(x.value))}/ч</small></div></div>`;
     }).join('');
   } catch (e) {
     el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`;
@@ -249,9 +283,10 @@ function ask(title: string, text: string, buttons: SheetBtn[]): Promise<string |
 }
 
 // ---------- действия ----------
-async function act(e: Event | null, fn: () => Promise<void>) {
+/** Действие с сервером: блокирует повторные нажатия и показывает загрузку на кнопке (событие или сама кнопка). */
+async function act(e: Event | HTMLElement | null, fn: () => Promise<void>) {
   if (busy || spinning) return;
-  const btn = (e?.currentTarget ?? null) as HTMLElement | null;
+  const btn = (e instanceof HTMLElement ? e : (e?.currentTarget ?? null)) as HTMLElement | null;
   busy = true;
   btn?.classList.add('loading');
   try { await fn(); } catch (err) { haptic.error(); toast((err as Error).message); }
@@ -357,6 +392,7 @@ async function spin() {
     setTimeout(() => toast(`Уровень ${S.level}!` + (un.length ? ' Открыто: ' + un.join(', ') : '')), r.auto_sold ? 2300 : 0);
   }
   renderAll(true);
+  refreshStats();
   // кнопки результата не должны прятаться под нижней панелью
   if (view === 'play') {
     const res = $('result').getBoundingClientRect(), dockTop = document.querySelector('.dock')!.getBoundingClientRect().top;
@@ -398,17 +434,194 @@ async function switchCountry(c: Country) {
   country = c; savePrefs(); card.sample(c); renderAll();
 }
 
+// ---------- действия с номером из коллекции ----------
+async function numberActions(x: Sim) {
+  const c = countryById(x.country)!;
+  const a = await ask(x.label, `${tierById(x.tier).name} · ${c.flag} ${x.operator} · оценка ${rub(x.value)}`, [
+    { id: 'brag', label: 'Похвастаться картинкой', kind: 'primary' },
+    { id: 'lot', label: 'Выставить на рынок', sub: 'за свою цену, 5% комиссии', kind: 'secondary' },
+    { id: 'sell', label: `Продать игре за ${rub(sellBackKop(x.value))}`, sub: '70% оценки', kind: 'secondary' },
+    { id: 'cancel', label: 'Закрыть', kind: 'ghost' },
+  ]);
+  if (a === 'brag') shareSim(c, x);
+  if (a === 'sell') {
+    await act(null, async () => { const r = await api.sellNumber(x.id); setState(r.state); toast('Продано: +' + rub(r.sold)); });
+    renderColl();
+  }
+  if (a === 'lot') listSheet(x);
+}
+
+/** Лист выставления на рынок: цена с быстрыми кнопками и подсказкой, сколько получишь. */
+function listSheet(x: Sim) {
+  const b = lotPriceBounds(x.value);
+  const sheet = $('sheet');
+  const quick = [0.8, 1, 1.2, 1.5, 2];
+  $('sheet-in').innerHTML = `<h3>Выставить на рынок</h3>
+    <p>${esc(x.label)} · оценка ${rub(x.value)}. Цена — от ${rub(b.min)} до ${rub(b.max)}. Пока номер на рынке, он не приносит доход.</p>
+    <input class="field" id="lot-price" type="number" inputmode="numeric" min="${Math.ceil(b.min / 100)}" max="${Math.floor(b.max / 100)}" value="${Math.round(x.value * 1.2 / 100)}">
+    <div class="quick">${quick.map((k) => `<button data-k="${k}">${k === 1 ? 'оценка' : (k > 1 ? '+' : '−') + Math.round(Math.abs(k - 1) * 100) + '%'}</button>`).join('')}</div>
+    <p id="lot-get"></p>
+    <div class="sheet-btns"><button class="btn btn-primary btn-l" id="lot-ok">Выставить</button><button class="btn btn-ghost btn-l" id="lot-cancel">Отмена</button></div>`;
+  sheet.classList.remove('hidden');
+  const input = $('lot-price') as HTMLInputElement;
+  const upd = () => { $('lot-get').textContent = `Получишь при продаже: ${rub(Math.floor(Number(input.value) * 100 * (1 - MARKET_FEE)))}`; };
+  input.oninput = upd; upd();
+  $('sheet-in').querySelector('.quick')!.addEventListener('click', (e) => {
+    const k = (e.target as HTMLElement).dataset.k;
+    if (k) { input.value = String(Math.round(x.value * Number(k) / 100)); upd(); haptic.select(); }
+  });
+  const close = () => { sheet.classList.add('hidden'); sheet.onclick = null; };
+  sheet.onclick = (e) => { if (e.target === sheet) close(); };
+  $('lot-cancel').onclick = close;
+  $('lot-ok').onclick = (e) => act(e, async () => {
+    const r = await api.lotCreate(x.id, Math.round(Number(input.value) * 100));
+    setState(r.state); close(); haptic.success(); toast('Номер на рынке'); renderColl();
+  });
+}
+
+// ---------- рынок ----------
+async function renderMarket() {
+  [...$('market-tabs').children].forEach((b) => b.classList.toggle('on', (b as HTMLElement).dataset.m === (marketMine ? 'mine' : 'all')));
+  $('market-filter').innerHTML = [{ id: 'all', name: 'Любая редкость' }, ...TIERS.slice().reverse().filter((t) => t.id !== 'common')]
+    .map((t) => `<button class="chip ${marketTier === t.id ? 'on' : ''}" data-t="${t.id}">${t.id !== 'all' ? `<span class="dot" style="--tc:${tierVar(t.id)}"></span>` : ''}${t.name}</button>`).join('');
+  const el = $('market');
+  if (!marketCache.length) el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+  try {
+    marketCache = await api.market(marketMine);
+    if (view !== 'market') return;
+    const list = marketCache.filter((l) => marketTier === 'all' || l.sim.tier === marketTier);
+    el.innerHTML = list.length ? list.map((l) => {
+      const c = countryById(l.sim.country)!;
+      return `<div class="row tap" style="--tc:${tierVar(l.sim.tier)}" ${l.mine ? `data-cancel="${l.id}"` : `data-buy="${l.id}"`}>
+        <div class="m"><div class="n">${esc(l.sim.label)}</div>
+          <div class="s"><span class="dot"></span>${tierById(l.sim.tier).name} · ${c.flag} · ${l.mine ? 'твой лот' : esc(l.seller || 'Игрок')}</div></div>
+        <div class="price">${rub(l.price)}<small>оценка ${rub(l.sim.value)}</small></div>
+      </div>`;
+    }).join('') : `<div class="empty">${marketMine ? 'Ты ничего не выставил. Нажми на номер в коллекции → «Выставить на рынок».' : 'Пока никто ничего не продаёт — выставь свой номер первым.'}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`;
+  }
+}
+
+async function buyLot(id: string) {
+  const l = marketCache.find((x) => x.id === id);
+  if (!l) return;
+  const a = await ask('Купить номер?', `${l.sim.label} · ${tierById(l.sim.tier).name}. Оценка ${rub(l.sim.value)} — по ней номер приносит доход на витрине.`, [
+    { id: 'buy', label: `Купить за ${rub(l.price)}`, kind: 'primary', disabled: S.balance < l.price },
+    { id: 'cancel', label: 'Отмена', kind: 'ghost' },
+  ]);
+  if (a !== 'buy') return;
+  await act(null, async () => { const r = await api.lotBuy(id); setState(r.state); haptic.success(); toast('Номер на твоей витрине'); });
+  renderMarket();
+}
+
+// ---------- друзья ----------
+async function renderFriends() {
+  const el = $('friends');
+  const link = inviteLink(S.telegram_id ?? 0);
+  const head = `<div class="hero">
+      <div class="eyebrow">Приглашай друзей</div>
+      <h2>Зови друзей — получай награды</h2>
+      <p>Друг сразу получит <b>${REF_NEW_SPINS} бесплатных прокруток</b>. Ты — <b>${rub(REF_REWARD_RUB * 100)}</b> и ${REF_REWARD_SPINS} прокрутки, когда он сделает ${REF_AFTER_SPINS} прокруток.</p>
+      <button class="btn btn-primary btn-l" style="width:100%" id="f-share">Отправить другу</button>
+      <div class="btn-row"><button class="btn btn-secondary btn-m" id="f-copy">${icon('i-link')}Копировать</button><button class="btn btn-secondary btn-m" id="f-ach">Награды</button></div>
+      <div class="link">${esc(link)}</div>
+    </div>`;
+  el.innerHTML = head + '<div class="stats"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  bindFriendButtons(link);
+  try {
+    const f = await api.friends();
+    if (view !== 'friends') return;
+    const next = [1, 3, 10].find((n) => n > f.active) ?? 10;
+    el.innerHTML = head + `
+      <div class="stats">
+        <div class="stat"><b>${f.invited}</b><span>пришло</span></div>
+        <div class="stat"><b>${f.active}</b><span>засчитано</span></div>
+        <div class="stat"><b>${rub(f.earned)}</b><span>принесли тебе</span></div>
+      </div>
+      <div class="panel" style="margin-top:var(--s3)"><b>До следующей награды · ${f.active}/${next}</b>
+        <div class="bar"><i style="width:${Math.min(100, (f.active / next) * 100)}%"></i></div>
+        <p class="note" style="text-align:left;margin:var(--s2) 0 0">Друг засчитывается после ${REF_AFTER_SPINS} прокруток — так награды не получить ботами.</p></div>
+      ${f.list.length ? `<div class="group-title">Твои друзья</div><div class="list">${f.list.map((x) => `<div class="row">
+        <span class="avatar">${esc((x.name || 'И').slice(0, 1).toUpperCase())}</span>
+        <div class="m"><div class="n" style="font-family:var(--font)">${esc(x.name || 'Игрок')}</div>
+          <div class="s">${x.counted ? 'засчитан ✓' : `прокруток ${Math.min(x.spins, REF_AFTER_SPINS)} из ${REF_AFTER_SPINS}`}</div></div></div>`).join('')}</div>` : ''}`;
+    bindFriendButtons(link);
+  } catch (e) {
+    toast((e as Error).message);
+  }
+}
+
+function bindFriendButtons(link: string) {
+  $('f-share').onclick = () => shareLink(link, 'Крути барабаны и собирай красивые номера в «Золотом номере» — держи 10 бесплатных прокруток!');
+  $('f-copy').onclick = async () => { toast((await copyText(link)) ? 'Ссылка скопирована' : link); };
+  $('f-ach').onclick = () => show('ach');
+}
+
+// ---------- ещё ----------
+const TILES = [
+  { v: 'rating', title: 'Рейтинг', sub: 'топ коллекций', icon: 'i-cup', bg: 'linear-gradient(135deg,#f6b833,#ff8a12)' },
+  { v: 'ach', title: 'Достижения', sub: 'коллекции регионов', icon: 'i-medal', bg: 'linear-gradient(135deg,#4ade80,#16a34a)' },
+  { soon: 'Магазин за звёзды Telegram — скоро', title: 'Магазин', sub: 'скоро', icon: 'i-star', bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)' },
+  { soon: 'Сезоны с наградами — скоро', title: 'Сезоны', sub: 'скоро', icon: 'i-flag', bg: 'linear-gradient(135deg,#b38cff,#7c5cc4)' },
+  { soon: 'Кланы — скоро', title: 'Кланы', sub: 'скоро', icon: 'i-shield', bg: 'linear-gradient(135deg,#38bdf8,#2563eb)' },
+];
+function renderMore() {
+  const n = stats ? achClaimable(stats).length : 0;
+  $('more').innerHTML = TILES.map((t) => `<button class="tile ${t.soon ? 'soon' : ''}" ${t.v ? `data-v="${t.v}"` : `data-soon="${t.soon}"`}>
+      <span class="ti" style="background:${t.bg}">${icon(t.icon)}</span><b>${t.title}</b><span>${t.v === 'ach' && n ? `можно забрать: ${n}` : t.sub}</span>
+      ${t.v === 'ach' && n ? `<i class="badge">${n}</i>` : ''}</button>`).join('');
+}
+
+// ---------- достижения ----------
+async function refreshStats() {
+  try { stats = await api.stats(); } catch { return; }
+  const n = achClaimable(stats).length;
+  $('more-badge').textContent = String(n);
+  $('more-badge').classList.toggle('hidden', n === 0);
+  if (view === 'more') renderMore();
+  if (view === 'ach') renderAch(false);
+}
+
+async function renderAch(fetch = true) {
+  const el = $('ach');
+  if (fetch || !stats) {
+    if (!stats) el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+    try { stats = await api.stats(); } catch (e) { el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`; return; }
+    if (view !== 'ach') return;
+  }
+  const st = stats!;
+  const groups = [...new Set(ACHIEVEMENTS.map((a) => a.group))];
+  // в каждом разделе: сначала то, что можно забрать, потом в процессе, полученные — в конце
+  const order = (a: (typeof ACHIEVEMENTS)[0]) => (st.claimed.includes(a.id) ? 2 : achProgress(a, st).have >= achProgress(a, st).need ? 0 : 1);
+  el.innerHTML = groups.map((g) => `<div class="group-title">${g}</div>` + ACHIEVEMENTS.filter((a) => a.group === g).sort((a, b) => order(a) - order(b)).map((a) => {
+    const p = achProgress(a, st), done = p.have >= p.need, claimed = st.claimed.includes(a.id);
+    const reward = rub(a.rewardRub * 100) + (a.rewardSpins ? ` + ${a.rewardSpins} прокр.` : '');
+    const prog = a.kind.t === 'value' ? `${rub(Math.min(p.have, p.need) * 100)} из ${rub(p.need * 100)}` : `${Math.min(p.have, p.need)} из ${p.need}`;
+    return `<div class="ach ${claimed ? 'claimed' : done ? 'done' : ''}">
+      <div class="m"><b>${a.title}</b><div class="s">${claimed ? 'получено' : prog} · ${reward}</div>
+        ${!claimed && !done ? `<div class="bar"><i style="width:${Math.min(100, (p.have / p.need) * 100)}%"></i></div>` : ''}</div>
+      ${done && !claimed ? `<button class="btn btn-ok btn-m" data-claim="${a.id}">Забрать</button>` : ''}</div>`;
+  }).join('')).join('');
+}
+
 // ---------- навигация ----------
-function show(v: typeof view) {
+const NAV_OF: Record<View, View> = { play: 'play', coll: 'coll', market: 'market', friends: 'friends', more: 'more', rating: 'more', ach: 'more' };
+function show(v: View) {
   view = v;
-  [...$('nav').children].forEach((x) => x.classList.toggle('on', (x as HTMLElement).dataset.v === v));
-  $('v-play').classList.toggle('hidden', v !== 'play');
-  $('v-coll').classList.toggle('hidden', v !== 'coll');
-  $('v-rating').classList.toggle('hidden', v !== 'rating');
+  [...$('nav').children].forEach((x) => x.classList.toggle('on', (x as HTMLElement).dataset.v === NAV_OF[v]));
+  for (const k of ['play', 'coll', 'market', 'friends', 'more', 'rating', 'ach']) $('v-' + k).classList.toggle('hidden', v !== k);
   $('spin').classList.toggle('hidden', v !== 'play');
-  backButton(v !== 'play', () => show('play'));
+  // касса и бонус — только там, где играют и копят
+  $('kassa').classList.toggle('hidden', v !== 'play' && v !== 'coll');
+  $('daily').classList.toggle('off', v !== 'play');
+  backButton(v !== 'play', () => show(v === 'rating' || v === 'ach' ? 'more' : 'play'));
   if (v === 'coll') renderColl();
   if (v === 'rating') renderRating();
+  if (v === 'market') renderMarket();
+  if (v === 'friends') renderFriends();
+  if (v === 'more') renderMore();
+  if (v === 'ach') renderAch();
   window.scrollTo(0, 0);
 }
 
@@ -444,34 +657,55 @@ function bind() {
     if (S.level < STAKE_LEVEL[s]) { toast(`Ставка ×${s} откроется на уровне ${STAKE_LEVEL[s]}`); return; }
     stake = s; haptic.select(); savePrefs(); renderChips(); renderSpin();
   };
-  $('coll').onclick = async (e) => {
-    const t = e.target as HTMLElement;
-    const sh = t.closest<HTMLElement>('[data-share]');
-    if (sh) {
-      const x = collCache.find((s) => s.id === sh.dataset.share);
-      if (x) shareSim(countryById(x.country)!, x);
-      return;
-    }
-    const b = t.closest<HTMLElement>('[data-sell]');
-    if (!b || busy) return;
-    const x = collCache.find((s) => s.id === b.dataset.sell);
-    if (!x) return;
-    const a = await ask('Продать номер?', `${x.label} стоит ${rub(x.value)}. Из коллекции номер продаётся за 70% цены.`, [
-      { id: 'sell', label: `Продать за ${rub(sellBackKop(x.value))}`, kind: 'primary' },
-      { id: 'cancel', label: 'Оставить', kind: 'ghost' },
-    ]);
-    if (a !== 'sell') return;
-    await act(null, async () => {
-      const r = await api.sellNumber(x.id); setState(r.state); toast('Продано: +' + rub(r.sold));
-    });
-    renderColl();
+  $('coll').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+    const x = b && collCache.find((s) => s.id === b.dataset.act);
+    if (x && !busy) numberActions(x);
   };
   $('nav').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('button');
     if (!b) return;
     haptic.select();
-    if (b.dataset.soon) { toast(b.dataset.soon); return; }
-    show(b.dataset.v as typeof view);
+    show(b.dataset.v as View);
+  };
+  $('market-tabs').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-m]');
+    if (!b) return;
+    marketMine = b.dataset.m === 'mine'; marketCache = []; haptic.select(); renderMarket();
+  };
+  $('market-filter').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-t]');
+    if (!b) return;
+    marketTier = b.dataset.t!; haptic.select(); renderMarket();
+  };
+  $('market').onclick = async (e) => {
+    const t = e.target as HTMLElement;
+    const buy = t.closest<HTMLElement>('[data-buy]'), cancel = t.closest<HTMLElement>('[data-cancel]');
+    if (buy) buyLot(buy.dataset.buy!);
+    if (cancel) {
+      const l = marketCache.find((x) => x.id === cancel.dataset.cancel);
+      const a = await ask('Снять с продажи?', `${l?.sim.label ?? ''} вернётся на витрину и снова будет приносить доход.`, [
+        { id: 'ok', label: 'Снять с продажи', kind: 'primary' }, { id: 'cancel', label: 'Оставить на рынке', kind: 'ghost' },
+      ]);
+      if (a !== 'ok') return;
+      await act(null, async () => { const r = await api.lotCancel(cancel.dataset.cancel!); setState(r.state); toast('Номер вернулся на витрину'); });
+      renderMarket();
+    }
+  };
+  $('more').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('.tile');
+    if (!b) return;
+    haptic.select();
+    if (b.dataset.soon) toast(b.dataset.soon); else show(b.dataset.v as View);
+  };
+  $('ach').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-claim]');
+    if (!b) return;
+    act(b, async () => {
+      const r = await api.claim(b.dataset.claim!); setState(r.state); haptic.success();
+      toast(`Награда: +${rub(r.reward)}` + (r.spins ? ` и ${r.spins} прокр.` : ''));
+      await refreshStats();
+    });
   };
   $('share-close').onclick = () => $('share-sheet').classList.add('hidden');
   // лёгкая вибрация на любое нажатие кнопки
@@ -513,6 +747,7 @@ async function start() {
   } else card.sample(country);
   bind();
   renderAll();
+  refreshStats();
   setInterval(() => { if (!spinning) { renderKassa(); renderLuck(); renderDaily(); renderSpin(); } }, 1000);
   $('splash').classList.add('gone');
 }

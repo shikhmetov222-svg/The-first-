@@ -9,9 +9,11 @@ import {
   AVG_BET_WEIGHT, BAILOUT_COOLDOWN_H, BAILOUT_RUB, BASE_COST_RUB, DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB,
   FREE_SPIN_EVERY_H, FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_SPINS, LUCKY_EVERY, SELL_BACK, SLOTS_MAX, SLOTS_START,
   STAKES, STAKE_LEVEL, XP_BASE, XP_POW, countryById, slotPriceRub,
+  ACHIEVEMENTS, MARKET_FEE, MARKET_MAX_BUYS_PER_SELLER, MARKET_MAX_LOTS, MARKET_MAX_PRICE, MARKET_MIN_PRICE,
+  REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS,
 } from '../_shared/game/config.ts';
 import {
-  drawLucky, formatLabel, guaranteeRank, spinCostKop, spinLuck, valueByBetKop, xpForSpin, type Rng,
+  achDone, drawLucky, formatLabel, guaranteeRank, spinCostKop, spinLuck, valueByBetKop, xpForSpin, type Rng, type Stats,
 } from '../_shared/game/logic.ts';
 
 const BOT_TOKEN = Deno.env.get('GN_TELEGRAM_BOT_TOKEN') ?? '';
@@ -67,7 +69,23 @@ const cryptoRng: Rng = () => {
 
 const FREE = { p_free_every_h: FREE_SPIN_EVERY_H, p_free_max: FREE_SPIN_MAX };
 const HAPPY = { p_happy_hours: HAPPY_HOURS_MSK, p_happy_spins: HAPPY_SPINS };
+const REF = { p_ref_after: REF_AFTER_SPINS, p_ref_reward: REF_REWARD_RUB * 100, p_ref_spins: REF_REWARD_SPINS };
 const UUID = /^[0-9a-f-]{36}$/;
+
+function uuid(body: Body, key: string): string {
+  const v = body[key];
+  if (typeof v !== 'string' || !UUID.test(v)) throw new ApiError(400, 'Не найдено');
+  return v;
+}
+
+// Пригласивший — из ссылки t.me/<бот>?startapp=r<telegram id>. Учитывается только при первом входе.
+function login(user: TelegramUser) {
+  const m = /^r(\d{1,15})$/.exec(user.start_param ?? '');
+  return rpc<Body>('gn_login', {
+    p_telegram_id: user.id, p_first_name: user.first_name ?? '', p_username: user.username ?? null,
+    p_ref_telegram_id: m ? Number(m[1]) : null, p_ref_bonus: REF_NEW_SPINS,
+  });
+}
 
 const isRetry = (e: unknown) => e instanceof ApiError && e.message === 'GN_RETRY';
 
@@ -87,8 +105,10 @@ async function spin(user: TelegramUser, body: Body) {
     const ctx = await rpc<Body>('gn_spin_context', { p_telegram_id: user.id, ...FREE, ...HAPPY });
     if (!ctx) throw new ApiError(401, 'Игрок не найден, перезапусти игру');
     const spinNo = ctx.spin_no as number;
+    // Сначала обычные бесплатные (копятся по времени), потом подарочные.
     const useFree = wantFree && (ctx.free as number) > 0;
-    const st = useFree ? 1 : stake;
+    const useBonus = wantFree && !useFree && (ctx.bonus as number) > 0;
+    const st = useFree || useBonus ? 1 : stake;
     const required = Math.max(country.lvl, STAKE_LEVEL[st]);
     if ((ctx.level as number) < required) {
       throw new ApiError(400, country.lvl > (ctx.level as number)
@@ -99,7 +119,7 @@ async function spin(user: TelegramUser, body: Body) {
     const nominal = spinCostKop(country, st);
     // Удача не даёт выгоды от резкого подъёма ставки: ставка не выше средней за последние ~100 прокруток.
     const bet = luck.luck > 1 ? Math.min(nominal, ctx.avg_bet as number) : nominal;
-    const cost = useFree ? 0 : bet;
+    const cost = useFree || useBonus ? 0 : bet;
     const d = drawLucky(cryptoRng, country, luck.luck, guaranteeRank(spinNo));
     try {
       return await rpc<Body>('gn_spin', {
@@ -107,6 +127,7 @@ async function spin(user: TelegramUser, body: Body) {
         p_spin_no: spinNo,
         p_required_level: required,
         p_use_free: useFree,
+        p_use_bonus: useBonus,
         p_lucky: luck.lucky,
         p_happy_used: luck.happyUsed,
         p_luck: luck.luck,
@@ -130,6 +151,7 @@ async function spin(user: TelegramUser, body: Body) {
         p_lucky_every: LUCKY_EVERY,
         ...FREE,
         ...HAPPY,
+        ...REF,
       });
     } catch (e) {
       if (!isRetry(e)) throw e;
@@ -140,7 +162,7 @@ async function spin(user: TelegramUser, body: Body) {
 
 async function buySlot(user: TelegramUser) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const st = await rpc<Body>('gn_login', { p_telegram_id: user.id, p_first_name: user.first_name ?? '', p_username: user.username ?? null });
+    const st = await login(user);
     const extra = st.extra_slots as number;
     if (SLOTS_START + extra >= SLOTS_MAX) throw new ApiError(400, 'Витрина уже максимальная');
     try {
@@ -154,11 +176,20 @@ async function buySlot(user: TelegramUser) {
   throw new ApiError(409, 'Попробуй ещё раз');
 }
 
+// Награда за достижение: выполнение проверяем по статистике сервера, повтор не даст SQL.
+async function claim(user: TelegramUser, body: Body) {
+  const a = ACHIEVEMENTS.find((x) => x.id === body.id);
+  if (!a) throw new ApiError(400, 'Нет такого достижения');
+  const stats = await rpc<Stats>('gn_stats', { p_telegram_id: user.id });
+  if (!achDone(a, stats)) throw new ApiError(400, 'Достижение ещё не выполнено');
+  return rpc('gn_claim', { p_telegram_id: user.id, p_key: a.id, p_reward: a.rewardRub * 100, p_spins: a.rewardSpins ?? 0 });
+}
+
 async function handle(user: TelegramUser, body: Body): Promise<unknown> {
   const tg = { p_telegram_id: user.id };
   switch (body.action) {
     case 'login':
-      return rpc('gn_login', { ...tg, p_first_name: user.first_name ?? '', p_username: user.username ?? null });
+      return login(user);
     case 'spin':
       return spin(user, body);
     case 'sell':
@@ -191,6 +222,28 @@ async function handle(user: TelegramUser, body: Body): Promise<unknown> {
       return rpc('gn_collection', tg);
     case 'leaderboard':
       return rpc('gn_leaderboard', tg);
+    case 'friends':
+      return rpc('gn_friends', tg);
+    case 'stats':
+      return rpc('gn_stats', tg);
+    case 'claim':
+      return claim(user, body);
+    case 'market':
+      return rpc('gn_market', { ...tg, p_mine: body.mine === true });
+    case 'lot_create': {
+      const price = body.price;
+      if (typeof price !== 'number' || !Number.isSafeInteger(price) || price <= 0) throw new ApiError(400, 'Укажи цену');
+      return rpc('gn_lot_create', {
+        ...tg, p_sim_id: uuid(body, 'id'), p_price: price,
+        p_min_share: MARKET_MIN_PRICE, p_max_share: MARKET_MAX_PRICE, p_max_lots: MARKET_MAX_LOTS,
+      });
+    }
+    case 'lot_cancel':
+      return rpc('gn_lot_cancel', { ...tg, p_lot_id: uuid(body, 'id'), p_slots_start: SLOTS_START });
+    case 'lot_buy':
+      return rpc('gn_lot_buy', {
+        ...tg, p_lot_id: uuid(body, 'id'), p_slots_start: SLOTS_START, p_fee: MARKET_FEE, p_max_buys: MARKET_MAX_BUYS_PER_SELLER,
+      });
     default:
       throw new ApiError(400, 'Неизвестное действие');
   }

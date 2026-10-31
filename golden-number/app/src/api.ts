@@ -35,4 +35,11 @@ export const serverApi: Api = {
   bailout: () => call('bailout'),
   collection: () => call('collection'),
   leaderboard: () => call('leaderboard'),
+  friends: () => call('friends'),
+  stats: () => call('stats'),
+  claim: (id) => call('claim', { id }),
+  market: (mine) => call('market', { mine }),
+  lotCreate: (id, price) => call('lot_create', { id, price }),
+  lotCancel: (id) => call('lot_cancel', { id }),
+  lotBuy: (id) => call('lot_buy', { id }),
 };

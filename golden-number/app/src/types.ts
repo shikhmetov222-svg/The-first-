@@ -1,3 +1,5 @@
+import type { Stats } from '../../supabase/functions/_shared/game/logic.ts';
+
 // Ответы сервера. Все суммы — в копейках.
 
 export interface Sim {
@@ -18,6 +20,7 @@ export interface Sim {
 }
 
 export interface State {
+  telegram_id?: number;
   balance: number;
   xp: number;
   level: number;
@@ -34,6 +37,8 @@ export interface State {
   daily_day: string | null;
   daily_streak: number;
   extra_slots: number;
+  bonus_spins?: number;
+  listed_count?: number;
   pending: Sim | null;
 }
 
@@ -47,6 +52,22 @@ export interface SpinResult {
 export interface Leaderboard {
   top: { place: number; name: string; value: number; count: number; me: boolean }[];
   me: { place: number; value: number; count: number } | null;
+}
+
+export interface Friends {
+  invited: number;
+  active: number;
+  earned: number;
+  list: { name: string; spins: number; counted: boolean }[];
+}
+
+export interface Lot {
+  id: string;
+  price: number;
+  created_at: string;
+  mine: boolean;
+  seller: string;
+  sim: Sim;
 }
 
 export interface SpinOptions {
@@ -66,4 +87,11 @@ export interface Api {
   bailout(): Promise<{ granted: number; state: State }>;
   collection(): Promise<Sim[]>;
   leaderboard(): Promise<Leaderboard>;
+  friends(): Promise<Friends>;
+  stats(): Promise<Stats>;
+  claim(id: string): Promise<{ reward: number; spins: number; state: State }>;
+  market(mine: boolean): Promise<Lot[]>;
+  lotCreate(simId: string, price: number): Promise<{ lot: Lot; state: State }>;
+  lotCancel(lotId: string): Promise<{ state: State }>;
+  lotBuy(lotId: string): Promise<{ paid: number; state: State }>;
 }
