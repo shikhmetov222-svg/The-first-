@@ -74,3 +74,25 @@ describe('рынок и друзья', () => {
     expect(u?.start_param).toBe('r42');
   });
 });
+
+import { parseKeepRule, ruleMatches } from '../../supabase/functions/_shared/game/logic.ts';
+
+describe('что оставлять себе', () => {
+  it('по редкости — этот тир и выше', () => {
+    expect(ruleMatches({ mode: 'tier', tier: 'rare' }, { tier: 'epic', value: 1 })).toBe(true);
+    expect(ruleMatches({ mode: 'tier', tier: 'rare' }, { tier: 'nice', value: 1e9 })).toBe(false);
+  });
+  it('по цене — от и до, «до» можно не задавать', () => {
+    expect(ruleMatches({ mode: 'price', from: 1000, to: 5000 }, { tier: 'common', value: 3000 })).toBe(true);
+    expect(ruleMatches({ mode: 'price', from: 1000, to: 5000 }, { tier: 'legend', value: 9000 })).toBe(false);
+    expect(ruleMatches({ mode: 'price', from: 1000, to: null }, { tier: 'common', value: 9e9 })).toBe(true);
+    expect(ruleMatches({ mode: 'none' }, { tier: 'legend', value: 9e9 })).toBe(false);
+  });
+  it('сервер не примет странное правило', () => {
+    expect(parseKeepRule({ mode: 'tier', tier: 'common' })).toBeNull();
+    expect(parseKeepRule({ mode: 'price', from: 500, to: 100 })).toBeNull();
+    expect(parseKeepRule({ mode: 'price', from: -1, to: null })).toBeNull();
+    expect(parseKeepRule({ mode: 'drop table' })).toBeNull();
+    expect(parseKeepRule({ mode: 'price', from: 100, to: null })).toEqual({ mode: 'price', from: 100, to: null });
+  });
+});

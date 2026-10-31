@@ -42,4 +42,5 @@ export const serverApi: Api = {
   lotCreate: (id, price) => call('lot_create', { id, price }),
   lotCancel: (id) => call('lot_cancel', { id }),
   lotBuy: (id) => call('lot_buy', { id }),
+  setKeepRule: (rule) => call('keep_rule', { rule }),
 };

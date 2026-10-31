@@ -1,4 +1,5 @@
 import type { Stats } from '../../supabase/functions/_shared/game/logic.ts';
+import type { KeepRule } from '../../supabase/functions/_shared/game/config.ts';
 
 // Ответы сервера. Все суммы — в копейках.
 
@@ -39,12 +40,14 @@ export interface State {
   extra_slots: number;
   bonus_spins?: number;
   listed_count?: number;
+  keep_rule?: KeepRule;
   pending: Sim | null;
 }
 
 export interface SpinResult {
   sim: Sim;
   auto_sold: number;
+  auto_kept?: number;
   levels_gained: number;
   state: State;
 }
@@ -94,4 +97,5 @@ export interface Api {
   lotCreate(simId: string, price: number): Promise<{ lot: Lot; state: State }>;
   lotCancel(lotId: string): Promise<{ state: State }>;
   lotBuy(lotId: string): Promise<{ paid: number; state: State }>;
+  setKeepRule(rule: KeepRule): Promise<{ state: State }>;
 }

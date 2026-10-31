@@ -206,7 +206,7 @@ svg { width: 20px; height: 20px; flex: none; }
 .btn-pill { min-height: 52px; padding: 0 var(--s4); border-radius: 999px; font-size: var(--f-md); font-variant-numeric: tabular-nums; }
 .btn-pill-dark { background: var(--surface-2); color: var(--text); }
 .btn-pill-gold { background: linear-gradient(180deg, #ffe066, #f5c518); color: #2a1d00; box-shadow: 0 6px 18px rgb(245 197 24 / .25); }
-.acts-note { margin-top: var(--s3); text-align: center; color: var(--text-2); font-size: var(--f-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
+.acts-note { display: block; width: 100%; margin-top: var(--s3); text-align: center; color: var(--text-2); font-size: var(--f-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* ============================ СПИСКИ ============================ */
 .list { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
@@ -345,3 +345,21 @@ nav button { position: relative; }
   .particles { display: none; }
   .res.enter, .sheet, .sheet-in { animation: none; }
 }
+
+/* ============================ правило «что оставлять» ============================ */
+.res-top .tags { margin-top: 0; flex: 1; }
+.tierbar b { display: flex; flex-direction: column; align-items: flex-end; font-size: var(--f-xl); line-height: 1.1; }
+.tierbar b small { font-size: var(--f-xs); color: var(--text-2); font-weight: 700; }
+.acts-note u { text-decoration: none; color: var(--accent-2); }
+.opts { border-radius: var(--r-lg); background: var(--surface-2); overflow: hidden; }
+.opt { width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--s4); font-size: var(--f-md); font-weight: 800; color: var(--tc, var(--text)); border-bottom: 1px solid var(--border); transition: background var(--t-fast) var(--ease); }
+.opt:last-child { border-bottom: 0; }
+.opt:active { background: var(--surface-1); }
+.tick { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); font-style: normal; font-size: var(--f-sm); font-weight: 800; }
+.price-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.price-row .field { font-size: var(--f-md); }
+.sheet-in { max-height: calc(100vh - 32px); overflow-y: auto; }
+.rule-row { grid-column: 1 / -1; width: 100%; margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--border); text-align: left; color: var(--text-2); font-size: var(--f-xs); font-weight: 700; }
+.rule-row b { color: var(--accent-2); }
+.coll-head { flex-wrap: wrap; }
+.coll-head .rule-row b { display: inline; font-size: inherit; color: var(--accent-2); }

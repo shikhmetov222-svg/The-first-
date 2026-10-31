@@ -7,7 +7,7 @@ import {
   GEN_WEIGHTS, RARITY, WORDS, tierFor, type Country, type GenWeights, type Rarity, type Operator, type PrefixRule, type Tier, type T9Word,
   DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS,
   LUCKY_EVERY, LUCKY_LUCK, ONBOARDING_GUARANTEE, SELL_BACK, STAKE_XP, TIERS, XP_BASE, XP_POW,
-  ACHIEVEMENTS, COUNTRIES, MARKET_MAX_PRICE, MARKET_MIN_PRICE, type Achievement,
+  ACHIEVEMENTS, COUNTRIES, MARKET_MAX_PRICE, MARKET_MIN_PRICE, type Achievement, type KeepRule,
 } from './config.ts';
 
 /** Возвращает число в [0, 1). */
@@ -319,4 +319,26 @@ export function priceBreakdown(prefix: string, sub: string, R: Rarity = RARITY) 
   const pattern = ev.tags.find((t) => !t.startsWith('T9:') && !t.startsWith('Код '));
   parts.unshift({ label: pattern ?? 'Без узора', mul: Math.round(base * 100) / 100 });
   return parts;
+}
+
+// ---------- что оставлять себе ----------
+
+/** Подходит ли номер под правило. Та же логика в SQL (gn_rule_match). */
+export function ruleMatches(rule: KeepRule, s: { tier: string; value: number }): boolean {
+  if (rule.mode === 'tier') return tierRank(s.tier) >= tierRank(rule.tier);
+  if (rule.mode === 'price') return s.value >= rule.from && (rule.to === null || s.value <= rule.to);
+  return false;
+}
+
+/** Проверка правила от клиента: только известные режимы и разумные числа. */
+export function parseKeepRule(x: unknown): KeepRule | null {
+  if (!x || typeof x !== 'object') return null;
+  const r = x as Record<string, unknown>;
+  if (r.mode === 'none') return { mode: 'none' };
+  if (r.mode === 'tier' && ['nice', 'rare', 'epic', 'legend'].includes(r.tier as string)) return { mode: 'tier', tier: r.tier as 'rare' };
+  const ok = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+  if (r.mode === 'price' && ok(r.from) && (r.to === null || (ok(r.to) && (r.to as number) >= (r.from as number)))) {
+    return { mode: 'price', from: r.from as number, to: r.to as number | null };
+  }
+  return null;
 }

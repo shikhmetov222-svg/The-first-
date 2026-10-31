@@ -2,10 +2,10 @@ import './styles.css';
 import {
   BAILOUT_RUB, COUNTRIES, FREE_SPIN_MAX, KASSA_CAP_HOURS, LUCKY_EVERY, LUCKY_LUCK, HAPPY_LUCK, HAPPY_SPINS, SLOTS_MAX, SLOTS_START,
   STAKES, STAKE_LEVEL, countryById, slotPriceRub, type Country,
-  ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
+  KEEP_RULE_DEFAULT, type KeepRule, ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
-  achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
+  ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
   sellBackKop, spinCostKop, tierRank, xpToNext, type Stats,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { serverApi } from './api.ts';
@@ -167,17 +167,17 @@ function renderResult(enter = false) {
   el.innerHTML = `
     <div class="res ${enter ? 'enter' : ''}" style="--tc:${tierVar(p.tier)}">
       <div class="res-top">
-        <span class="tier">${tierById(p.tier).name} · ×${fmtMul(p.mul)}</span>
+        <div class="tags">${p.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('') || '<span class="tag">Ничего особенного</span>'}${extra}</div>
         <button class="icon-btn" id="b-share" aria-label="Поделиться картинкой">${icon('i-share')}</button>
       </div>
-      <div class="tags">${p.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('') || '<span class="tag">Ничего особенного</span>'}${extra}</div>
-      <div class="val"><b>${local(c, p.value)}</b>${c.cur !== '₽' ? `<span>≈ ${rub(p.value)}</span>` : ''}</div>
       ${whyHtml(p)}
       <div class="acts">
         <button class="btn btn-pill btn-pill-dark" id="b-sell">Продать за ${rub(p.value)}</button>
         <button class="btn btn-pill btn-pill-gold" id="b-keep">В коллекцию</button>
       </div>
-      <div class="acts-note">${full ? `Витрина заполнена · ${S.collection_count}/${slotsCap()}` : `В коллекции принесёт +${rub(incomePerHourKop(p.value))}/ч · витрина ${S.collection_count}/${slotsCap()}`}</div>
+      <button class="acts-note" id="b-rule">${ruleMatches(keepRule(), p)
+        ? (full ? `Подходит под правило, но витрина заполнена (${S.collection_count}/${slotsCap()})` : `Этот номер уйдёт в коллекцию сам · +${rub(incomePerHourKop(p.value))}/ч`)
+        : 'Этот номер продастся, когда крутишь следующий'} · <u>что оставлять</u></button>
     </div>`;
   $('b-sell').onclick = (e) => act(e, async () => {
     const r = await api.sell(); setState(r.state); card.clearGlow(); toast('Продано: +' + rub(r.sold));
@@ -187,6 +187,7 @@ function renderResult(enter = false) {
   const sell = $('b-sell'), keep = $('b-keep');
   if (sell.offsetTop !== keep.offsetTop) sell.textContent = 'Продать';
   $('b-share').onclick = () => shareSim(c, p);
+  $('b-rule').onclick = () => ruleSheet();
 }
 
 /** Шкала редкости над карточкой: тир, ступени и цена — как только барабаны остановились. */
@@ -196,9 +197,9 @@ function renderTierbar(p: Sim | null) {
   const rank = tierRank(p.tier);
   el.classList.remove('hidden');
   el.style.setProperty('--tc', tierVar(p.tier));
-  el.innerHTML = `<div><div class="tb-name">${tierById(p.tier).name}</div>
+  el.innerHTML = `<div><div class="tb-name">${tierById(p.tier).name} · ×${fmtMul(p.mul)}</div>
     <div class="tb-steps">${TIERS.map((_, i) => `<i class="${i <= rank ? 'on' : ''}"></i>`).join('')}</div></div>
-    <b>${rub(p.value)}</b>`;
+    <b>${local(countryById(p.country)!, p.value)}${countryById(p.country)!.cur !== '₽' ? `<small>≈ ${rub(p.value)}</small>` : ''}</b>`;
 }
 
 /** «Почему такая цена»: база × страна × узор × бонусы × ставка. */
@@ -215,6 +216,8 @@ async function renderColl() {
   const price = slotPriceRub(S.extra_slots) * 100, max = slotsCap() >= SLOTS_MAX;
   head.innerHTML = `<div class="m"><span>Витрина ${S.collection_count}/${slotsCap()} · касса копится ${KASSA_CAP_HOURS} ч</span><b>+${rub(incomePerHourKop(S.collection_value))}/ч</b></div>
     <button class="btn btn-secondary btn-m btn-stack" id="buy-slot" ${max || S.balance < price ? 'disabled' : ''}>${max ? 'Максимум' : 'Ещё место'}${max ? '' : `<span class="sub">${rub(price)}</span>`}</button>`;
+  head.insertAdjacentHTML('beforeend', `<button class="rule-row" id="coll-rule">Сами уходят в коллекцию: <b>${ruleText(keepRule())}</b> ›</button>`);
+  $('coll-rule').onclick = () => ruleSheet();
   $('buy-slot').onclick = (e) => act(e, async () => {
     const r = await api.buySlot(); setState(r.state); haptic.success(); toast(`Витрина: ${slotsCap()} мест`); renderColl();
   });
@@ -323,12 +326,14 @@ async function keepPending(): Promise<boolean> {
   return true;
 }
 
-/** Перед автопродажей редкого и выше — спросить. go: можно продолжать. */
+const keepRule = (): KeepRule => S.keep_rule ?? KEEP_RULE_DEFAULT;
+
+/** Прошлый номер подходит под правило «оставлять», а витрина полна — спросить, что делать. go: можно продолжать. */
 async function confirmPending(action: string): Promise<{ go: boolean; autosellOk: boolean }> {
   const p = S.pending;
-  if (!p || tierRank(p.tier) < 2) return { go: true, autosellOk: false };
-  const a = await ask(`${tierById(p.tier).name} номер ещё не решён`, `${p.label} · ${rub(p.value)}. ${action}`, [
-    { id: 'keep', label: 'Сначала в коллекцию', kind: 'primary' },
+  if (!p || !ruleMatches(keepRule(), p) || S.collection_count < slotsCap()) return { go: true, autosellOk: false };
+  const a = await ask('Витрина заполнена', `${p.label} · ${tierById(p.tier).name} · ${rub(p.value)} подходит под правило «оставлять», но ему нет места. ${action}`, [
+    { id: 'keep', label: 'Освободить место или купить', kind: 'primary' },
     { id: 'sell', label: `Продать за ${rub(p.value)}`, kind: 'secondary' },
     { id: 'cancel', label: 'Отмена', kind: 'ghost' },
   ]);
@@ -338,6 +343,51 @@ async function confirmPending(action: string): Promise<{ go: boolean; autosellOk
     catch (e) { busy = false; toast((e as Error).message); renderAll(); return { go: false, autosellOk: false }; }
   }
   return { go: a === 'sell', autosellOk: a === 'sell' };
+}
+
+const RULE_TIERS: { tier: 'nice' | 'rare' | 'epic' | 'legend'; label: string }[] = [
+  { tier: 'nice', label: 'Красивые и дороже' },
+  { tier: 'rare', label: 'Редкие и дороже' },
+  { tier: 'epic', label: 'Эпические и дороже' },
+  { tier: 'legend', label: 'Только легендарные' },
+];
+const ruleText = (r: KeepRule) => r.mode === 'none' ? 'всё продавать'
+  : r.mode === 'tier' ? RULE_TIERS.find((x) => x.tier === r.tier)!.label.toLowerCase()
+  : `по цене от ${rub(r.from)}${r.to !== null ? ` до ${rub(r.to)}` : ''}`;
+
+/** Лист «Что оставлять себе»: по цене или по редкости. */
+function ruleSheet() {
+  const r = keepRule(), sheet = $('sheet');
+  $('sheet-in').innerHTML = `<h3>Что оставлять себе</h3>
+    <p>Номер, по которому ты ничего не нажал, при следующей прокрутке уйдёт в коллекцию, если подходит, — остальные продаются игре по оценке. Выбери одно: по редкости или по цене.</p>
+    <div class="group-title" style="margin-top:0">По редкости</div>
+    <div class="opts">${RULE_TIERS.map((t) => `<button class="opt" data-tier="${t.tier}" style="--tc:${tierVar(t.tier)}"><span>${t.label}</span>${r.mode === 'tier' && r.tier === t.tier ? '<i class="tick">✓</i>' : ''}</button>`).join('')}
+      <button class="opt" data-none="1"><span>Никакие — всё продавать</span>${r.mode === 'none' ? '<i class="tick">✓</i>' : ''}</button></div>
+    <div class="group-title">По цене, в рублях</div>
+    <div class="price-row"><input class="field" id="rule-from" type="number" inputmode="numeric" placeholder="Цена от" value="${r.mode === 'price' ? Math.round(r.from / 100) : ''}">
+      <input class="field" id="rule-to" type="number" inputmode="numeric" placeholder="до (можно пусто)" value="${r.mode === 'price' && r.to !== null ? Math.round(r.to / 100) : ''}"></div>
+    <div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-gold btn-l" id="rule-price">Оставлять по цене${r.mode === 'price' ? ' ✓' : ''}</button>
+      <button class="btn btn-ghost btn-l" id="rule-close">Закрыть</button></div>`;
+  sheet.classList.remove('hidden');
+  const close = () => { sheet.classList.add('hidden'); sheet.onclick = null; };
+  const save = (rule: KeepRule, btn: HTMLElement) => act(btn, async () => {
+    const res = await api.setKeepRule(rule); setState(res.state); haptic.success(); close();
+    toast('Оставлять: ' + ruleText(rule));
+  });
+  sheet.onclick = (e) => {
+    const t = e.target as HTMLElement;
+    if (t === sheet) return close();
+    const o = t.closest<HTMLElement>('.opt');
+    if (o) save(o.dataset.none ? { mode: 'none' } : { mode: 'tier', tier: o.dataset.tier as 'rare' }, o);
+  };
+  $('rule-close').onclick = close;
+  $('rule-price').onclick = (e) => {
+    const from = Math.round(Number(($('rule-from') as HTMLInputElement).value || 0) * 100);
+    const toRaw = ($('rule-to') as HTMLInputElement).value;
+    const to = toRaw ? Math.round(Number(toRaw) * 100) : null;
+    if (to !== null && to < from) { toast('«До» должно быть больше «от»'); return; }
+    save({ mode: 'price', from, to }, e.currentTarget as HTMLElement);
+  };
 }
 
 function setSpinning(on: boolean) {
@@ -368,7 +418,8 @@ async function spin() {
     renderAll();
     return;
   }
-  if (r.auto_sold) toast('Прошлый номер продан: +' + rub(r.auto_sold));
+  if (r.auto_kept) toast('Прошлый номер — в коллекции по правилу');
+  else if (r.auto_sold) toast('Прошлый номер продан: +' + rub(r.auto_sold));
   const prevLevel = S.level;
   // Баланс показываем сразу, остальное (опыт, номер) — после остановки, чтобы не выдать результат.
   renderHud(r.state.balance);
@@ -428,7 +479,12 @@ async function switchCountry(c: Country) {
     const conf = await confirmPending('При смене страны он продастся.');
     if (!conf.go) return;
     if (S.pending) {
-      await act(null, async () => { const r = await api.sell(); setState(r.state); toast('Прошлый номер продан: +' + rub(r.sold)); });
+      const p = S.pending;
+      if (ruleMatches(keepRule(), p) && S.collection_count < slotsCap()) {
+        await act(null, async () => { const r = await api.keep(); setState(r.state); toast('Прошлый номер — в коллекции по правилу'); });
+      } else {
+        await act(null, async () => { const r = await api.sell(); setState(r.state); toast('Прошлый номер продан: +' + rub(r.sold)); });
+      }
       if (S.pending) return;
     }
   }

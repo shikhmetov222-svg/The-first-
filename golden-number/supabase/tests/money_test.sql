@@ -17,7 +17,7 @@ begin
   happy := not lucky and (c->>'happy_left')::int > 0;
   return gn_spin(tg, n, lvl, use_free, use_bonus, lucky, happy, 1, case when use_free or use_bonus then 0 else cost end, cost, xp, autosell_ok,
     'ru', 'МТС', '910', '1234567', '+7 (910) 123-45-67', 1, tier, '{}', 1, value,
-    80, 1.5, 0.01, 100, 4, 2, '{13,20}', 10, 30, 500000, 3);
+    80, 1.5, 0.01, 100, 4, 2, '{13,20}', 10, 30, 500000, 3, 6);
 end $$;
 
 do $$
@@ -38,13 +38,28 @@ begin
   perform pg_temp.check((r->'state'->>'avg_bet') is null, 'avg_bet не уходит клиенту');
   perform pg_temp.check((select avg_bet from gn_players where telegram_id = tg) = 100000, 'средняя ставка обновлена');
 
-  -- редкий номер нельзя продать автоматически без подтверждения
+  -- правило «что оставлять»: по умолчанию «Редкие и дороже» — редкий уходит в коллекцию сам
   r := pg_temp.spin(tg, 100000, 456000, tier => 'rare');
-  begin perform pg_temp.spin(tg, 100000, 1); perform pg_temp.check(false, 'автопродажа редкого');
-  exception when raise_exception then
-    perform pg_temp.check(sqlerrm = 'Сначала реши, что делать с прошлым номером', 'редкий без подтверждения не продаётся'); end;
-  r := pg_temp.spin(tg, 100000, 1000, autosell_ok => true);
-  perform pg_temp.check((r->>'auto_sold')::bigint = 456000, 'с подтверждением — продан');
+  r := pg_temp.spin(tg, 100000, 1000);
+  perform pg_temp.check((r->>'auto_kept')::bigint = 456000 and (r->>'auto_sold')::bigint = 0, 'редкий по правилу ушёл в коллекцию');
+  perform pg_temp.check((r->'state'->>'collection_count')::int = 1, 'на витрине появился номер');
+  -- правило «никакие»: всё продаётся
+  perform gn_set_keep_rule(tg, '{"mode":"none"}');
+  r := pg_temp.spin(tg, 100000, 2000, tier => 'epic');
+  r := pg_temp.spin(tg, 100000, 1);
+  perform pg_temp.check((r->>'auto_sold')::bigint = 2000 and (r->>'auto_kept')::bigint = 0, 'правило «всё продавать»');
+  -- правило по цене: от 1 000 до 5 000 копеек
+  perform gn_set_keep_rule(tg, '{"mode":"price","from":1000,"to":5000}');
+  r := pg_temp.spin(tg, 100000, 3000);
+  r := pg_temp.spin(tg, 100000, 9000);
+  perform pg_temp.check((r->>'auto_kept')::bigint = 3000, 'по цене: подходящий оставлен');
+  r := pg_temp.spin(tg, 100000, 1);
+  perform pg_temp.check((r->>'auto_sold')::bigint = 9000, 'по цене: дороже «до» — продан');
+  perform pg_temp.check((r->'state'->'keep_rule'->>'mode') = 'price', 'правило в состоянии игрока');
+  -- освобождаем витрину и выключаем правило для остальных проверок
+  s := gn_collection(tg);
+  for i in 0..jsonb_array_length(s) - 1 loop perform gn_sell_number(tg, (s->i->>'id')::uuid, 0.7); end loop;
+  perform gn_set_keep_rule(tg, '{"mode":"none"}');
 
   -- снимок устарел → GN_RETRY
   begin perform pg_temp.spin(tg, 100000, 1, spin_no_override => 1); perform pg_temp.check(false, 'старый снимок');
@@ -63,8 +78,11 @@ begin
   perform pg_temp.spin(tg, 100000, 99000);
   begin perform gn_keep(tg, 6, 0.7); perform pg_temp.check(false, 'седьмое место');
   exception when raise_exception then perform pg_temp.check(sqlerrm = 'Витрина заполнена', 'на полной витрине нужно выбрать замену'); end;
+  perform gn_set_keep_rule(tg, '{"mode":"tier","tier":"common"}');
+  begin perform pg_temp.spin(tg, 100000, 1); perform pg_temp.check(false, 'полная витрина');
+  exception when raise_exception then perform pg_temp.check(sqlerrm like 'Витрина заполнена%', 'подходящий номер не продаётся молча, если витрина полна'); end;
+  perform gn_set_keep_rule(tg, '{"mode":"none"}');
   s := gn_collection(tg);
-  select balance into i from gn_players where telegram_id = tg;
   r := gn_keep(tg, 6, 0.7, (s->5->>'id')::uuid); -- самый дешёвый (10 000 коп.)
   perform pg_temp.check((r->>'replaced_sold')::bigint = 7000, 'заменённый номер продан за 70%');
   perform pg_temp.check((r->'state'->>'collection_count')::int = 6, 'на витрине по-прежнему 6');

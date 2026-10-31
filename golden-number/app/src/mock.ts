@@ -3,11 +3,11 @@
 // Параметры для проверки состояний: &seq=7777777,1234567 (следующие номера) &spins=99 (сколько уже было
 // прокруток) &level=7 &balance=500 &free=0 &daily=0 (бонус уже забран) &coll=6 (заполнить витрину)
 import {
-  ACHIEVEMENTS, AVG_BET_START_RUB, AVG_BET_WEIGHT, BAILOUT_RUB, BASE_COST_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, MARKET_FEE,
+  KEEP_RULE_DEFAULT, type KeepRule, ACHIEVEMENTS, AVG_BET_START_RUB, AVG_BET_WEIGHT, BAILOUT_RUB, BASE_COST_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, MARKET_FEE,
   SLOTS_MAX, SLOTS_START, STAKE_LEVEL, START_BALANCE_RUB, countryById, slotPriceRub,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
-  achDone, lotPriceBounds, type Stats, dailyNow, drawLucky, evaluate, formatLabel, freeNow, guaranteeRank, happyNow, kassaTotalKop, msk, sellBackKop,
+  ruleMatches, achDone, lotPriceBounds, type Stats, dailyNow, drawLucky, evaluate, formatLabel, freeNow, guaranteeRank, happyNow, kassaTotalKop, msk, sellBackKop,
   spinCostKop, spinLuck, valueByBetKop, xpForSpin, xpToNext,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import type { Api, Lot, Sim, State } from './types.ts';
@@ -24,7 +24,7 @@ const P = {
   dailyDay: q.get('daily') === '0' ? msk(new Date()).date : (null as string | null), dailyStreak: 2,
   extraSlots: 0, bailoutAt: 0, bonus: num('bonus', 0),
   pending: null as Sim | null, coll: [] as Sim[], history: [] as Sim[], claimed: [] as string[],
-  lots: [] as Lot[], myLots: [] as Lot[],
+  lots: [] as Lot[], myLots: [] as Lot[], rule: KEEP_RULE_DEFAULT as KeepRule,
 };
 const fail = (msg: string) => new Promise<never>((_, r) => setTimeout(() => r(new Error(msg)), 200));
 const collValue = () => P.coll.reduce((s, x) => s + x.value, 0);
@@ -35,7 +35,7 @@ const state = (): State => ({
   kassa_acc: kassa(), server_now: new Date().toISOString(), bailout_at: null,
   total_spins: P.totalSpins, free_charges: P.freeCharges, free_at: P.freeAt.toISOString(),
   happy_key: P.happyKey, happy_used: P.happyUsed, daily_day: P.dailyDay, daily_streak: P.dailyStreak,
-  extra_slots: P.extraSlots, pending: P.pending, telegram_id: 979901619, bonus_spins: P.bonus, listed_count: P.myLots.length,
+  extra_slots: P.extraSlots, pending: P.pending, telegram_id: 979901619, bonus_spins: P.bonus, listed_count: P.myLots.length, keep_rule: P.rule,
 });
 const stats = (): Stats => ({
   total_spins: P.totalSpins,
@@ -74,15 +74,19 @@ const base: Partial<Api> = {
     const st = useFree || useBonus ? 1 : stake;
     if (P.level < c.lvl) return fail(`${c.name} откроется на уровне ${c.lvl}`);
     if (P.level < STAKE_LEVEL[st]) return fail(`Ставка ×${st} откроется на уровне ${STAKE_LEVEL[st]}`);
-    if (P.pending && ['rare', 'epic', 'legend'].includes(P.pending.tier) && !o.autosellOk) return fail('Сначала реши, что делать с прошлым номером');
+    let kept = 0;
+    const match = !!P.pending && ruleMatches(P.rule, P.pending);
+    if (match && P.coll.length >= SLOTS_START + P.extraSlots && !o.autosellOk) return fail('Витрина заполнена: прошлый номер подходит под правило «оставлять», но ему нет места');
     const spinNo = P.totalSpins + 1;
     const h = happyNow(P.happyKey, P.happyUsed, now);
     const luck = spinLuck(spinNo, h.left);
     const nominal = spinCostKop(c, st);
     const bet = luck.luck > 1 ? Math.min(nominal, P.avgBet) : nominal;
     const cost = useFree || useBonus ? 0 : bet;
-    const auto = P.pending?.value ?? 0;
+    const keepIt = match && P.coll.length < SLOTS_START + P.extraSlots;
+    const auto = keepIt ? 0 : P.pending?.value ?? 0;
     if (P.balance + auto < cost) return fail('Не хватает денег');
+    if (keepIt && P.pending) { settle(); P.coll.push(P.pending); kept = P.pending.value; }
     const sim = makeSim(c.id, st, bet, luck.luck, useFree || useBonus, guaranteeRank(spinNo), seq.shift());
     P.history.push(sim);
     if (useBonus) P.bonus--;
@@ -99,7 +103,7 @@ const base: Partial<Api> = {
     let levels = 0;
     while (P.xp >= xpToNext(P.level)) { P.xp -= xpToNext(P.level); P.level++; levels++; }
     P.pending = sim;
-    return ok({ sim, auto_sold: auto, levels_gained: levels, state: state() });
+    return ok({ sim, auto_sold: auto, auto_kept: kept, levels_gained: levels, state: state() });
   },
   sell() {
     if (!P.pending) return fail('Нет номера');
@@ -199,6 +203,7 @@ export const mockApi = Object.assign(base, {
     settle(); P.coll.push(P.myLots.splice(i, 1)[0].sim);
     return ok({ state: state() });
   },
+  setKeepRule(rule: KeepRule) { P.rule = rule; return ok({ state: state() }); },
   lotBuy(lotId: string) {
     const i = P.lots.findIndex((x) => x.id === lotId);
     if (i < 0) return fail(P.myLots.some((x) => x.id === lotId) ? 'Это твой лот' : 'Этот номер уже купили');

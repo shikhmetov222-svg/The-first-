@@ -13,7 +13,7 @@ import {
   REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS,
 } from '../_shared/game/config.ts';
 import {
-  achDone, drawLucky, formatLabel, guaranteeRank, spinCostKop, spinLuck, valueByBetKop, xpForSpin, type Rng, type Stats,
+  achDone, drawLucky, formatLabel, guaranteeRank, parseKeepRule, spinCostKop, spinLuck, valueByBetKop, xpForSpin, type Rng, type Stats,
 } from '../_shared/game/logic.ts';
 
 const BOT_TOKEN = Deno.env.get('GN_TELEGRAM_BOT_TOKEN') ?? '';
@@ -152,6 +152,7 @@ async function spin(user: TelegramUser, body: Body) {
         ...FREE,
         ...HAPPY,
         ...REF,
+        p_slots_start: SLOTS_START,
       });
     } catch (e) {
       if (!isRetry(e)) throw e;
@@ -222,6 +223,11 @@ async function handle(user: TelegramUser, body: Body): Promise<unknown> {
       return rpc('gn_collection', tg);
     case 'leaderboard':
       return rpc('gn_leaderboard', tg);
+    case 'keep_rule': {
+      const rule = parseKeepRule(body.rule);
+      if (!rule) throw new ApiError(400, 'Непонятное правило');
+      return rpc('gn_set_keep_rule', { ...tg, p_rule: rule });
+    }
     case 'friends':
       return rpc('gn_friends', tg);
     case 'stats':

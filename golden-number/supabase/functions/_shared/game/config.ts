@@ -80,6 +80,14 @@ export const REF_AFTER_SPINS = 30; // друг засчитывается, ко�
 export const REF_REWARD_RUB = 5000; // пригласившему за каждого засчитанного друга
 export const REF_REWARD_SPINS = 3;
 
+// --- Что оставлять себе ---
+/** Правило: невыбранный номер при следующей прокрутке уходит в коллекцию, если подходит, иначе продаётся. */
+export type KeepRule =
+  | { mode: 'tier'; tier: 'nice' | 'rare' | 'epic' | 'legend' }
+  | { mode: 'price'; from: number; to: number | null } // копейки
+  | { mode: 'none' };
+export const KEEP_RULE_DEFAULT: KeepRule = { mode: 'tier', tier: 'rare' };
+
 // --- Рынок между игроками ---
 export const MARKET_FEE = 0.05; // комиссия с продажи — сгорает
 export const MARKET_MIN_PRICE = 0.5; // цена лота: от 50% …
