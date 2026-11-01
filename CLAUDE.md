@@ -16,7 +16,7 @@
     - `capital-hourly` — раз в час;
     - `capital-snapshot` — каждые 5 минут;
     - `market-maintenance` — каждые 5 минут;
-    - `notify-dispatch` — рассылка уведомлений ботом, через pg_net.
+    - `notify-dispatch` — рассылка уведомлений ботом, через pg_net. Сейчас выключена: `notify.bot_enabled = 0` (0028), уведомления в игре остаются.
 - **Вход:** Telegram initData. Подпись проверяется на сервере (`supabase/functions/_shared/telegram.ts`).
 - **Хостинг сайта:** GitHub Pages — https://shikhmetov222-svg.github.io/The-first-/. Сайт собирается сам при каждом push в `main` (`.github/workflows/pages.yml`). Netlify больше не используется: кончились бесплатные кредиты. `netlify.toml` остался от него.
 
@@ -57,7 +57,7 @@ app/src/
                      здания бизнесов и детали берёт из street/gen
 app/public/street2d/ СГЕНЕРИРОВАНО: PNG каждого бизнеса на каждом уровне — node scripts/render-street2d.mjs (из app/)
 supabase/
-  migrations/        0001…0027, по порядку; каждая следующая переопределяет функции целиком (create or replace).
+  migrations/        0001…0028, по порядку; каждая следующая переопределяет функции целиком (create or replace).
                      get_state — обёртка (0022): основное состояние в get_state_base, обёртка добавляет daily, events, rival, orders, news и лигу (0026: league_tier игрока, переходы по итогам сезона — триггер league_rollover);
                      company_card — обёртка (0023): company_card_base + city (город компании для просмотра);
                      dev_info — обёртка (0027): dev_info_base + players_stats (заходы, возвраты, путь новичка)
