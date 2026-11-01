@@ -30,57 +30,41 @@
     <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-1.5 4L16 12H5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-cash" viewBox="0 0 24 24"><path d="M3 7h18v10H3z M12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   </defs>
 </svg>
 
 <header class="hud">
   <div class="hud-in">
-    <div class="lvl" id="lvl-ring" aria-label="Уровень">
-      <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" class="ring-bg"/><circle cx="20" cy="20" r="17" class="ring-fg" id="xpring"/></svg>
-      <b id="lvl">1</b>
-    </div>
-    <div class="hud-meta">
-      <small>Витрина</small>
-      <span id="slots">0/6</span>
-    </div>
+    <button class="menu-btn" id="menu" aria-label="Меню: уровень, касса, бонусы">
+      <svg class="ring" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" class="ring-bg"/><circle cx="24" cy="24" r="22" class="ring-fg" id="xpring"/></svg>
+      <svg class="burger"><use href="#i-menu"/></svg>
+      <i class="red-dot hidden" id="menu-dot"></i>
+    </button>
+    <button class="hpill" id="slots-pill" aria-label="Витрина">
+      <span class="hpill-t">Витрина <b id="slots" class="num-t">0/6</b></span>
+      <span class="hbar"><i id="slots-fill"></i></span>
+    </button>
+    <button class="hpill star" id="luck-pill" aria-label="До удачи ×10"><svg><use href="#i-star"/></svg><b id="luck-n" class="num-t">100</b></button>
     <div class="bal"><small>Баланс</small><b id="bal" class="num-t">0 ₽</b></div>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="kassa" id="kassa">
-    <span class="kassa-ico"><svg><use href="#i-cash"/></svg></span>
-    <div class="kassa-t">
-      <span class="cap">Касса · <span id="rate" class="num-t">0</span> ₽/ч</span>
-      <b id="acc" class="num-t">0 ₽</b>
-      <span class="kassa-bar"><i id="kassa-fill"></i></span>
-    </div>
-    <button class="btn btn-secondary btn-m" id="collect">Забрать</button>
-  </section>
-
-  <section class="daily hidden" id="daily">
-    <span class="daily-ico"><svg><use href="#i-gift"/></svg></span>
-    <div class="daily-t"><b>Ежедневный бонус</b><span id="daily-sub">День 1</span></div>
-    <button class="btn btn-primary btn-m" id="daily-btn">Забрать</button>
-  </section>
-
   <section id="v-play">
-    <div class="label">Страна</div>
-    <div class="chips fade" id="countries"></div>
-    <div class="label">Ставка</div>
-    <div class="chips" id="stakes"></div>
+    <div class="banners" id="banners"></div>
 
-    <div class="luck" id="luck"></div>
+    <div class="tierbar" id="tierbar"></div>
 
-    <div class="tierbar hidden" id="tierbar"></div>
-
-    <div class="stage">
+    <div class="stage" id="stage">
       <div class="card-wrap" id="card-wrap">
         <div class="card" id="card">
           <div class="card-row"><span class="chipicon"></span><span id="cflag"></span><span id="ccode" class="card-code"></span><span class="op" id="opname">—</span></div>
           <div class="num" id="num"></div>
-          <div class="card-foot">Игровой номер · не звоните по нему</div>
+          <div class="card-foot" id="card-foot">Пример номера</div>
         </div>
       </div>
       <div class="particles" id="particles"></div>
@@ -89,7 +73,7 @@
     <div class="result" id="result"></div>
   </section>
 
-  <section id="v-coll" class="hidden">
+<section id="v-coll" class="hidden">
     <div class="panel coll-head" id="coll-head"></div>
     <div class="list" id="coll"></div>
   </section>
@@ -116,10 +100,18 @@
 </main>
 
 <div class="dock"><div class="dock-in">
-  <button class="btn btn-spin" id="spin">
-    <span class="spin-labels"><span class="spin-l on" id="spin-l1">Крутить</span><span class="spin-l" id="spin-l2">Пропустить</span></span>
-    <span class="plaque num-t" id="cost">1 000 ₽</span>
-  </button>
+  <div class="dock-play" id="dock-play">
+    <div class="target" id="target"></div>
+    <div class="sel-row">
+      <button class="sel" id="sel-country"></button>
+      <button class="sel" id="sel-stake"></button>
+      <button class="sel auto" id="auto" aria-pressed="false" aria-label="Автоспин: 5 прокруток подряд">5×</button>
+    </div>
+    <button class="btn btn-spin" id="spin">
+      <span class="spin-labels"><span class="spin-l on" id="spin-l1">Крутить</span><span class="spin-l" id="spin-l2">Пропустить</span></span>
+      <span class="plaque num-t" id="cost">1 000 ₽</span>
+    </button>
+  </div>
   <nav id="nav">
     <button data-v="play" class="on"><svg><use href="#i-play"/></svg>Играть</button>
     <button data-v="coll"><svg><use href="#i-sim"/></svg>Коллекция</button>

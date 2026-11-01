@@ -6,10 +6,10 @@ import {
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
   valueFactor, ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
-  sellBackKop, spinCostKop, tierRank, xpToNext, type Stats,
+  sellBackKop, spinCostKop, xpToNext, type Stats,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { serverApi } from './api.ts';
-import { esc, fmt, fmtMul, local, rub, tierById, tierVar } from './format.ts';
+import { esc, fmt, local, rub, tierById, tierVar } from './format.ts';
 import { Card } from './reels.ts';
 import { shareSim } from './share.ts';
 import { backButton, copyText, haptic, initData, setupTelegram, shareLink } from './tg.ts';
@@ -39,6 +39,10 @@ let marketMine = false;
 let marketTier = 'all';
 let marketCache: Lot[] = [];
 const card = new Card();
+let menuOpen = false;
+let autoOn = false;
+let autoLeft = 0;
+const AUTO_SPINS = 5;
 
 function loadPrefs() {
   try {
@@ -90,131 +94,133 @@ function showBalance(target: number) {
 
 // ---------- отрисовка ----------
 function renderHud(balance = S.balance) {
-  $('lvl').textContent = String(S.level);
   const k = Math.min(1, S.xp / xpToNext(S.level));
-  ($('xpring') as unknown as SVGCircleElement).style.strokeDashoffset = String(106.8 * (1 - k));
+  ($('xpring') as unknown as SVGCircleElement).style.strokeDashoffset = String(RING * (1 - k));
   $('slots').textContent = `${S.collection_count}/${slotsCap()}`;
+  ($('slots-fill') as HTMLElement).style.width = Math.min(100, (S.collection_count / slotsCap()) * 100) + '%';
+  const until = LUCKY_EVERY - (S.total_spins % LUCKY_EVERY);
+  $('luck-n').textContent = String(until);
+  $('luck-pill').classList.toggle('hot', until === 1);
+  $('luck-pill').setAttribute('aria-label', until === 1 ? `Следующая прокрутка — удача ×${LUCKY_LUCK}` : `До удачи ×${LUCKY_LUCK}: ${until}`);
+  $('menu-dot').classList.toggle('hidden', !menuHasClaims());
   showBalance(balance);
 }
+const RING = 2 * Math.PI * 22;
 
-function renderKassa() {
-  const rate = incomePerHourKop(S.collection_value), acc = kassaNow();
-  $('rate').textContent = fmt(rate / 100);
-  $('acc').textContent = rub(acc);
-  ($('kassa-fill') as HTMLElement).style.width = rate > 0 ? Math.min(100, (acc / (rate * KASSA_CAP_HOURS)) * 100) + '%' : '0%';
-  ($('collect') as HTMLButtonElement).disabled = acc < 100 || busy;
+/** Есть что забрать: касса за час и больше, бонус дня, достижения. */
+const kassaReady = () => kassaNow() >= 100 && kassaNow() >= incomePerHourKop(S.collection_value);
+const menuHasClaims = () => kassaReady() || dailyInfo().available || (stats ? achClaimable(stats).length > 0 : false);
+
+interface Banner { id: string; icon: string; title: string; sub: string; cta?: string; hot?: boolean; kind: string }
+/** Короткие баннеры над карточкой: не больше двух, остальное — в меню ☰. */
+function banners(): Banner[] {
+  const out: Banner[] = [];
+  const h = happyInfo(), d = dailyInfo(), acc = kassaNow();
+  if (h.active && h.left > 0) out.push({ id: 'happy', kind: 'happy', icon: 'i-sun', title: `Счастливый час ×${HAPPY_LUCK}`, sub: `осталось ${h.left} из ${HAPPY_SPINS}`, hot: true });
+  if (d.available) out.push({ id: 'daily', kind: 'daily', icon: 'i-gift', title: 'Бонус дня', sub: rub(d.amountKop), cta: 'Забрать' });
+  if (acc >= 100) out.push({ id: 'kassa', kind: 'kassa', icon: 'i-cash', title: `Касса · ${fmt(incomePerHourKop(S.collection_value) / 100)} ₽/ч`, sub: '+' + rub(acc), cta: 'Забрать' });
+  if (!h.active || h.left === 0) out.push({ id: 'happy', kind: 'happy-next', icon: 'i-sun', title: 'Счастливый час', sub: h.next ? `в ${mskHm(h.next)} МСК` : '—' });
+  return out.slice(0, 2);
 }
 
-function renderDaily() {
-  const d = dailyInfo();
-  $('daily').classList.toggle('hidden', !d.available || $('daily').classList.contains('off'));
-  if (d.available) $('daily-sub').textContent = `День ${d.streak + 1} подряд · ${rub(d.amountKop)}`;
+function renderBanners() {
+  const list = banners();
+  const el = $('banners');
+  el.classList.toggle('two', list.length > 1);
+  el.innerHTML = list.map((b) => `<button class="banner ${b.hot ? 'hot' : ''} b-${b.kind}" data-b="${b.id}">
+      <span class="banner-ico">${icon(b.icon)}</span>
+      <span class="banner-t"><b><span class="bi">${icon(b.icon)}</span>${b.title}</b><span class="num-t">${b.sub}${b.cta ? ` · <u>${b.cta}</u>` : ''}</span></span>
+      ${icon('i-right')}</button>`).join('');
 }
 
-function renderChips() {
-  $('countries').innerHTML = COUNTRIES.map((c) => {
-    const lock = S.level < c.lvl;
-    return `<button class="chip ${c.id === country.id ? 'on' : ''} ${lock ? 'lock' : ''}" data-c="${c.id}"><span class="f">${c.flag}</span>${c.name}<small>${lock ? icon('i-lock') + 'ур. ' + c.lvl : '×' + c.mul}</small></button>`;
-  }).join('');
-  $('stakes').innerHTML = STAKES.map((s) => {
-    const lock = S.level < STAKE_LEVEL[s];
-    return `<button class="chip ${s === stake ? 'on' : ''} ${lock ? 'lock' : ''}" data-s="${s}">×${s}${lock ? `<small>${icon('i-lock')}${STAKE_LEVEL[s]}</small>` : ''}</button>`;
-  }).join('');
-}
-
-function renderLuck() {
-  const h = happyInfo(), until = LUCKY_EVERY - (S.total_spins % LUCKY_EVERY);
-  const happy = h.active
-    ? `<span class="pill ${h.left ? 'hot' : ''}">${icon('i-sun')}Счастливый час ×${HAPPY_LUCK} · ${h.left} из ${HAPPY_SPINS}</span>`
-    : `<span class="pill">${icon('i-sun')}Счастливый час в ${h.next ? mskHm(h.next) : '—'} МСК</span>`;
-  const lucky = until === 1
-    ? `<span class="pill lucky">${icon('i-star')}Следующая — удача ×${LUCKY_LUCK}</span>`
-    : `<span class="pill">${icon('i-star')}До удачи ×${LUCKY_LUCK}: ${until}</span>`;
-  const fr = freeInfo(), total = fr.charges + bonusSpins();
-  const free = total > 0
-    ? `<span class="pill hot">Бесплатных: ${total}</span>`
-    : fr.nextAt ? `<span class="pill">Бесплатная через ${left(fr.nextAt)}</span>` : '';
-  $('luck').innerHTML = lucky + happy + free;
+function renderSelectors() {
+  $('sel-country').innerHTML = `<span class="f">${country.flag}</span><span class="sel-t">${country.name}</span>${icon('i-chev')}`;
+  $('sel-stake').innerHTML = `<span class="sel-t">Ставка ×${stake}</span>${icon('i-chev')}`;
+  $('auto').classList.toggle('on', autoOn);
+  $('auto').setAttribute('aria-pressed', String(autoOn));
+  $('auto').textContent = autoLeft > 0 ? `${autoLeft}×` : '5×';
+  $('target').textContent = `Крутишь: ${country.name} · любой оператор${country.mul !== 1 ? ` · ×${country.mul}` : ''}`;
 }
 
 function renderSpin() {
   const btn = $('spin');
-  const free = useFree(), lucky = nextIsLucky();
+  const free = useFree(), lucky = nextIsLucky(), fr = freeInfo();
   btn.classList.toggle('free', free && !spinning);
   btn.classList.toggle('lucky', lucky && !free && !spinning);
-  $('spin-l1').textContent = lucky ? `Удача ×${LUCKY_LUCK}` : free ? 'Крутить бесплатно' : 'Крутить';
+  btn.classList.toggle('idle', !spinning && !busy);
+  const again = !!S.pending || S.total_spins > 0;
+  $('spin-l1').textContent = autoLeft > 0 ? `Автоспин · ${autoLeft}` : lucky ? `Удача ×${LUCKY_LUCK}` : free ? 'Бесплатно' : again ? 'Крутить ещё' : 'Крутить';
   $('spin-l1').classList.toggle('on', !spinning);
   $('spin-l2').classList.toggle('on', spinning);
-  $('cost').textContent = free
-    ? (bonusSpins() > 0 && freeInfo().charges === 0 ? `ещё ${bonusSpins()}` : `${freeInfo().charges} из ${FREE_SPIN_MAX}`)
-    : rub(spinCostKop(country, stake));
+  const price = rub(spinCostKop(country, stake));
+  $('cost').innerHTML = free
+    ? (fr.charges > 0 ? `${fr.charges} из ${FREE_SPIN_MAX}` : `ещё ${bonusSpins()}`)
+    : fr.nextAt ? `${price}<small>Бесплатный через ${left(fr.nextAt)}</small>` : price;
 }
+
+/** 9 делений шкалы редкости: чем выше множитель узора, тем больше закрашено. */
+const SEG_FROM = [0, 1.5, 3, 6, 12, 40, 100, 250, 500];
+const segments = (mul: number) => SEG_FROM.filter((m) => mul >= m).length;
 
 function renderResult(enter = false) {
   const el = $('result');
-  const p = S.pending;
-  renderTierbar(spinning ? null : p);
+  const p = spinning ? null : S.pending;
+  renderTierbar(p);
+  $('card-foot').textContent = card.isSample && !spinning ? 'Пример номера' : 'Игровой номер · не звоните по нему';
   if (!p) {
-    el.innerHTML = `<div class="hint">${spinning ? 'Крутим… нажми ещё раз, чтобы пропустить' : 'Жми «Крутить», чтобы получить SIM-карту'}</div>`;
+    el.innerHTML = `<div class="hint">${spinning ? 'Крутим… нажми ещё раз, чтобы пропустить' : 'Жми «Крутить» — выпадет SIM-карта с игровым номером'}</div>`;
     return;
   }
   const c = countryById(p.country)!;
   const full = S.collection_count >= slotsCap();
-  const extra = [
-    p.luck > 1 ? `<span class="tag luck-tag">Удача ×${p.luck}</span>` : '',
-    p.is_free ? '<span class="tag">Бесплатная прокрутка</span>' : '',
-  ].join('');
+  const auto = ruleMatches(keepRule(), p);
   el.innerHTML = `
-    <div class="res ${enter ? 'enter' : ''}" style="--tc:${tierVar(p.tier)}">
-      <div class="res-top">
-        <div class="tags">${p.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('') || '<span class="tag">Ничего особенного</span>'}${extra}</div>
-        <button class="icon-btn" id="b-share" aria-label="Поделиться картинкой">${icon('i-share')}</button>
-      </div>
+    <div class="res ${enter ? 'enter' : ''}">
       ${whyHtml(p)}
       <div class="acts">
-        <button class="btn btn-pill btn-pill-dark" id="b-sell">Продать за ${rub(p.value)}</button>
         <button class="btn btn-pill btn-pill-gold" id="b-keep">В коллекцию</button>
+        <button class="btn sq-btn" id="b-share" aria-label="Поделиться картинкой">${icon('i-share')}</button>
       </div>
-      <button class="acts-note" id="b-rule">${ruleMatches(keepRule(), p)
-        ? (full ? `Подходит под правило, но витрина заполнена (${S.collection_count}/${slotsCap()})` : `Этот номер уйдёт в коллекцию сам · +${rub(incomePerHourKop(p.value))}/ч`)
-        : 'Этот номер продастся, когда крутишь следующий'} · <u>что оставлять</u></button>
+      <button class="acts-note" id="b-rule">${auto
+        ? (full ? `Под правило, но витрина заполнена · ${S.collection_count}/${slotsCap()}` : 'Уйдёт в коллекцию сам, если крутить дальше')
+        : `Этот номер продастся за ${rub(p.value)}, если крутить дальше`}</button>
     </div>`;
-  $('b-sell').onclick = (e) => act(e, async () => {
-    const r = await api.sell(); setState(r.state); card.clearGlow(); toast('Продано: +' + rub(r.sold));
-  });
   $('b-keep').onclick = (e) => act(e, async () => { await keepPending(); });
-  // обе кнопки — в одну строку: если «Продать за …» не помещается, оставляем «Продать» (цена и так крупно выше)
-  const sell = $('b-sell'), keep = $('b-keep');
-  if (sell.offsetTop !== keep.offsetTop) sell.textContent = 'Продать';
   $('b-share').onclick = () => shareSim(c, p);
   $('b-rule').onclick = () => ruleSheet();
 }
 
-/** Шкала редкости над карточкой: тир, ступени и цена — как только барабаны остановились. */
+/** Плашка редкости над карточкой: тир, 9 делений и цена; до прокрутки — «Готов к игре». */
 function renderTierbar(p: Sim | null) {
   const el = $('tierbar');
-  if (!p) { el.classList.add('hidden'); return; }
-  const rank = tierRank(p.tier);
-  el.classList.remove('hidden');
-  el.style.setProperty('--tc', tierVar(p.tier));
-  el.innerHTML = `<div><div class="tb-name">${tierById(p.tier).name} · ×${fmtMul(p.mul)}</div>
-    <div class="tb-steps">${TIERS.map((_, i) => `<i class="${i <= rank ? 'on' : ''}"></i>`).join('')}</div></div>
-    <b>${local(countryById(p.country)!, p.value)}${countryById(p.country)!.cur !== '₽' ? `<small>≈ ${rub(p.value)}</small>` : ''}</b>`;
+  const tier = p?.tier ?? 'none', n = p ? segments(p.mul) : 0;
+  el.style.setProperty('--tc', p ? tierVar(p.tier) : 'var(--text-2)');
+  el.classList.toggle('empty', !p);
+  const c = p ? countryById(p.country)! : null;
+  el.innerHTML = `<div class="tb-l"><div class="tb-name">${p ? tierById(p.tier).name : spinning ? 'Крутим…' : 'Готов к игре'}</div>
+    <div class="tb-steps" aria-label="Редкость ${n} из 9">${SEG_FROM.map((_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</div></div>
+    <b class="num-t">${p && c ? local(c, p.value) + (c.cur !== '₽' ? `<small>≈ ${rub(p.value)}</small>` : '') : '—'}</b>`;
+  el.dataset.tier = tier;
 }
 
-/** «Почему такая цена»: ставка × (75% + 17% за каждый «×» узора). */
+/** «Почему такая цена»: каждая причина — своей строкой, строки появляются по одной. */
 function whyHtml(p: Sim): string {
-  const parts = priceBreakdown(p.prefix, p.sub).filter((x) => x.mul !== 1);
   const k = valueFactor(p.mul), bet = Math.round(p.value / k);
   const fx = (x: number) => x.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-  return `<div class="why">Почему столько: ставка <b>${rub(bet)}</b> × <b>${fx(k)}</b>${parts.length
-    ? ` · ${parts.map((x) => `${esc(x.label)} <b>×${fmtMul(x.mul)}</b>`).join(' · ')}` : ' · без узора — 75% ставки'}</div>`;
+  const parts = priceBreakdown(p.prefix, p.sub).filter((x) => x.mul !== 1);
+  const lines: { label: string; mul: string; up: boolean }[] = parts.map((x) => ({ label: x.label, mul: '×' + fx(x.mul), up: x.mul > 1 }));
+  lines.push(parts.length
+    ? { label: `Цена: ставка ${rub(bet)}`, mul: '×' + fx(k), up: k >= 1 }
+    : { label: 'Без узора', mul: '×' + fx(k), up: false });
+  if (p.luck > 1) lines.push({ label: 'Удача — узоры чаще', mul: '×' + p.luck, up: true });
+  if (p.is_free) lines.push({ label: 'Бесплатная прокрутка', mul: '', up: false });
+  return `<ul class="why">${lines.map((l, i) => `<li style="--i:${i}"><span>${esc(l.label)}</span>${l.mul ? `<b class="${l.up ? 'up' : 'dim'}">${l.mul}</b>` : ''}</li>`).join('')}</ul>`;
 }
 
 async function renderColl() {
   const el = $('coll'), head = $('coll-head');
   const price = slotPriceRub(S.extra_slots) * 100, max = slotsCap() >= SLOTS_MAX;
-  head.innerHTML = `<div class="m"><span>Витрина ${S.collection_count}/${slotsCap()} · касса копится ${KASSA_CAP_HOURS} ч</span><b>+${rub(incomePerHourKop(S.collection_value))}/ч</b></div>
+  head.innerHTML = `<div class="m"><span>Витрина ${S.collection_count}/${slotsCap()} · доход в кассу</span><b>+${rub(incomePerHourKop(S.collection_value))}/ч</b></div>
     <button class="btn btn-secondary btn-m btn-stack" id="buy-slot" ${max || S.balance < price ? 'disabled' : ''}>${max ? 'Максимум' : 'Ещё место'}${max ? '' : `<span class="sub">${rub(price)}</span>`}</button>`;
   head.insertAdjacentHTML('beforeend', `<button class="rule-row" id="coll-rule">Сами уходят в коллекцию: <b>${ruleText(keepRule())}</b> ›</button>`);
   $('coll-rule').onclick = () => ruleSheet();
@@ -265,7 +271,8 @@ async function renderRating() {
 }
 
 function renderAll(enterResult = false) {
-  renderHud(); renderKassa(); renderDaily(); renderChips(); renderLuck(); renderSpin(); renderResult(enterResult);
+  renderHud(); renderBanners(); renderSelectors(); renderSpin(); renderResult(enterResult);
+  if (menuOpen) renderMenu();
 }
 
 // ---------- лист-подтверждение ----------
@@ -286,6 +293,95 @@ function ask(title: string, text: string, buttons: SheetBtn[]): Promise<string |
       res(b && b.dataset.id !== 'cancel' ? b.dataset.id! : null);
     };
   });
+}
+
+// ---------- нижние листы: меню, страна, ставка ----------
+/** Открыть лист со своей разметкой; pick получает нажатый элемент с data-*, close закрывает. */
+function openSheet(html: string, pick: (el: HTMLElement, close: () => void) => void, onClose?: () => void) {
+  const sheet = $('sheet');
+  $('sheet-in').innerHTML = html;
+  sheet.classList.remove('hidden');
+  const close = () => { sheet.classList.add('hidden'); sheet.onclick = null; onClose?.(); };
+  sheet.onclick = (e) => {
+    const t = e.target as HTMLElement;
+    if (t === sheet || t.closest('[data-close]')) return close();
+    const el = t.closest<HTMLElement>('[data-pick]');
+    if (el && !el.hasAttribute('disabled')) pick(el, close);
+  };
+  return close;
+}
+
+function menuHtml(): string {
+  const need = xpToNext(S.level), k = Math.min(1, S.xp / need);
+  const acc = kassaNow(), rate = incomePerHourKop(S.collection_value), d = dailyInfo(), h = happyInfo(), fr = freeInfo();
+  const until = LUCKY_EVERY - (S.total_spins % LUCKY_EVERY), claims = stats ? achClaimable(stats).length : 0;
+  const row = (pick: string, ico: string, title: string, sub: string, right: string, hot = false) =>
+    `<button class="mrow ${hot ? 'hot' : ''}" data-pick="${pick}"><span class="banner-ico">${icon(ico)}</span><span class="mrow-t"><b>${title}</b><span class="num-t">${sub}</span></span>${right}</button>`;
+  const go = icon('i-right');
+  const cta = (t: string, on: boolean) => `<span class="mcta ${on ? 'on' : ''}">${t}</span>`;
+  return `<div class="menu-head"><div class="menu-lvl">${S.level}</div><div class="menu-xp"><b>Уровень ${S.level}</b>
+      <span class="num-t">${fmt(S.xp)} / ${fmt(need)} опыта</span><div class="bar"><i style="width:${k * 100}%"></i></div></div></div>
+    <div class="mlist">
+      ${row('kassa', 'i-cash', `Касса · ${fmt(rate / 100)} ₽/ч`, rate > 0 ? `${rub(acc)} · копится до ${KASSA_CAP_HOURS} ч` : 'оставляй номера — они приносят доход', cta('Забрать', acc >= 100), acc >= 100)}
+      ${row('daily', 'i-gift', 'Ежедневный бонус', d.available ? `день ${d.streak + 1} подряд · ${rub(d.amountKop)}` : 'уже забран — приходи завтра', d.available ? cta('Забрать', true) : '', d.available)}
+      ${row('happy', 'i-sun', h.active ? `Счастливый час ×${HAPPY_LUCK} идёт` : 'Счастливый час', h.active ? `осталось ${h.left} из ${HAPPY_SPINS} прокруток с удачей ×${HAPPY_LUCK}` : `в ${h.next ? mskHm(h.next) : '—'} МСК · ${HAPPY_SPINS} прокруток с удачей ×${HAPPY_LUCK}`, '', h.active && h.left > 0)}
+      ${row('luck', 'i-star', `Удача ×${LUCKY_LUCK}`, until === 1 ? 'следующая прокрутка!' : `через ${until} ${plural(until, 'прокрутку', 'прокрутки', 'прокруток')}`, '')}
+      ${row('free', 'i-play', 'Бесплатные прокрутки', `${fr.charges} из ${FREE_SPIN_MAX}${bonusSpins() ? ` · бонусных ${bonusSpins()}` : ''}${fr.nextAt ? ` · следующая через ${left(fr.nextAt)}` : ''}`, '')}
+      ${row('rule', 'i-sim', 'Что оставлять себе', ruleText(keepRule()), go)}
+      ${row('ach', 'i-medal', 'Достижения', claims ? `можно забрать: ${claims}` : 'награды за коллекции', claims ? `<i class="badge static">${claims}</i>${go}` : go, claims > 0)}
+      ${row('rating', 'i-cup', 'Рейтинг', 'топ коллекций', go)}
+    </div>
+    <div class="sheet-btns"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`;
+}
+
+function renderMenu() {
+  if (!menuOpen) return;
+  const sc = $('sheet-in').scrollTop;
+  $('sheet-in').innerHTML = menuHtml();
+  $('sheet-in').scrollTop = sc;
+}
+
+function menuSheet() {
+  menuOpen = true;
+  haptic.select();
+  openSheet(menuHtml(), (el, close) => {
+    const k = el.dataset.pick;
+    if (k === 'kassa') { if (kassaNow() >= 100) act(el, collectKassa); return; }
+    if (k === 'daily') { if (dailyInfo().available) act(el, claimDaily); return; }
+    if (k === 'rule') { close(); ruleSheet(); return; }
+    if (k === 'ach' || k === 'rating') { close(); show(k); return; }
+  }, () => { menuOpen = false; });
+}
+
+function countrySheet() {
+  if (spinning || busy) return;
+  openSheet(`<h3>Страна</h3><p>Чем дороже страна, тем дороже прокрутка и номера.</p><div class="opts">${COUNTRIES.map((c) => {
+    const lock = S.level < c.lvl;
+    return `<button class="opt" data-pick="${c.id}" ${lock ? 'aria-disabled="true"' : ''}><span class="opt-l"><span class="f">${c.flag}</span>${c.name}<small>${lock ? `${icon('i-lock')}уровень ${c.lvl}` : `×${c.mul} · ${rub(spinCostKop(c, stake))}`}</small></span>${c.id === country.id ? '<i class="tick">✓</i>' : ''}</button>`;
+  }).join('')}</div><div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`, (el, close) => {
+    const c = countryById(el.dataset.pick!)!;
+    if (S.level < c.lvl) { haptic.error(); toast(`${c.flag} ${c.name} откроется на уровне ${c.lvl}`); return; }
+    close(); switchCountry(c);
+  });
+}
+
+function stakeSheet() {
+  if (spinning) return;
+  openSheet(`<h3>Ставка</h3><p>Ставка умножает цену прокрутки и цену номера. Опыта за большие ставки — больше.</p><div class="opts">${STAKES.map((st) => {
+    const lock = S.level < STAKE_LEVEL[st];
+    return `<button class="opt" data-pick="${st}" ${lock ? 'aria-disabled="true"' : ''}><span class="opt-l">×${st}<small>${lock ? `${icon('i-lock')}уровень ${STAKE_LEVEL[st]}` : `прокрутка ${rub(spinCostKop(country, st))}`}</small></span>${st === stake ? '<i class="tick">✓</i>' : ''}</button>`;
+  }).join('')}</div><div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`, (el, close) => {
+    const st = Number(el.dataset.pick);
+    if (S.level < STAKE_LEVEL[st]) { haptic.error(); toast(`Ставка ×${st} откроется на уровне ${STAKE_LEVEL[st]}`); return; }
+    stake = st; haptic.select(); savePrefs(); close(); renderAll();
+  });
+}
+
+async function collectKassa() {
+  const r = await api.collect(); setState(r.state); haptic.success(); toast('Касса: +' + rub(r.collected));
+}
+async function claimDaily() {
+  const r = await api.daily(); setState(r.state); haptic.success(); toast(`Бонус: +${rub(r.amount)}`);
 }
 
 // ---------- действия ----------
@@ -396,13 +492,33 @@ function setSpinning(on: boolean) {
   renderSpin();
 }
 
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Кнопка спина: пропустить анимацию, одна прокрутка или автоспин на 5 прокруток. */
 async function spin() {
   if (spinning) { card.skip(); haptic.tick(); return; }
+  if (autoLeft > 0) { autoLeft = 0; toast('Автоспин остановлен'); renderAll(); return; }
   if (busy) return;
+  if (!autoOn) { await spinOnce(); return; }
+  autoLeft = AUTO_SPINS;
+  while (autoLeft > 0 && view === 'play') {
+    renderSelectors(); renderSpin();
+    const sim = await spinOnce();
+    if (autoLeft > 0) autoLeft--;
+    // эпический и легендарный — останавливаемся, чтобы игрок увидел
+    if (!sim || sim.mul >= 40) break;
+    if (autoLeft > 0) await wait(900);
+  }
+  autoLeft = 0;
+  renderAll();
+}
+
+/** Одна прокрутка. Возвращает номер или null, если прокрутки не было. */
+async function spinOnce(): Promise<Sim | null> {
   const conf = await confirmPending('Если крутить дальше, он продастся.');
-  if (!conf.go) return;
+  if (!conf.go) return null;
   const c = country, free = useFree(), auto = S.pending?.value ?? 0, price = cost();
-  if (S.balance + auto < price) { noMoney(); return; }
+  if (S.balance + auto < price) { noMoney(); return null; }
 
   setSpinning(true);
   card.startWaiting(c);
@@ -417,7 +533,7 @@ async function spin() {
     card.stopWaiting(c);
     haptic.error(); toast((e as Error).message);
     renderAll();
-    return;
+    return null;
   }
   if (r.auto_kept) toast('Прошлый номер — в коллекции по правилу');
   else if (r.auto_sold) toast('Прошлый номер продан: +' + rub(r.auto_sold));
@@ -452,6 +568,7 @@ async function spin() {
     const res = $('result').getBoundingClientRect(), dockTop = document.querySelector('.dock')!.getBoundingClientRect().top;
     if (res.bottom > dockTop - 8) window.scrollBy({ top: res.bottom - dockTop + 16, behavior: reduced ? 'auto' : 'smooth' });
   }
+  return sim;
 }
 
 function noMoney() {
@@ -670,10 +787,9 @@ function show(v: View) {
   view = v;
   [...$('nav').children].forEach((x) => x.classList.toggle('on', (x as HTMLElement).dataset.v === NAV_OF[v]));
   for (const k of ['play', 'coll', 'market', 'friends', 'more', 'rating', 'ach']) $('v-' + k).classList.toggle('hidden', v !== k);
-  $('spin').classList.toggle('hidden', v !== 'play');
-  // касса и бонус — только там, где играют и копят
-  $('kassa').classList.toggle('hidden', v !== 'play' && v !== 'coll');
-  $('daily').classList.toggle('off', v !== 'play');
+  $('dock-play').classList.toggle('hidden', v !== 'play');
+  document.body.classList.toggle('on-play', v === 'play');
+  if (v !== 'play') autoLeft = 0;
   backButton(v !== 'play', () => show(v === 'rating' || v === 'ach' ? 'more' : 'play'));
   if (v === 'coll') renderColl();
   if (v === 'rating') renderRating();
@@ -698,23 +814,30 @@ function toast(msg: string, btn?: string, fn?: () => void) {
 // ---------- события ----------
 function bind() {
   $('spin').onclick = spin;
-  $('collect').onclick = (e) => act(e, async () => {
-    const r = await api.collect(); setState(r.state); haptic.success(); toast('Касса: +' + rub(r.collected));
-  });
-  $('daily-btn').onclick = (e) => act(e, async () => {
-    const r = await api.daily(); setState(r.state); haptic.success(); toast(`Бонус: +${rub(r.amount)}`);
-  });
-  $('countries').onclick = (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-c]');
-    if (!b || spinning || busy) return;
-    switchCountry(countryById(b.dataset.c!)!);
+  $('menu').onclick = () => menuSheet();
+  $('slots-pill').onclick = () => { haptic.select(); show('coll'); };
+  $('luck-pill').onclick = () => {
+    const until = LUCKY_EVERY - (S.total_spins % LUCKY_EVERY);
+    toast(until === 1 ? `Следующая прокрутка — удача ×${LUCKY_LUCK}: узоры выпадают в ${LUCKY_LUCK} раз чаще` : `Каждая ${LUCKY_EVERY}-я прокрутка — удача ×${LUCKY_LUCK}. До неё: ${until}`);
   };
-  $('stakes').onclick = (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-s]');
-    if (!b || spinning) return;
-    const s = Number(b.dataset.s);
-    if (S.level < STAKE_LEVEL[s]) { toast(`Ставка ×${s} откроется на уровне ${STAKE_LEVEL[s]}`); return; }
-    stake = s; haptic.select(); savePrefs(); renderChips(); renderSpin();
+  $('banners').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-b]');
+    if (!b) return;
+    const k = b.dataset.b;
+    if (k === 'kassa') act(b, collectKassa);
+    else if (k === 'daily') act(b, claimDaily);
+    else if (k === 'happy') {
+      const h = happyInfo();
+      toast(h.active ? `Счастливый час: ещё ${h.left} прокруток с удачей ×${HAPPY_LUCK}` : `Счастливые часы — 13:00 и 20:00 МСК: ${HAPPY_SPINS} прокруток с удачей ×${HAPPY_LUCK}`);
+    }
+  };
+  $('sel-country').onclick = () => countrySheet();
+  $('sel-stake').onclick = () => stakeSheet();
+  $('auto').onclick = () => {
+    haptic.select();
+    if (autoLeft > 0) { autoLeft = 0; autoOn = false; toast('Автоспин остановлен'); }
+    else { autoOn = !autoOn; toast(autoOn ? `Автоспин: кнопка крутит ${AUTO_SPINS} раз подряд` : 'Автоспин выключен'); }
+    renderSelectors(); renderSpin();
   };
   $('coll').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
@@ -807,7 +930,7 @@ async function start() {
   bind();
   renderAll();
   refreshStats();
-  setInterval(() => { if (!spinning) { renderKassa(); renderLuck(); renderDaily(); renderSpin(); } }, 1000);
+  setInterval(() => { if (!spinning) { renderBanners(); renderSpin(); renderHud(); if (menuOpen && !busy) renderMenu(); } }, 1000);
   $('splash').classList.add('gone');
 }
 

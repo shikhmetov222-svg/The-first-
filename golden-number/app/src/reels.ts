@@ -35,7 +35,11 @@ export class Card {
   readonly el = $('card');
 
   /** Нарисовать карточку без анимации. */
+  /** На карточке — пример номера, а не выпавший. */
+  isSample = false;
+
   build(c: Country, prefix: string, sub: string) {
+    this.isSample = false;
     this.country = c; this.plen = prefix.length;
     $('cflag').textContent = c.flag; $('ccode').textContent = c.code;
     const num = $('num'); num.innerHTML = ''; this.reelsP = []; this.reelsS = [];
@@ -53,10 +57,11 @@ export class Card {
     }
   }
 
-  /** Пустая карточка страны: код и номер из нулей. */
+  /** Пример номера страны до первой прокрутки. */
   sample(c: Country) {
-    this.build(c, c.ops[0].prefixes[0].code.replace(/./g, '0'), '0000000');
-    $('opname').textContent = '—';
+    this.build(c, c.ops[0].prefixes[0].code, '7771234');
+    $('opname').textContent = 'оператор';
+    this.isSample = true;
     this.clearGlow();
   }
 
@@ -64,6 +69,7 @@ export class Card {
   startWaiting(c: Country) {
     if (this.country !== c) this.sample(c);
     this.skipQueued = false;
+    this.isSample = false;
     this.clearGlow();
     $('opname').textContent = '…';
     for (const o of [...this.reelsP, ...this.reelsS]) {
@@ -132,12 +138,19 @@ export class Card {
   /** Свечение по тиру: еле заметное у Красивого, яркое у Эпического и Легендарного (см. .card-wrap.t-*). */
   glow(tier: string) {
     this.clearGlow();
+    this.stage.style.setProperty('--glow', `var(--g-${tier})`);
     if (tier === 'common') return;
     this.wrap.style.setProperty('--tc', `var(--t-${tier})`);
     this.wrap.classList.add('t-' + tier);
   }
 
-  clearGlow() { this.wrap.classList.remove('t-nice', 't-rare', 't-epic', 't-legend'); }
+  clearGlow() {
+    this.wrap.classList.remove('t-nice', 't-rare', 't-epic', 't-legend');
+    this.stage.style.setProperty('--glow', 'var(--g-common)');
+  }
+
+  /** Сцена за карточкой: мягкое радиальное свечение цвета редкости (плавно меняется, см. @property --glow). */
+  readonly stage = $('stage');
 
   burst(tier: string, n: number) {
     const p = $('particles'); p.style.setProperty('--tc', `var(--t-${tier})`); p.innerHTML = '';
