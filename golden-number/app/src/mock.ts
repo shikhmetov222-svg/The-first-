@@ -10,7 +10,9 @@ import {
   ruleMatches, achDone, lotPriceBounds, type Stats, dailyNow, drawLucky, evaluate, formatLabel, freeNow, guaranteeRank, happyNow, kassaTotalKop, msk, sellBackKop,
   spinCostKop, spinLuck, valueByBetKop, xpForSpin, xpToNext,
 } from '../../supabase/functions/_shared/game/logic.ts';
-import type { Api, Lot, Sim, State } from './types.ts';
+import type { Api, Lot, Sim, State, Trade } from './types.ts';
+import { drawExactTier, nextTier, questDone, questKey, questsFor, type DayStats } from '../../supabase/functions/_shared/game/logic.ts';
+import { QUEST_ALL_RUB, QUEST_ALL_SPINS, COUNTRIES } from '../../supabase/functions/_shared/game/config.ts';
 
 const q = new URLSearchParams(location.search);
 const num = (k: string, d: number) => (q.has(k) ? Number(q.get(k)) : d);
@@ -25,6 +27,7 @@ const P = {
   extraSlots: 0, bailoutAt: 0, bonus: num('bonus', 0),
   pending: null as Sim | null, coll: [] as Sim[], history: [] as Sim[], claimed: [] as string[],
   lots: [] as Lot[], myLots: [] as Lot[], rule: KEEP_RULE_DEFAULT as KeepRule,
+  notify: true, notifyHappy: false, trades: [] as Trade[], qClaimed: [] as string[], sold: new Set<string>(),
 };
 const fail = (msg: string) => new Promise<never>((_, r) => setTimeout(() => r(new Error(msg)), 200));
 const collValue = () => P.coll.reduce((s, x) => s + x.value, 0);
@@ -36,6 +39,8 @@ const state = (): State => ({
   total_spins: P.totalSpins, free_charges: P.freeCharges, free_at: P.freeAt.toISOString(),
   happy_key: P.happyKey, happy_used: P.happyUsed, daily_day: P.dailyDay, daily_streak: P.dailyStreak,
   extra_slots: P.extraSlots, pending: P.pending, telegram_id: 979901619, bonus_spins: P.bonus, listed_count: P.myLots.length, keep_rule: P.rule,
+  notify: P.notify, notify_happy: P.notifyHappy, trades_in: P.trades.filter((t) => t.incoming).length, is_admin: q.has('admin'),
+  week_prize: q.has('prize') ? { place: 2, prize: 2_500_000, spins: 3 } : null,
 });
 const stats = (): Stats => ({
   total_spins: P.totalSpins,
@@ -44,7 +49,19 @@ const stats = (): Stats => ({
   t9: new Set(P.history.flatMap((x) => x.tags.filter((t) => t.startsWith('T9:')))).size,
   codes: P.history.filter((x) => x.prefix.length > 1 && new Set(x.prefix).size === 1).length,
   collection_value: collValue(), friends: 1, claimed: P.claimed,
+  tags: [...new Set(P.history.flatMap((x) => x.tags))],
 });
+const today = () => msk(new Date()).date;
+const dayStats = (): DayStats => {
+  const h = P.history.filter((x) => msk(new Date(x.created_at)).date === today());
+  return {
+    day: today(), spins: h.length,
+    tiers: h.reduce((m, x) => ({ ...m, [x.tier]: (m[x.tier] ?? 0) + 1 }), {} as Record<string, number>),
+    tags: [...new Set(h.flatMap((x) => x.tags))], countries: new Set(h.map((x) => x.country)).size,
+    kept: h.filter((x) => P.coll.includes(x)).length, big_stake: h.filter((x) => x.stake >= 2 && !x.is_free).length,
+    claimed: P.qClaimed,
+  };
+};
 const ok = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 250));
 
 function makeSim(countryId: string, stake: number, bet: number, luck: number, isFree: boolean, minRank: number, forced?: string): Sim {
@@ -87,6 +104,7 @@ const base: Partial<Api> = {
     const auto = keepIt ? 0 : P.pending?.value ?? 0;
     if (P.balance + auto < cost) return fail('Не хватает денег');
     if (keepIt && P.pending) { settle(); P.coll.push(P.pending); kept = P.pending.value; }
+    else if (P.pending) P.sold.add(P.pending.id);
     const sim = makeSim(c.id, st, bet, luck.luck, useFree || useBonus, guaranteeRank(spinNo), seq.shift());
     P.history.push(sim);
     if (useBonus) P.bonus--;
@@ -107,7 +125,7 @@ const base: Partial<Api> = {
   },
   sell() {
     if (!P.pending) return fail('Нет номера');
-    const v = P.pending.value; P.balance += v; P.pending = null;
+    const v = P.pending.value; P.balance += v; P.sold.add(P.pending.id); P.pending = null;
     return ok({ sold: v, state: state() });
   },
   keep(replaceId) {
@@ -174,8 +192,76 @@ for (let i = 0; i < 4; i++) {
   P.lots.push({ id: crypto.randomUUID(), price: Math.round(sim.value * [1.2, 0.9, 1.5, 1.1][i]), created_at: new Date().toISOString(), mine: false, seller: others[i % 3], sim });
 }
 
+const friendSims = ['1237878', '5121212', '7712093'].map((x) => makeSim('ru', 1, 100000, 1, false, 0, x));
+if (q.has('trade')) {
+  const mine = makeSim('ru', 1, 100000, 1, false, 0, '1238321'); P.coll.push(mine);
+  P.trades.push({ id: crypto.randomUUID(), status: 'pending', created_at: new Date().toISOString(), incoming: true, from_name: 'Олег', to_name: 'Вы', give: mine, get: friendSims[1] });
+}
+const merged = new Set<string>();
+
 export const mockApi = Object.assign(base, {
-  friends: () => ok({ invited: 2, active: 1, earned: 500_000, list: [{ name: 'Олег', spins: 42, counted: true }, { name: 'Ира', spins: 12, counted: false }] }),
+  history: () => ok([...P.history].reverse().slice(0, 50).map((x) => ({ ...x, cost: x.is_free ? 0 : x.stake * 100000,
+    status: P.pending === x ? 'pending' as const : P.coll.includes(x) ? 'kept' as const : merged.has(x.id) ? 'merged' as const
+      : P.myLots.some((l) => l.sim === x) ? 'listed' as const : 'auto_sold' as const }))),
+  day: () => ok(dayStats()),
+  questClaim(id: string) {
+    const d = dayStats(), qs = questsFor(today(), 979901619, P.level);
+    if (id === 'all') {
+      if (!qs.every((x) => d.claimed.includes(questKey(today(), x.id)))) return fail('Сначала выполни все три задания');
+      if (P.qClaimed.includes(questKey(today(), 'all'))) return fail('Награда уже получена');
+      P.qClaimed.push(questKey(today(), 'all')); P.balance += QUEST_ALL_RUB * 100; P.bonus += QUEST_ALL_SPINS;
+      return ok({ reward: QUEST_ALL_RUB * 100, spins: QUEST_ALL_SPINS, state: state() });
+    }
+    const x = qs.find((y) => y.id === id);
+    if (!x || !questDone(x, d)) return fail('Задание ещё не выполнено');
+    if (P.qClaimed.includes(questKey(today(), id))) return fail('Награда уже получена');
+    P.qClaimed.push(questKey(today(), id)); P.balance += x.rewardRub * 100; P.bonus += x.rewardSpins ?? 0;
+    return ok({ reward: x.rewardRub * 100, spins: x.rewardSpins ?? 0, state: state() });
+  },
+  feed: () => ok([
+    ...P.history.filter((x) => x.tier === 'epic' || x.tier === 'legend').map((x) => ({ name: 'Вы', label: x.label, tier: x.tier, value: x.value, tag: x.tags[0] ?? null, country: x.country, created_at: x.created_at, me: true })),
+    { name: 'Мадина', label: '+7 (926) 777-77-77', tier: 'legend' as const, value: 7_595_000, tag: 'Все цифры одинаковые', country: 'ru', created_at: new Date(Date.now() - 6e5).toISOString(), me: false },
+    { name: 'Тимур', label: '+90 (532) 123 45 67', tier: 'epic' as const, value: 4_140_000, tag: 'Лесенка', country: 'tr', created_at: new Date(Date.now() - 36e5).toISOString(), me: false },
+  ]),
+  week: (prev: boolean) => ok({ start: new Date().toISOString(), top: [
+    { place: 1, name: 'Мадина', value: 7_595_000, me: false }, { place: 2, name: 'Тимур', value: 4_140_000, me: false },
+    { place: 3, name: prev ? 'Ольга' : 'Вы', value: prev ? 900_000 : Math.max(0, ...P.history.map((x) => x.value)), me: !prev },
+  ], me: prev ? null : { place: 3, value: Math.max(0, ...P.history.map((x) => x.value)) } }),
+  merge(ids: string[]) {
+    const xs = P.coll.filter((x) => ids.includes(x.id));
+    if (xs.length !== 3 || new Set(xs.map((x) => x.tier)).size !== 1) return fail('Нужны три номера одной редкости');
+    const t = nextTier(xs[0].tier);
+    if (!t) return fail('Легендарный — уже высшая редкость');
+    settle();
+    xs.forEach((x) => { P.coll.splice(P.coll.indexOf(x), 1); merged.add(x.id); });
+    const d = drawExactTier(Math.random, COUNTRIES[0], t);
+    const sim = makeSim('ru', 1, 100000, 1, false, 0, d.sub);
+    P.coll.push(sim); P.history.push(sim);
+    return ok({ sim, state: state() });
+  },
+  friendCollection: () => ok({ name: 'Олег', list: friendSims }),
+  trades: () => ok([...P.trades]),
+  tradeOffer(my: string, _friend: string, their: string) {
+    const a = P.coll.find((x) => x.id === my), b = friendSims.find((x) => x.id === their);
+    if (!a || !b) return fail('Номер не найден');
+    if (Math.max(a.value, b.value) > 2 * Math.min(a.value, b.value)) return fail('Слишком разные цены: меняться можно номерами, которые отличаются не больше чем в 2 раза');
+    const t: Trade = { id: crypto.randomUUID(), status: 'pending', created_at: new Date().toISOString(), incoming: false, from_name: 'Вы', to_name: 'Олег', give: a, get: b };
+    P.trades.unshift(t);
+    return ok({ trade: t, state: state() });
+  },
+  tradeAnswer(id: string, accept: boolean) {
+    const i = P.trades.findIndex((x) => x.id === id);
+    if (i < 0) return fail('Предложение уже закрыто');
+    const t = P.trades.splice(i, 1)[0];
+    if (t.incoming && accept) { settle(); P.coll.splice(P.coll.indexOf(t.give), 1); P.coll.push(t.get); }
+    return ok({ status: !t.incoming ? 'cancelled' : accept ? 'accepted' : 'declined', state: state() });
+  },
+  notifyPrefs(n: boolean, h: boolean) { P.notify = n; P.notifyHappy = h; return ok({ state: state() }); },
+  adminStats: () => ok({ players: 37, new_today: 4, active_today: 11, active_7d: 23, returned_next_day: 41, spins_today: 612, spins_7d: 3904,
+    rtp_7d: 116.2, stuck_under_10: 9, spins_buckets: { '0': 3, '1-9': 6, '10-49': 12, '50-199': 11, '200+': 5 },
+    tiers_7d: { common: 3380, nice: 420, rare: 72, epic: 29, legend: 3 }, market_7d: 14, trades_7d: 3,
+    by_day: [{ day: today(), spins: 612, players: 11 }, { day: '2026-11-01', spins: 840, players: 14 }] }),
+  friends: () => ok({ invited: 2, active: 1, earned: 500_000, list: [{ id: 'f1', name: 'Олег', spins: 42, counted: true, count: 3 }, { id: 'f2', name: 'Ира', spins: 12, counted: false, count: 0 }], inviter: null }),
   stats: () => ok(stats()),
   claim(id: string) {
     const a = ACHIEVEMENTS.find((x) => x.id === id);

@@ -291,11 +291,12 @@ export type AchKind =
   | { t: 't9'; n: number }
   | { t: 'code'; n: number } // номера с кодом из одинаковых цифр
   | { t: 'value'; rub: number } // стоимость коллекции
-  | { t: 'friends'; n: number };
+  | { t: 'friends'; n: number }
+  | { t: 'set'; kinds: PatternKind[] }; // альбом: выбить хотя бы раз каждый узор из списка
 
 export interface Achievement {
   id: string;
-  group: 'Прокрутки' | 'Редкость' | 'Коллекции регионов' | 'Узоры' | 'Витрина' | 'Друзья';
+  group: 'Альбомы' | 'Прокрутки' | 'Редкость' | 'Коллекции регионов' | 'Узоры' | 'Витрина' | 'Друзья';
   title: string;
   kind: AchKind;
   rewardRub: number;
@@ -303,6 +304,10 @@ export interface Achievement {
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'albTails', group: 'Альбомы', title: 'Все хвосты', kind: { t: 'set', kinds: ['tailABAB', 'tailAABB', 'tailABBA', 'tail000', 'tail00', 'tailLadder', 'tail3'] }, rewardRub: 20000, rewardSpins: 3 },
+  { id: 'albMirrors', group: 'Альбомы', title: 'Зеркала и повторы', kind: { t: 'set', kinds: ['mirror', 'pairs', 'twoDigits', 'block3'] }, rewardRub: 30000, rewardSpins: 3 },
+  { id: 'albRuns', group: 'Альбомы', title: 'Серии: 4, 5 и 6 подряд', kind: { t: 'set', kinds: ['run4', 'run5', 'run6'] }, rewardRub: 40000, rewardSpins: 5 },
+  { id: 'albLegends', group: 'Альбомы', title: 'Легенды: лесенка, круглый, все одинаковые', kind: { t: 'set', kinds: ['ladder', 'round', 'allSame'] }, rewardRub: 150000, rewardSpins: 10 },
   { id: 'spins10', group: 'Прокрутки', title: '10 прокруток', kind: { t: 'spins', n: 10 }, rewardRub: 500 },
   { id: 'spins100', group: 'Прокрутки', title: '100 прокруток', kind: { t: 'spins', n: 100 }, rewardRub: 3000, rewardSpins: 2 },
   { id: 'spins500', group: 'Прокрутки', title: '500 прокруток', kind: { t: 'spins', n: 500 }, rewardRub: 15000 },
@@ -329,3 +334,67 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'friends3', group: 'Друзья', title: '3 друга', kind: { t: 'friends', n: 3 }, rewardRub: 10000, rewardSpins: 3 },
   { id: 'friends10', group: 'Друзья', title: '10 друзей', kind: { t: 'friends', n: 10 }, rewardRub: 40000, rewardSpins: 10 },
 ];
+
+/** Узоры для альбомов — по тегам номера (patternKind в logic.ts). */
+export type PatternKind = 'round' | 'allSame' | 'ladder' | 'run6' | 'run5' | 'run4' | 'mirror' | 'pairs' | 'twoDigits' | 'block3'
+  | 'tail000' | 'tail00' | 'tailABAB' | 'tailAABB' | 'tailABBA' | 'tailLadder' | 'tail3' | 't9';
+
+/** Названия узоров для экрана «Как оценивается номер» и альбомов: пример и множитель (RARITY). */
+export const PATTERN_INFO: { kind: PatternKind; name: string; example: string }[] = [
+  { kind: 'round', name: 'Круглый номер', example: '700-00-00' },
+  { kind: 'allSame', name: 'Все цифры одинаковые', example: '777-77-77' },
+  { kind: 'run6', name: '6 одинаковых подряд', example: '188-88-88' },
+  { kind: 'ladder', name: 'Лесенка', example: '123-45-67' },
+  { kind: 'run5', name: '5 одинаковых подряд', example: '125-55-55' },
+  { kind: 'mirror', name: 'Зеркальный', example: '123-83-21' },
+  { kind: 'pairs', name: 'Повтор пар', example: '512-12-12' },
+  { kind: 'twoDigits', name: 'Только две цифры', example: '121-12-11' },
+  { kind: 'run4', name: '4 одинаковых подряд', example: '124-44-49' },
+  { kind: 'block3', name: 'Повтор трёх цифр', example: '456-45-61' },
+  { kind: 'tail000', name: 'Хвост 000', example: '123-40-00' },
+  { kind: 'tailABAB', name: 'Хвост 78-78', example: '123-78-78' },
+  { kind: 'tailAABB', name: 'Хвост 77-88', example: '123-77-88' },
+  { kind: 'tailABBA', name: 'Зеркальный хвост', example: '123-78-87' },
+  { kind: 'tailLadder', name: 'Хвост-лесенка', example: '580-34-56' },
+  { kind: 'tail00', name: 'Хвост 00', example: '580-39-00' },
+  { kind: 'tail3', name: 'Красивый хвост', example: '580-31-11' },
+];
+
+// ======================= ЗАДАНИЯ ДНЯ =======================
+// Каждый день (по Москве) — 3 задания из списка, у каждого игрока свои. Прогресс — по прокруткам за день (gn_day_stats).
+export type QuestKind =
+  | { t: 'spins'; n: number }
+  | { t: 'tier'; tier: Tier['id']; n: number } // столько номеров этой редкости и выше
+  | { t: 'kept'; n: number } // оставить в коллекции
+  | { t: 'countries'; n: number } // крутить в разных странах
+  | { t: 'tail'; n: number } // номер с узором в хвосте
+  | { t: 'bigStake'; n: number }; // прокрутки со ставкой ×2 и выше
+
+export interface Quest { id: string; title: string; kind: QuestKind; rewardRub: number; rewardSpins?: number; minLevel?: number }
+
+export const QUESTS: Quest[] = [
+  { id: 'spins20', title: 'Сделай 20 прокруток', kind: { t: 'spins', n: 20 }, rewardRub: 2000 },
+  { id: 'spins50', title: 'Сделай 50 прокруток', kind: { t: 'spins', n: 50 }, rewardRub: 5000, rewardSpins: 1 },
+  { id: 'nice3', title: 'Выбей 3 Красивых номера', kind: { t: 'tier', tier: 'nice', n: 3 }, rewardRub: 3000 },
+  { id: 'rare1', title: 'Выбей Редкий номер', kind: { t: 'tier', tier: 'rare', n: 1 }, rewardRub: 4000, rewardSpins: 1 },
+  { id: 'kept2', title: 'Оставь 2 номера в коллекции', kind: { t: 'kept', n: 2 }, rewardRub: 2000 },
+  { id: 'tail1', title: 'Выбей номер с красивым хвостом', kind: { t: 'tail', n: 1 }, rewardRub: 3000 },
+  { id: 'countries2', title: 'Покрути в двух странах', kind: { t: 'countries', n: 2 }, rewardRub: 2500 },
+  { id: 'stake10', title: '10 прокруток со ставкой ×2 и выше', kind: { t: 'bigStake', n: 10 }, rewardRub: 5000, minLevel: 2 },
+];
+/** За все три задания дня — ещё награда. */
+export const QUEST_ALL_RUB = 3000;
+export const QUEST_ALL_SPINS = 2;
+export const QUESTS_PER_DAY = 3;
+
+// ======================= НЕДЕЛЯ, ОБМЕН, УВЕДОМЛЕНИЯ =======================
+/** Призы недели за лучший номер недели: 1, 2, 3 место (₽ и бесплатные прокрутки). Выдаются при входе после конца недели. */
+export const WEEK_PRIZES_RUB = [50_000, 25_000, 10_000];
+export const WEEK_PRIZES_SPINS = [5, 3, 1];
+/** Обмен с друзьями: цены номеров отличаются не больше чем в 2 раза; не больше 5 предложений сразу и 3 обменов в сутки. */
+export const TRADE_MAX_RATIO = 2;
+export const TRADE_MAX_PENDING = 5;
+export const TRADE_MAX_PER_DAY = 3;
+/** Рассылка ботом не чаще раза в минуту (расписание зовёт каждые 5 минут). */
+export const NOTIFY_MIN_GAP_S = 60;
+export const NOTIFY_BATCH = 200;

@@ -2,18 +2,21 @@ import './styles.css';
 import {
   BAILOUT_RUB, COUNTRIES, FREE_SPIN_MAX, KASSA_CAP_HOURS, LUCKY_EVERY, LUCKY_LUCK, HAPPY_LUCK, SLOTS_MAX, SLOTS_START,
   STAKES, STAKE_LEVEL, countryById, slotPriceRub, type Country,
-  KEEP_RULE_DEFAULT, type KeepRule, VALUE_BASE, ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
+  KEEP_RULE_DEFAULT, type KeepRule, VALUE_BASE, PATTERN_INFO, RARITY, QUEST_ALL_RUB, QUEST_ALL_SPINS, WEEK_PRIZES_RUB, WEEK_PRIZES_SPINS,
+  TRADE_MAX_RATIO, TIERS as TIER_LIST, ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
   microFactor, valueFactor, ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
   sellBackKop, spinCostKop, xpToNext, type Stats,
+  nextTier, patternKind, questKey, questProgress, questsFor, weekStart, type DayStats,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { serverApi } from './api.ts';
 import { esc, fmt, local, rub, tierById, tierVar } from './format.ts';
 import { Card } from './reels.ts';
 import { shareSim } from './share.ts';
 import { backButton, copyText, haptic, initData, setupTelegram, shareLink } from './tg.ts';
-import type { Api, Lot, Sim, State } from './types.ts';
+import type { Api, Lot, Sim, State, Trade } from './types.ts';
+import { sfx } from './sound.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 const PREFS_KEY = 'zn-prefs';
@@ -31,7 +34,7 @@ let country: Country = COUNTRIES[0];
 let stake: number = STAKES[0];
 let spinning = false;
 let busy = false;
-type View = 'play' | 'coll' | 'market' | 'friends' | 'more' | 'rating' | 'ach';
+type View = 'play' | 'coll' | 'market' | 'friends' | 'more' | 'rating' | 'ach' | 'hist' | 'feed' | 'admin';
 let view: View = 'play';
 let collCache: Sim[] = [];
 let stats: Stats | null = null;
@@ -40,6 +43,11 @@ let marketTier = 'all';
 let marketCache: Lot[] = [];
 const card = new Card();
 let menuOpen = false;
+let isAdmin = false;
+let day: DayStats | null = null;
+let ratingWeek = true;
+let mergeMode = false;
+const mergeSel = new Set<string>();
 let autoOn = false;
 let autoLeft = 0;
 const AUTO_SPINS = 5;
@@ -111,7 +119,7 @@ const RING = 2 * Math.PI * 22;
 
 /** Есть что забрать: касса за час и больше, бонус дня, достижения. */
 const kassaReady = () => kassaNow() >= 100 && kassaNow() >= incomePerHourKop(S.collection_value);
-const menuHasClaims = () => kassaReady() || dailyInfo().available || (stats ? achClaimable(stats).length > 0 : false);
+const menuHasClaims = () => kassaReady() || dailyInfo().available || (stats ? achClaimable(stats).length > 0 : false) || questClaimable() > 0 || (S.trades_in ?? 0) > 0;
 
 interface Banner { id: string; icon: string; title: string; sub: string; cta?: string; hot?: boolean; kind: string }
 /** Короткие баннеры над карточкой: не больше двух, остальное — в меню ☰. */
@@ -120,6 +128,9 @@ function banners(): Banner[] {
   const h = happyInfo(), d = dailyInfo(), acc = kassaNow();
   if (h.active) out.push({ id: 'happy', kind: 'happy', icon: 'i-sun', title: `Удача ×${HAPPY_LUCK} идёт`, sub: `до ${happyEnd()} МСК`, hot: true });
   if (d.available) out.push({ id: 'daily', kind: 'daily', icon: 'i-gift', title: 'Бонус дня', sub: rub(d.amountKop), cta: 'Забрать' });
+  const qc = questClaimable();
+  if (qc > 0) out.push({ id: 'quests', kind: 'quests', icon: 'i-target', title: qc > 1 ? `Задания: ${qc} готово` : 'Задание выполнено', sub: 'награда ждёт', cta: 'Забрать' });
+  if ((S.trades_in ?? 0) > 0) out.push({ id: 'trades', kind: 'trades', icon: 'i-swap', title: 'Тебе предлагают обмен', sub: `предложений: ${S.trades_in}`, cta: 'Открыть' });
   if (acc >= 100) out.push({ id: 'kassa', kind: 'kassa', icon: 'i-cash', title: `Касса · ${fmt(incomePerHourKop(S.collection_value) / 100)} ₽/ч`, sub: '+' + rub(acc), cta: 'Забрать' });
   if (!h.active) out.push({ id: 'happy', kind: 'happy-next', icon: 'i-sun', title: 'Счастливый час', sub: h.next ? `в ${mskHm(h.next)} МСК` : '—' });
   return out.slice(0, 2);
@@ -226,7 +237,9 @@ async function renderColl() {
   const price = slotPriceRub(S.extra_slots) * 100, max = slotsCap() >= SLOTS_MAX;
   head.innerHTML = `<div class="m"><span>Витрина ${S.collection_count}/${slotsCap()} · доход в кассу</span><b>+${rub(incomePerHourKop(S.collection_value))}/ч</b></div>
     <button class="btn btn-secondary btn-m btn-stack" id="buy-slot" ${max || S.balance < price ? 'disabled' : ''}>${max ? 'Максимум' : 'Ещё место'}${max ? '' : `<span class="sub">${rub(price)}</span>`}</button>`;
-  head.insertAdjacentHTML('beforeend', `<button class="rule-row" id="coll-rule">Сами уходят в коллекцию: <b>${ruleText(keepRule())}</b> ›</button>`);
+  head.insertAdjacentHTML('beforeend', `<button class="rule-row" id="coll-rule">Сами уходят в коллекцию: <b>${ruleText(keepRule())}</b> ›</button>
+    <button class="rule-row" id="coll-merge">${icon('i-up')} Улучшить: <b>3 номера одной редкости → 1 редкостью выше</b> ›</button>`);
+  $('coll-merge').onclick = () => { mergeMode = !mergeMode; mergeSel.clear(); haptic.select(); renderColl(); };
   $('coll-rule').onclick = () => ruleSheet();
   $('buy-slot').onclick = (e) => act(e, async () => {
     const r = await api.buySlot(); setState(r.state); haptic.success(); toast(`Витрина: ${slotsCap()} мест`); renderColl();
@@ -239,11 +252,15 @@ async function renderColl() {
     if (!list.length) { el.innerHTML = '<div class="empty">Пока пусто. Оставляй красивые номера — они приносят доход в кассу. Нажми на номер, чтобы продать, выставить на рынок или похвастаться.</div>'; return; }
     el.innerHTML = list.map((x) => {
       const c = countryById(x.country)!, tier = tierById(x.tier);
-      return `<div class="row tap" style="--tc:${tierVar(x.tier)}" data-act="${x.id}">
+      const sel = mergeSel.has(x.id), off = mergeMode && !mergeOk(x);
+      return `<div class="row tap ${sel ? 'picked' : ''} ${off ? 'off' : ''}" style="--tc:${tierVar(x.tier)}" data-act="${x.id}">
+        ${mergeMode ? `<span class="pick-box">${sel ? '✓' : ''}</span>` : ''}
         <div class="m"><div class="n">${esc(x.label)}</div>
-          <div class="s"><span class="dot"></span>${tier.name} · ${c.flag} ${esc(x.operator)}</div></div>
+          <div class="s"><span class="dot"></span>${tier.name} · ${c.flag} ${esc(x.operator)}</div>
+          ${badgesHtml(x)}</div>
         <div class="price">${rub(x.value)}<small>+${rub(incomePerHourKop(x.value))}/ч</small></div></div>`;
     }).join('');
+    renderMergeBar();
   } catch (e) {
     el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`;
   }
@@ -256,7 +273,9 @@ const plural = (n: number, a: string, b: string, c: string) => {
 
 async function renderRating() {
   const el = $('rating'), me = $('me-rank');
+  [...$('rating-tabs').children].forEach((b) => b.classList.toggle('on', (b as HTMLElement).dataset.r === (ratingWeek ? 'week' : 'all')));
   el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>'; me.innerHTML = 'Загрузка…';
+  if (ratingWeek) { await renderWeek(); return; }
   try {
     const lb = await api.leaderboard();
     if (view !== 'rating') return;
@@ -303,6 +322,7 @@ function ask(title: string, text: string, buttons: SheetBtn[]): Promise<string |
 /** Открыть лист со своей разметкой; pick получает нажатый элемент с data-*, close закрывает. */
 function openSheet(html: string, pick: (el: HTMLElement, close: () => void) => void, onClose?: () => void) {
   const sheet = $('sheet');
+  if (!$('coach').classList.contains('hidden')) coachDone();
   $('sheet-in').innerHTML = html;
   sheet.classList.remove('hidden');
   const close = () => { sheet.classList.add('hidden'); sheet.onclick = null; onClose?.(); };
@@ -323,6 +343,7 @@ function menuHtml(): string {
     `<button class="mrow ${hot ? 'hot' : ''}" data-pick="${pick}"><span class="banner-ico">${icon(ico)}</span><span class="mrow-t"><b>${title}</b><span class="num-t">${sub}</span></span>${right}</button>`;
   const go = icon('i-right');
   const cta = (t: string, on: boolean) => `<span class="mcta ${on ? 'on' : ''}">${t}</span>`;
+  const toggle = (on: boolean) => `<span class="tgl ${on ? 'on' : ''}" role="switch" aria-checked="${on}"><i></i></span>`;
   return `<div class="menu-head"><div class="menu-lvl">${S.level}</div><div class="menu-xp"><b>Уровень ${S.level}</b>
       <span class="num-t">${fmt(S.xp)} / ${fmt(need)} опыта</span><div class="bar"><i style="width:${k * 100}%"></i></div></div></div>
     <div class="mlist">
@@ -331,9 +352,19 @@ function menuHtml(): string {
       ${row('happy', 'i-sun', h.active ? `Счастливый час ×${HAPPY_LUCK} идёт` : 'Счастливый час', h.active ? `удача ×${HAPPY_LUCK} на все прокрутки до ${happyEnd()} МСК` : `в ${h.next ? mskHm(h.next) : '—'} МСК · целый час удачи ×${HAPPY_LUCK}`, '', h.active)}
       ${row('luck', 'i-star', `Удача ×${LUCKY_LUCK}`, until === 1 ? 'следующая прокрутка!' : `через ${until} ${plural(until, 'прокрутку', 'прокрутки', 'прокруток')}`, '')}
       ${row('free', 'i-play', 'Бесплатные прокрутки', `${fr.charges} из ${FREE_SPIN_MAX}${bonusSpins() ? ` · бонусных ${bonusSpins()}` : ''}${fr.nextAt ? ` · следующая через ${left(fr.nextAt)}` : ''}`, '')}
+      ${row('quests', 'i-target', 'Задания дня', questSummary(), questClaimable() ? `<i class="badge static">${questClaimable()}</i>${go}` : go, questClaimable() > 0)}
       ${row('rule', 'i-sim', 'Что оставлять себе', ruleText(keepRule()), go)}
       ${row('ach', 'i-medal', 'Достижения', claims ? `можно забрать: ${claims}` : 'награды за коллекции', claims ? `<i class="badge static">${claims}</i>${go}` : go, claims > 0)}
-      ${row('rating', 'i-cup', 'Рейтинг', 'топ коллекций', go)}
+      ${row('rating', 'i-cup', 'Рейтинг недели', 'лучший номер недели · призы', go)}
+      ${row('feed', 'i-fire', 'Только что выпало', 'эпические и легендарные у всех', go)}
+      ${row('hist', 'i-clock', 'История прокруток', 'куда делись номера и деньги', go)}
+      ${row('rules', 'i-book', 'Как оценивается номер', 'все узоры и множители', go)}
+    </div>
+    <div class="mlist">
+      ${row('sound', 'i-sound', 'Звук', sfx.enabled ? 'барабаны и выигрыши' : 'выключен', toggle(sfx.enabled))}
+      ${row('notify', 'i-bell', 'Сообщения от бота', 'касса полна, номер купили, обмен', toggle(S.notify ?? true))}
+      ${row('notifyHappy', 'i-sun', 'Напоминать о счастливом часе', 'за 10 минут, в 13:00 и 20:00 МСК', toggle(S.notify_happy ?? false))}
+      ${isAdmin ? row('admin', 'i-chart', 'Статистика игры', 'только для владельца', go) : ''}
     </div>
     <div class="sheet-btns"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`;
 }
@@ -353,7 +384,16 @@ function menuSheet() {
     if (k === 'kassa') { if (kassaNow() >= 100) act(el, collectKassa); return; }
     if (k === 'daily') { if (dailyInfo().available) act(el, claimDaily); return; }
     if (k === 'rule') { close(); ruleSheet(); return; }
-    if (k === 'ach' || k === 'rating') { close(); show(k); return; }
+    if (k === 'ach' || k === 'rating' || k === 'hist' || k === 'feed' || k === 'admin') { close(); show(k); return; }
+    if (k === 'quests') { close(); questSheet(); return; }
+    if (k === 'rules') { close(); rulesSheet(); return; }
+    if (k === 'sound') { sfx.set(!sfx.enabled); renderMenu(); return; }
+    if (k === 'notify' || k === 'notifyHappy') {
+      const n = k === 'notify' ? !(S.notify ?? true) : (S.notify ?? true);
+      const h = k === 'notifyHappy' ? !(S.notify_happy ?? false) : (S.notify_happy ?? false);
+      act(el, async () => { const r = await api.notifyPrefs(n, h); setState(r.state); haptic.select(); });
+      return;
+    }
   }, () => { menuOpen = false; });
 }
 
@@ -382,10 +422,10 @@ function stakeSheet() {
 }
 
 async function collectKassa() {
-  const r = await api.collect(); setState(r.state); haptic.success(); toast('Касса: +' + rub(r.collected));
+  const r = await api.collect(); setState(r.state); haptic.success(); sfx.coin(); toast('Касса: +' + rub(r.collected));
 }
 async function claimDaily() {
-  const r = await api.daily(); setState(r.state); haptic.success(); toast(`Бонус: +${rub(r.amount)}`);
+  const r = await api.daily(); setState(r.state); haptic.success(); sfx.coin(); toast(`Бонус: +${rub(r.amount)}`);
 }
 
 // ---------- действия ----------
@@ -525,6 +565,7 @@ async function spinOnce(): Promise<Sim | null> {
   if (S.balance + auto < price) { noMoney(); return null; }
 
   setSpinning(true);
+  sfx.spin();
   card.startWaiting(c);
   renderHud(S.balance + auto - price);
   renderResult();
@@ -552,6 +593,7 @@ async function spinOnce(): Promise<Sim | null> {
 
   setState(r.state);
   setSpinning(false);
+  if (sim.mul >= 1.5) sfx.win(sim.tier);
   if (sim.mul >= 1.5) {
     card.glow(sim.tier);
     if (sim.mul >= 6 && !reduced) card.burst(sim.tier, sim.mul >= 40 ? 40 : 18);
@@ -567,6 +609,7 @@ async function spinOnce(): Promise<Sim | null> {
   }
   renderAll(true);
   refreshStats();
+  coachAfterSpin();
   // кнопки результата не должны прятаться под нижней панелью
   if (view === 'play') {
     const res = $('result').getBoundingClientRect(), dockTop = document.querySelector('.dock')!.getBoundingClientRect().top;
@@ -722,11 +765,21 @@ async function renderFriends() {
       <div class="panel" style="margin-top:var(--s3)"><b>До следующей награды · ${f.active}/${next}</b>
         <div class="bar"><i style="width:${Math.min(100, (f.active / next) * 100)}%"></i></div>
         <p class="note" style="text-align:left;margin:var(--s2) 0 0">Друг засчитывается после ${REF_AFTER_SPINS} прокруток — так награды не получить ботами.</p></div>
-      ${f.list.length ? `<div class="group-title">Твои друзья</div><div class="list">${f.list.map((x) => `<div class="row">
+      <div id="trades"></div>
+      ${f.list.length || f.inviter ? `<div class="group-title">Твои друзья · нажми, чтобы меняться номерами</div><div class="list" id="friend-list">${
+        (f.inviter ? [{ id: f.inviter.id, name: f.inviter.name, sub: `пригласил тебя · номеров: ${f.inviter.count}` }] : [])
+          .concat(f.list.map((x) => ({ id: x.id ?? '', name: x.name, sub: (x.counted ? 'засчитан ✓' : `прокруток ${Math.min(x.spins, REF_AFTER_SPINS)} из ${REF_AFTER_SPINS}`) + (x.count !== undefined ? ` · номеров: ${x.count}` : '') })))
+          .map((x) => `<div class="row ${x.id ? 'tap' : ''}" ${x.id ? `data-friend="${x.id}" data-name="${esc(x.name || 'Игрок')}"` : ''}>
         <span class="avatar">${esc((x.name || 'И').slice(0, 1).toUpperCase())}</span>
         <div class="m"><div class="n" style="font-family:var(--font)">${esc(x.name || 'Игрок')}</div>
-          <div class="s">${x.counted ? 'засчитан ✓' : `прокруток ${Math.min(x.spins, REF_AFTER_SPINS)} из ${REF_AFTER_SPINS}`}</div></div></div>`).join('')}</div>` : ''}`;
+          <div class="s">${x.sub}</div></div>${x.id ? icon('i-swap') : ''}</div>`).join('')}</div>` : ''}`;
     bindFriendButtons(link);
+    const fl = document.getElementById('friend-list');
+    if (fl) fl.onclick = (e) => {
+      const r = (e.target as HTMLElement).closest<HTMLElement>('[data-friend]');
+      if (r) tradeStart(r.dataset.friend!, r.dataset.name!);
+    };
+    renderTrades();
   } catch (e) {
     toast((e as Error).message);
   }
@@ -739,24 +792,29 @@ function bindFriendButtons(link: string) {
 }
 
 // ---------- ещё ----------
-const TILES = [
-  { v: 'rating', title: 'Рейтинг', sub: 'топ коллекций', icon: 'i-cup', bg: 'linear-gradient(135deg,#f6b833,#ff8a12)' },
-  { v: 'ach', title: 'Достижения', sub: 'коллекции регионов', icon: 'i-medal', bg: 'linear-gradient(135deg,#4ade80,#16a34a)' },
+const TILES: { v?: string; soon?: string; title: string; sub: string; icon: string; bg: string; admin?: boolean }[] = [
+  { v: 'quests', title: 'Задания дня', sub: 'три цели на сегодня', icon: 'i-target', bg: 'linear-gradient(135deg,#ff7a7a,#e5484d)' },
+  { v: 'rating', title: 'Рейтинг', sub: 'неделя с призами', icon: 'i-cup', bg: 'linear-gradient(135deg,#f6b833,#ff8a12)' },
+  { v: 'ach', title: 'Достижения', sub: 'альбомы и коллекции', icon: 'i-medal', bg: 'linear-gradient(135deg,#4ade80,#16a34a)' },
+  { v: 'feed', title: 'Только что выпало', sub: 'находки игроков', icon: 'i-fire', bg: 'linear-gradient(135deg,#b38cff,#7c5cc4)' },
+  { v: 'hist', title: 'История', sub: 'последние 50 номеров', icon: 'i-clock', bg: 'linear-gradient(135deg,#38bdf8,#2563eb)' },
+  { v: 'rules', title: 'Как оценивается', sub: 'узоры и цены', icon: 'i-book', bg: 'linear-gradient(135deg,#94a3b8,#64748b)' },
+  { v: 'admin', title: 'Статистика', sub: 'для владельца', icon: 'i-chart', bg: 'linear-gradient(135deg,#2dd4bf,#0f766e)', admin: true },
   { soon: 'Магазин за звёзды Telegram — скоро', title: 'Магазин', sub: 'скоро', icon: 'i-star', bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)' },
-  { soon: 'Сезоны с наградами — скоро', title: 'Сезоны', sub: 'скоро', icon: 'i-flag', bg: 'linear-gradient(135deg,#b38cff,#7c5cc4)' },
-  { soon: 'Кланы — скоро', title: 'Кланы', sub: 'скоро', icon: 'i-shield', bg: 'linear-gradient(135deg,#38bdf8,#2563eb)' },
 ];
 function renderMore() {
-  const n = stats ? achClaimable(stats).length : 0;
-  $('more').innerHTML = TILES.map((t) => `<button class="tile ${t.soon ? 'soon' : ''}" ${t.v ? `data-v="${t.v}"` : `data-soon="${t.soon}"`}>
-      <span class="ti" style="background:${t.bg}">${icon(t.icon)}</span><b>${t.title}</b><span>${t.v === 'ach' && n ? `можно забрать: ${n}` : t.sub}</span>
-      ${t.v === 'ach' && n ? `<i class="badge">${n}</i>` : ''}</button>`).join('');
+  const n = stats ? achClaimable(stats).length : 0, qn = questClaimable();
+  const cnt = (v?: string) => (v === 'ach' ? n : v === 'quests' ? qn : 0);
+  $('more').innerHTML = TILES.filter((t) => !t.admin || isAdmin).map((t) => `<button class="tile ${t.soon ? 'soon' : ''}" ${t.v ? `data-v="${t.v}"` : `data-soon="${t.soon}"`}>
+      <span class="ti" style="background:${t.bg}">${icon(t.icon)}</span><b>${t.title}</b><span>${cnt(t.v) ? `можно забрать: ${cnt(t.v)}` : t.sub}</span>
+      ${cnt(t.v) ? `<i class="badge">${cnt(t.v)}</i>` : ''}</button>`).join('');
 }
 
 // ---------- достижения ----------
 async function refreshStats() {
   try { stats = await api.stats(); } catch { return; }
-  const n = achClaimable(stats).length;
+  try { day = await api.day(); } catch { /* старый сервер без заданий */ }
+  const n = achClaimable(stats).length + questClaimable();
   $('more-badge').textContent = String(n);
   $('more-badge').classList.toggle('hidden', n === 0);
   if (view === 'more') renderMore();
@@ -780,27 +838,315 @@ async function renderAch(fetch = true) {
     const prog = a.kind.t === 'value' ? `${rub(Math.min(p.have, p.need) * 100)} из ${rub(p.need * 100)}` : `${Math.min(p.have, p.need)} из ${p.need}`;
     return `<div class="ach ${claimed ? 'claimed' : done ? 'done' : ''}">
       <div class="m"><b>${a.title}</b><div class="s">${claimed ? 'получено' : prog} · ${reward}</div>
+        ${a.kind.t === 'set' ? setChips(a.kind.kinds, st) : ''}
         ${!claimed && !done ? `<div class="bar"><i style="width:${Math.min(100, (p.have / p.need) * 100)}%"></i></div>` : ''}</div>
       ${done && !claimed ? `<button class="btn btn-ok btn-m" data-claim="${a.id}">Забрать</button>` : ''}</div>`;
   }).join('')).join('');
 }
 
+// ---------- задания дня ----------
+const questsToday = () => (day && S.telegram_id ? questsFor(day.day, S.telegram_id, S.level) : []);
+const questClaimed = (id: string) => !!day && day.claimed.includes(questKey(day.day, id));
+function questClaimable(): number {
+  if (!day) return 0;
+  const qs = questsToday();
+  const n = qs.filter((q) => !questClaimed(q.id) && (() => { const p = questProgress(q, day!); return p.have >= p.need; })()).length;
+  const all = qs.length > 0 && qs.every((q) => questClaimed(q.id)) && !questClaimed('all') ? 1 : 0;
+  return n + all;
+}
+function questSummary(): string {
+  if (!day) return 'три цели на сегодня';
+  const qs = questsToday(), done = qs.filter((q) => questClaimed(q.id)).length;
+  return `выполнено ${done} из ${qs.length}${questClaimable() ? ' · есть награда' : ''}`;
+}
+function questHtml(): string {
+  if (!day) return '<p>Задания загружаются…</p>';
+  const qs = questsToday();
+  const rows = qs.map((q) => {
+    const p = questProgress(q, day!), done = p.have >= p.need, got = questClaimed(q.id);
+    const reward = rub(q.rewardRub * 100) + (q.rewardSpins ? ` + ${q.rewardSpins} прокр.` : '');
+    return `<div class="quest ${got ? 'got' : done ? 'done' : ''}"><div class="m"><b>${q.title}</b>
+      <div class="s num-t">${got ? 'получено ✓' : `${Math.min(p.have, p.need)} из ${p.need}`} · ${reward}</div>
+      ${!got ? `<div class="bar"><i style="width:${Math.min(100, (p.have / p.need) * 100)}%"></i></div>` : ''}</div>
+      ${done && !got ? `<button class="btn btn-ok btn-m" data-pick="${q.id}">Забрать</button>` : ''}</div>`;
+  }).join('');
+  const allDone = qs.every((q) => questClaimed(q.id)), allGot = questClaimed('all');
+  return `<h3>Задания дня</h3><p>Новые — каждый день в 00:00 по Москве.</p>${rows}
+    <div class="quest bonus ${allGot ? 'got' : allDone ? 'done' : ''}"><div class="m"><b>Все три задания</b>
+      <div class="s">${allGot ? 'получено ✓' : `ещё ${rub(QUEST_ALL_RUB * 100)} и ${QUEST_ALL_SPINS} прокрутки`}</div></div>
+      ${allDone && !allGot ? '<button class="btn btn-ok btn-m" data-pick="all">Забрать</button>' : ''}</div>
+    <div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`;
+}
+async function questSheet() {
+  haptic.select();
+  if (!day) { try { day = await api.day(); } catch (e) { toast((e as Error).message); return; } }
+  openSheet(questHtml(), (el) => {
+    act(el, async () => {
+      const r = await api.questClaim(el.dataset.pick!); setState(r.state); haptic.success(); sfx.coin();
+      toast(`Награда: +${rub(r.reward)}` + (r.spins ? ` и ${r.spins} прокр.` : ''));
+      day = await api.day();
+      $('sheet-in').innerHTML = questHtml();
+    });
+  });
+}
+
+// ---------- как оценивается номер ----------
+function rulesSheet() {
+  haptic.select();
+  const rows = PATTERN_INFO.map((x) => {
+    const m = RARITY[x.kind as keyof typeof RARITY] as number;
+    const t = TIER_LIST.find((y) => m >= y.min)!;
+    return `<div class="rule-line" style="--tc:${tierVar(t.id)}"><span><b>${x.name}</b><small>${x.example}</small></span><i class="num-t">×${fmtNum(m)}</i></div>`;
+  }).join('');
+  openSheet(`<h3>Как оценивается номер</h3>
+    <p>Цена = ставка × доля по редкости × особенности цифр. Берётся самый дорогой узор, T9-слово и красивый код умножают сверху.</p>
+    <div class="rules">${rows}
+      <div class="rule-line"><span><b>T9-слово</b><small>КОТИК = 45644, ДЕНЬГИ = 336544</small></span><i>×2 / ×3</i></div>
+      <div class="rule-line"><span><b>Красивый код</b><small>(999), (777), (44)</small></span><i>×2</i></div></div>
+    <div class="group-title">Редкость по множителю</div>
+    <div class="rules">${TIER_LIST.slice().reverse().map((t) => `<div class="rule-line" style="--tc:${tierVar(t.id)}"><span><b style="color:var(--tc)">${t.name}</b></span><i class="num-t">от ×${fmtNum(t.min)}</i></div>`).join('')}</div>
+    <div class="group-title">Цена от ставки</div>
+    <p style="text-align:left">Обычный номер — ${fmtNum(VALUE_BASE * 100)}% ставки, каждый «×» узора добавляет ещё 13%: Редкий ×12 ≈ 2,4 ставки, Легендарный ×500 ≈ 66.
+      Цифры меняют цену ещё на −12…+30%: меньше разных цифр, одинаковые рядом и семёрки — дороже.</p>
+    <div class="sheet-btns"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`, () => {});
+}
+const fmtNum = (x: number) => x.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+
+// ---------- история ----------
+const STATUS_TEXT: Record<string, string> = {
+  pending: 'на экране', sold: 'продан', auto_sold: 'продан', kept: 'в коллекции',
+  sold_from_collection: 'продан из витрины', listed: 'на рынке', merged: 'улучшен',
+};
+function ago(iso: string): string {
+  const m = Math.max(0, Math.round((now().getTime() - new Date(iso).getTime()) / 60e3));
+  if (m < 1) return 'только что';
+  if (m < 60) return `${m} мин назад`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} ч назад`;
+  return `${Math.floor(h / 24)} дн назад`;
+}
+async function renderHist() {
+  const el = $('hist');
+  el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+  try {
+    const list = await api.history();
+    if (view !== 'hist') return;
+    el.innerHTML = list.length ? list.map((x) => {
+      const c = countryById(x.country), diff = x.value - (x.cost ?? 0);
+      return `<div class="row" style="--tc:${tierVar(x.tier)}"><div class="m"><div class="n">${esc(x.label)}</div>
+        <div class="s"><span class="dot"></span>${c?.flag ?? ''} ${STATUS_TEXT[x.status ?? ''] ?? ''} · ${ago(x.created_at)}</div></div>
+        <div class="price">${rub(x.value)}<small class="${diff >= 0 ? 'up' : ''}">${x.cost ? `${diff >= 0 ? '▲ +' : '▼ −'}${rub(Math.abs(diff))}` : 'бесплатно'}</small></div></div>`;
+    }).join('') : '<div class="empty">Пока ни одной прокрутки</div>';
+  } catch (e) { el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`; }
+}
+
+// ---------- лента ----------
+async function renderFeed() {
+  const el = $('feed');
+  el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+  try {
+    const list = await api.feed();
+    if (view !== 'feed') return;
+    el.innerHTML = list.length ? list.map((x) => `<div class="row ${x.me ? 'me' : ''}" style="--tc:${tierVar(x.tier)}">
+        <span class="avatar">${esc((x.name || 'И').slice(0, 1).toUpperCase())}</span>
+        <div class="m"><div class="n">${esc(x.label)}</div>
+          <div class="s"><span class="dot"></span>${esc(x.me ? 'Ты' : x.name || 'Игрок')} · ${tierById(x.tier).name}${x.tag ? ' · ' + esc(x.tag) : ''} · ${ago(x.created_at)}</div></div>
+        <div class="price">${rub(x.value)}</div></div>`).join('')
+      : '<div class="empty">За неделю никто не выбил эпический номер — будь первым!</div>';
+  } catch (e) { el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`; }
+}
+
+// ---------- рейтинг недели ----------
+async function renderWeek() {
+  const el = $('rating'), me = $('me-rank');
+  try {
+    const w = await api.week(false);
+    if (view !== 'rating' || !ratingWeek) return;
+    const end = new Date(weekStart(now()).getTime() + 7 * 86400e3), msLeft = end.getTime() - now().getTime();
+    const dLeft = Math.floor(msLeft / 86400e3), hLeft = Math.floor((msLeft % 86400e3) / 3600e3);
+    const prizes = WEEK_PRIZES_RUB.map((r, i) => `${i + 1} место — ${rub(r * 100)} + ${WEEK_PRIZES_SPINS[i]} прокр.`).join(' · ');
+    me.innerHTML = `<b>Лучший номер недели</b> · до конца ${dLeft ? `${dLeft} дн ` : ''}${hLeft} ч<br><small>${prizes}<br>Приз приходит при входе после конца недели.</small>`
+      + (w.me ? `<br>Твоё место: <b>${w.me.place}</b> · номер на <b>${rub(w.me.value)}</b>` : '<br>Крути — твой лучший номер попадёт в рейтинг');
+    el.innerHTML = w.top.length ? w.top.map((r) => `<div class="row ${r.me ? 'me' : ''}">
+        <span class="place ${r.place <= 3 ? 'p' + r.place : ''}">${r.place}</span>
+        <span class="avatar">${esc((r.name || 'И').slice(0, 1).toUpperCase())}</span>
+        <div class="m"><div class="n" style="font-family:var(--font)">${esc(r.name || 'Игрок')}</div><div class="s">лучший номер · ${rub(r.value)}</div></div>
+        ${r.place <= WEEK_PRIZES_RUB.length ? `<span class="prize num-t">${rub(WEEK_PRIZES_RUB[r.place - 1] * 100)}</span>` : ''}</div>`).join('')
+      : '<div class="empty">На этой неделе ещё никто не крутил</div>';
+  } catch (e) { el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`; }
+}
+
+// ---------- альбомы и значки ----------
+function setChips(kinds: string[], st: Stats): string {
+  const got = new Set((st.tags ?? []).map(patternKind));
+  return `<div class="chips-set">${kinds.map((k) => {
+    const info = PATTERN_INFO.find((x) => x.kind === k);
+    return `<span class="kchip ${got.has(k as never) ? 'on' : ''}">${got.has(k as never) ? '✓ ' : ''}${info?.name ?? k}</span>`;
+  }).join('')}</div>`;
+}
+function badgesHtml(x: Sim): string {
+  const b: string[] = [];
+  if (x.first) b.push('<span class="nb gold">Первый в игре</span>');
+  if (x.luck >= 10) b.push('<span class="nb">Удача ×10</span>');
+  else if (x.luck === 2) b.push('<span class="nb">Счастливый час</span>');
+  if (x.is_free) b.push('<span class="nb">Бесплатный</span>');
+  return b.length ? `<div class="nbs">${b.join('')}</div>` : '';
+}
+
+// ---------- улучшение 3 → 1 ----------
+function mergeOk(x: Sim): boolean {
+  if (!nextTier(x.tier)) return false;
+  const first = collCache.find((y) => mergeSel.has(y.id));
+  return !first || first.tier === x.tier;
+}
+function toggleMergePick(x: Sim) {
+  if (mergeSel.has(x.id)) mergeSel.delete(x.id);
+  else if (!nextTier(x.tier)) { toast('Легендарный — уже высшая редкость'); return; }
+  else if (!mergeOk(x)) { toast('Нужны три номера одной редкости'); return; }
+  else if (mergeSel.size < 3) mergeSel.add(x.id);
+  haptic.select();
+  renderColl();
+}
+function renderMergeBar() {
+  const bar = $('merge-bar');
+  bar.classList.toggle('hidden', !mergeMode);
+  if (!mergeMode) return;
+  const first = collCache.find((y) => mergeSel.has(y.id)), to = first ? nextTier(first.tier) : null;
+  const sum = collCache.filter((y) => mergeSel.has(y.id)).reduce((a, y) => a + y.value, 0);
+  bar.innerHTML = `<div class="m"><b>Выбрано ${mergeSel.size} из 3</b><span>${to ? `${tierById(first!.tier).name} → ${tierById(to).name} · отдаёшь ${rub(sum)}` : 'выбери три номера одной редкости'}</span></div>
+    <button class="btn btn-pill btn-pill-ghost" id="merge-cancel">Отмена</button>
+    <button class="btn btn-pill btn-pill-gold" id="merge-go" ${mergeSel.size === 3 ? '' : 'disabled'}>Улучшить</button>`;
+  $('merge-cancel').onclick = () => { mergeMode = false; mergeSel.clear(); renderColl(); };
+  $('merge-go').onclick = (e) => act(e, async () => {
+    const r = await api.merge([...mergeSel]); setState(r.state);
+    mergeMode = false; mergeSel.clear(); haptic.success(); sfx.win(r.sim.tier);
+    toast(`Новый номер: ${r.sim.label} · ${tierById(r.sim.tier).name} · ${rub(r.sim.value)}`);
+    renderColl();
+  });
+}
+
+// ---------- обмен с друзьями ----------
+async function renderTrades() {
+  const el = document.getElementById('trades');
+  if (!el) return;
+  let list: Trade[] = [];
+  try { list = await api.trades(); } catch { return; }
+  if (view !== 'friends') return;
+  el.innerHTML = list.length ? `<div class="group-title">Обмены</div><div class="list">${list.map((t) => `<div class="trade">
+      <div class="trade-t">${t.incoming ? `<b>${esc(t.from_name)}</b> предлагает обмен` : `Ты предложил <b>${esc(t.to_name)}</b>`}</div>
+      <div class="trade-row"><span>Отдаёшь</span><b>${esc(t.give.label)}</b><i class="num-t">${rub(t.give.value)}</i></div>
+      <div class="trade-row"><span>Получаешь</span><b>${esc(t.get.label)}</b><i class="num-t">${rub(t.get.value)}</i></div>
+      <div class="acts">${t.incoming
+        ? `<button class="btn btn-pill btn-pill-dark" data-tr="${t.id}" data-ok="0">Отказать</button><button class="btn btn-pill btn-pill-gold" data-tr="${t.id}" data-ok="1">Поменяться</button>`
+        : `<button class="btn btn-pill btn-pill-dark" data-tr="${t.id}" data-ok="0">Отменить</button>`}</div></div>`).join('')}</div>` : '';
+  el.onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tr]');
+    if (!b) return;
+    act(b, async () => {
+      const r = await api.tradeAnswer(b.dataset.tr!, b.dataset.ok === '1'); setState(r.state);
+      if (r.status === 'accepted') { haptic.success(); sfx.coin(); toast('Обмен состоялся — номер в твоей коллекции'); }
+      else toast(r.status === 'declined' ? 'Предложение отклонено' : 'Предложение отменено');
+      renderTrades();
+    });
+  };
+}
+async function tradeStart(friendId: string, name: string) {
+  haptic.select();
+  let theirs: Sim[];
+  try { theirs = (await api.friendCollection(friendId)).list; } catch (e) { toast((e as Error).message); return; }
+  if (!theirs.length) { toast(`У ${name} пока пустая коллекция`); return; }
+  const row = (x: Sim) => `<button class="opt" data-pick="${x.id}" style="--tc:${tierVar(x.tier)}"><span class="opt-l"><span class="dot"></span><span class="mono">${esc(x.label)}</span></span><small class="num-t">${rub(x.value)}</small></button>`;
+  openSheet(`<h3>Коллекция: ${esc(name)}</h3><p>Выбери номер, который хочешь получить.</p><div class="opts">${theirs.map(row).join('')}</div>
+    <div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-ghost" data-close>Закрыть</button></div>`, async (el, close) => {
+    const want = theirs.find((x) => x.id === el.dataset.pick)!;
+    close();
+    const mine = (await api.collection()).filter((x) => Math.max(x.value, want.value) <= TRADE_MAX_RATIO * Math.min(x.value, want.value));
+    if (!mine.length) { toast(`Нет номера в похожую цену: меняться можно, если цены отличаются не больше чем в ${TRADE_MAX_RATIO} раза`); return; }
+    openSheet(`<h3>Что отдашь за ${esc(want.label)}?</h3><p>Номер ${esc(name)} стоит ${rub(want.value)}. Показаны твои номера в похожую цену.</p>
+      <div class="opts">${mine.map(row).join('')}</div>
+      <div class="sheet-btns" style="margin-top:var(--s3)"><button class="btn btn-pill btn-pill-ghost" data-close>Отмена</button></div>`, (el2, close2) => {
+      act(el2, async () => {
+        const r = await api.tradeOffer(el2.dataset.pick!, friendId, want.id); setState(r.state);
+        close2(); haptic.success(); toast(`Предложение отправлено — ${name} получит сообщение`);
+        renderTrades();
+      });
+    });
+  });
+}
+
+// ---------- статистика для владельца ----------
+async function renderAdmin() {
+  const el = $('admin');
+  el.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+  try {
+    const a = await api.adminStats() as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (view !== 'admin') return;
+    const tile = (v: unknown, t: string) => `<div class="stat"><b class="num-t">${v ?? '—'}</b><span>${t}</span></div>`;
+    const kv = (o: Record<string, number>) => Object.entries(o ?? {}).map(([k, v]) => `<div class="rule-line"><span>${esc(k)}</span><i class="num-t">${v}</i></div>`).join('');
+    el.innerHTML = `<div class="stats">${tile(a.players, 'всего игроков')}${tile(a.active_today, 'зашли сегодня')}${tile(a.new_today, 'новых сегодня')}</div>
+      <div class="stats" style="margin-top:var(--s2)">${tile(a.active_7d, 'за 7 дней')}${tile(a.returned_next_day != null ? a.returned_next_day + '%' : '—', 'вернулись на 2-й день')}${tile(a.rtp_7d != null ? a.rtp_7d + '%' : '—', 'отдача прокруток')}</div>
+      <div class="stats" style="margin-top:var(--s2)">${tile(a.spins_today, 'прокруток сегодня')}${tile(a.market_7d, 'продаж на рынке')}${tile(a.trades_7d, 'обменов')}</div>
+      <div class="group-title">Сколько прокруток сделали игроки</div><div class="rules">${kv(a.spins_buckets)}</div>
+      <p class="note" style="text-align:left">Застряли на старте (меньше 10 прокруток): <b>${a.stuck_under_10}</b>. Если их много — новичкам непонятно, что делать.</p>
+      <div class="group-title">Редкость за 7 дней</div><div class="rules">${kv(a.tiers_7d)}</div>
+      <div class="group-title">По дням</div><div class="rules">${(a.by_day ?? []).map((d: { day: string; spins: number; players: number }) =>
+        `<div class="rule-line"><span>${d.day}</span><i class="num-t">${d.players} игр. · ${d.spins} прокр.</i></div>`).join('')}</div>`;
+  } catch (e) { el.innerHTML = `<div class="empty">${esc((e as Error).message)}</div>`; }
+}
+
+// ---------- обучение новичка: три подсказки ----------
+const COACH_KEY = 'zn-coach';
+let coachStep = 0;
+function coachShow(text: string, target: string) {
+  const el = $('coach'), t = document.querySelector(target) as HTMLElement | null;
+  $('coach-t').textContent = text;
+  el.classList.remove('hidden');
+  const r = t?.getBoundingClientRect();
+  const below = !!r && r.top < 200; // цель наверху — пузырь под ней
+  el.classList.toggle('below', below);
+  el.style.setProperty('--y', r ? `${below ? r.bottom + 12 : r.top - 12}px` : '40%');
+  document.querySelectorAll('.coach-target').forEach((x) => x.classList.remove('coach-target'));
+  t?.classList.add('coach-target');
+}
+function coachDone() {
+  $('coach').classList.add('hidden');
+  document.querySelectorAll('.coach-target').forEach((x) => x.classList.remove('coach-target'));
+  if (coachStep >= 3) try { localStorage.setItem(COACH_KEY, '1'); } catch { /* */ }
+}
+function coachStart() {
+  let seen = false;
+  try { seen = localStorage.getItem(COACH_KEY) === '1'; } catch { /* */ }
+  if (seen || S.total_spins > 0) { coachStep = 9; return; }
+  coachStep = 1;
+  setTimeout(() => coachShow('Жми «Крутить» — выпадет SIM-карта с игровым номером. Первые прокрутки бесплатные.', '#spin'), 700);
+}
+function coachAfterSpin() {
+  if (coachStep === 1) { coachStep = 2; setTimeout(() => coachShow('Красивый номер оставь себе — «В коллекцию». Остальные продаются сами, когда крутишь дальше.', '#b-keep'), 400); }
+  else if (coachStep === 2) { coachStep = 3; setTimeout(() => coachShow('Номера в коллекции приносят доход в кассу. Забирай её в меню ☰ — там же бонусы и задания дня.', '#menu'), 400); }
+}
+
 // ---------- навигация ----------
-const NAV_OF: Record<View, View> = { play: 'play', coll: 'coll', market: 'market', friends: 'friends', more: 'more', rating: 'more', ach: 'more' };
+const NAV_OF: Record<View, View> = { play: 'play', coll: 'coll', market: 'market', friends: 'friends', more: 'more', rating: 'more', ach: 'more', hist: 'more', feed: 'more', admin: 'more' };
+const SUB_VIEWS: View[] = ['rating', 'ach', 'hist', 'feed', 'admin'];
 function show(v: View) {
   view = v;
   [...$('nav').children].forEach((x) => x.classList.toggle('on', (x as HTMLElement).dataset.v === NAV_OF[v]));
-  for (const k of ['play', 'coll', 'market', 'friends', 'more', 'rating', 'ach']) $('v-' + k).classList.toggle('hidden', v !== k);
+  for (const k of ['play', 'coll', 'market', 'friends', 'more', 'rating', 'ach', 'hist', 'feed', 'admin']) $('v-' + k).classList.toggle('hidden', v !== k);
+  if (v !== 'coll') { mergeMode = false; mergeSel.clear(); }
+  if (v !== 'play') coachDone();
   $('dock-play').classList.toggle('hidden', v !== 'play');
   document.body.classList.toggle('on-play', v === 'play');
   if (v !== 'play') autoLeft = 0;
-  backButton(v !== 'play', () => show(v === 'rating' || v === 'ach' ? 'more' : 'play'));
+  backButton(v !== 'play', () => show(SUB_VIEWS.includes(v) ? 'more' : 'play'));
   if (v === 'coll') renderColl();
   if (v === 'rating') renderRating();
   if (v === 'market') renderMarket();
   if (v === 'friends') renderFriends();
   if (v === 'more') renderMore();
   if (v === 'ach') renderAch();
+  if (v === 'hist') renderHist();
+  if (v === 'feed') renderFeed();
+  if (v === 'admin') renderAdmin();
   window.scrollTo(0, 0);
 }
 
@@ -830,6 +1176,8 @@ function bind() {
     const k = b.dataset.b;
     if (k === 'kassa') act(b, collectKassa);
     else if (k === 'daily') act(b, claimDaily);
+    else if (k === 'quests') questSheet();
+    else if (k === 'trades') show('friends');
     else if (k === 'happy') {
       const h = happyInfo();
       toast(h.active ? `Счастливый час: удача ×${HAPPY_LUCK} на все прокрутки до ${happyEnd()} МСК` : `Счастливые часы — 13:00 и 20:00 МСК: целый час удачи ×${HAPPY_LUCK}`);
@@ -846,7 +1194,9 @@ function bind() {
   $('coll').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
     const x = b && collCache.find((s) => s.id === b.dataset.act);
-    if (x && !busy) numberActions(x);
+    if (!x || busy) return;
+    if (mergeMode) { toggleMergePick(x); return; }
+    numberActions(x);
   };
   $('nav').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('button');
@@ -854,6 +1204,12 @@ function bind() {
     haptic.select();
     show(b.dataset.v as View);
   };
+  $('rating-tabs').onclick = (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-r]');
+    if (!b) return;
+    ratingWeek = b.dataset.r === 'week'; haptic.select(); renderRating();
+  };
+  $('coach-ok').onclick = () => coachDone();
   $('market-tabs').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-m]');
     if (!b) return;
@@ -882,13 +1238,16 @@ function bind() {
     const b = (e.target as HTMLElement).closest<HTMLElement>('.tile');
     if (!b) return;
     haptic.select();
-    if (b.dataset.soon) toast(b.dataset.soon); else show(b.dataset.v as View);
+    if (b.dataset.soon) toast(b.dataset.soon);
+    else if (b.dataset.v === 'quests') questSheet();
+    else if (b.dataset.v === 'rules') rulesSheet();
+    else show(b.dataset.v as View);
   };
   $('ach').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-claim]');
     if (!b) return;
     act(b, async () => {
-      const r = await api.claim(b.dataset.claim!); setState(r.state); haptic.success();
+      const r = await api.claim(b.dataset.claim!); setState(r.state); haptic.success(); sfx.coin();
       toast(`Награда: +${rub(r.reward)}` + (r.spins ? ` и ${r.spins} прокр.` : ''));
       await refreshStats();
     });
@@ -916,7 +1275,9 @@ async function start() {
   }
   loadPrefs();
   try {
-    setState(await api.login());
+    const st = await api.login();
+    isAdmin = !!st.is_admin;
+    setState(st);
   } catch (e) {
     $('splash-t').textContent = (e as Error).message;
     return;
@@ -934,6 +1295,9 @@ async function start() {
   bind();
   renderAll();
   refreshStats();
+  const wp = S.week_prize;
+  if (wp) setTimeout(() => { haptic.success(); sfx.win('epic'); toast(`Приз недели: ${wp.place} место! +${rub(wp.prize)}${wp.spins ? ` и ${wp.spins} прокр.` : ''}`); }, 600);
+  coachStart();
   setInterval(() => { if (!spinning) { renderBanners(); renderSpin(); renderHud(); if (menuOpen && !busy) renderMenu(); } }, 1000);
   $('splash').classList.add('gone');
 }

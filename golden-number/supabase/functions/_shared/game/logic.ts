@@ -8,6 +8,7 @@ import {
   DAILY_BASE_RUB, DAILY_MAX_STREAK, DAILY_STEP_RUB, FREE_SPIN_EVERY_H, FREE_SPIN_MAX, HAPPY_HOURS_MSK, HAPPY_LUCK, HAPPY_SPINS,
   LUCKY_EVERY, LUCKY_LUCK, ONBOARDING_GUARANTEE, SELL_BACK, STAKE_XP, TIERS, XP_BASE, XP_POW,
   ACHIEVEMENTS, COUNTRIES, MARKET_MAX_PRICE, MARKET_MIN_PRICE, type Achievement, type KeepRule,
+  QUESTS, QUESTS_PER_DAY, type PatternKind, type Quest,
 } from './config.ts';
 
 /** Возвращает число в [0, 1). */
@@ -305,6 +306,8 @@ export interface Stats {
   collection_value: number; // копейки
   friends: number; // засчитанных друзей
   claimed: string[];
+  /** Все теги, которые выпадали (для альбомов). У старого сервера нет. */
+  tags?: string[];
 }
 
 /** Прогресс достижения: сколько сделано из скольких. */
@@ -327,6 +330,10 @@ export function achProgress(a: Achievement, s: Stats): { have: number; need: num
     case 'code': return { have: s.codes, need: k.n };
     case 'value': return { have: Math.floor(s.collection_value / 100), need: k.rub };
     case 'friends': return { have: s.friends, need: k.n };
+    case 'set': {
+      const got = new Set((s.tags ?? []).map(patternKind));
+      return { have: k.kinds.filter((x) => got.has(x)).length, need: k.kinds.length };
+    }
   }
 }
 
@@ -375,4 +382,104 @@ export function parseKeepRule(x: unknown): KeepRule | null {
     return { mode: 'price', from: r.from as number, to: r.to as number | null };
   }
   return null;
+}
+
+// ---------- узоры по тегам (альбомы, правила) ----------
+
+/** Какой узор означает тег номера (тег — текст из evaluate()). */
+export function patternKind(tag: string): PatternKind | null {
+  if (tag === 'Круглый номер') return 'round';
+  if (tag === 'Все цифры одинаковые') return 'allSame';
+  if (tag === 'Лесенка') return 'ladder';
+  if (/^[67] одинаковых подряд$/.test(tag)) return 'run6';
+  if (tag === '5 одинаковых подряд') return 'run5';
+  if (tag === '4 одинаковых подряд') return 'run4';
+  if (tag === 'Зеркальный') return 'mirror';
+  if (tag === 'Повтор пар') return 'pairs';
+  if (tag === 'Только две цифры') return 'twoDigits';
+  if (/^Повтор \d{3}$/.test(tag)) return 'block3';
+  if (tag === 'Хвост 000') return 'tail000';
+  if (tag === 'Хвост 00') return 'tail00';
+  if (/^Зеркальный хвост /.test(tag)) return 'tailABBA';
+  let m = /^Хвост (\d)(\d)-(\d)(\d)$/.exec(tag);
+  if (m) return m[1] === m[3] && m[2] === m[4] ? 'tailABAB' : 'tailAABB';
+  if (tag === 'Хвост-лесенка') return 'tailLadder';
+  if (tag === 'Красивый хвост') return 'tail3';
+  m = /^T9: /.exec(tag);
+  return m ? 't9' : null;
+}
+export const isTailKind = (k: PatternKind | null) => !!k && (k.startsWith('tail'));
+
+// ---------- задания дня ----------
+
+export interface DayStats {
+  day: string; // 'YYYY-MM-DD' по Москве
+  spins: number;
+  tiers: Partial<Record<string, number>>;
+  tags: string[];
+  countries: number;
+  kept: number;
+  big_stake: number;
+  claimed: string[]; // ключи 'q:<день>:<id>'
+}
+
+/** Детерминированный выбор 3 заданий на день: у каждого игрока свои, одинаково на сервере и в игре. */
+export function questsFor(day: string, telegramId: number, level = 99): Quest[] {
+  let h = 2166136261;
+  for (const ch of `${day}:${telegramId}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const pool = QUESTS.filter((q) => (q.minLevel ?? 1) <= level);
+  const out: Quest[] = [];
+  while (out.length < QUESTS_PER_DAY && pool.length) {
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    const q = pool.splice(h % pool.length, 1)[0];
+    // не два задания на прокрутки сразу
+    if (q.kind.t === 'spins' && out.some((x) => x.kind.t === 'spins')) continue;
+    out.push(q);
+  }
+  return out;
+}
+
+export function questProgress(q: Quest, d: DayStats): { have: number; need: number } {
+  const k = q.kind;
+  switch (k.t) {
+    case 'spins': return { have: d.spins, need: k.n };
+    case 'tier': {
+      const r = tierRank(k.tier);
+      return { have: Object.entries(d.tiers).reduce((n, [id, c]) => n + (tierRank(id) >= r ? c ?? 0 : 0), 0), need: k.n };
+    }
+    case 'kept': return { have: d.kept, need: k.n };
+    case 'countries': return { have: d.countries, need: k.n };
+    case 'tail': return { have: d.tags.filter((t) => isTailKind(patternKind(t))).length, need: k.n };
+    case 'bigStake': return { have: d.big_stake, need: k.n };
+  }
+}
+export const questKey = (day: string, id: string) => `q:${day}:${id}`;
+export const questDone = (q: Quest, d: DayStats) => { const p = questProgress(q, d); return p.have >= p.need; };
+
+// ---------- неделя ----------
+
+/** Начало недели (понедельник 00:00 по Москве), в которую попадает момент now. */
+export function weekStart(now: Date): Date {
+  const m = new Date(now.getTime() + 3 * 3600e3);
+  const dow = (m.getUTCDay() + 6) % 7; // 0 — понедельник
+  const day = Date.UTC(m.getUTCFullYear(), m.getUTCMonth(), m.getUTCDate()) - dow * 86400e3;
+  return new Date(day - 3 * 3600e3);
+}
+
+// ---------- улучшение 3 → 1 ----------
+
+/** Следующая редкость для улучшения; у Легендарного — нет. */
+export function nextTier(tier: string): Tier['id'] | null {
+  const i = TIERS.findIndex((t) => t.id === tier);
+  return i > 0 ? TIERS[i - 1].id : null;
+}
+
+/** Номер ровно нужной редкости (для улучшения). */
+export function drawExactTier(rng: Rng, c: Country, tier: Tier['id']): LuckyDraw {
+  const r = tierRank(tier);
+  for (let i = 0; i < 300; i++) {
+    const d = drawLucky(rng, c, 1, r);
+    if (tierRank(d.ev.tier.id) === r) return d;
+  }
+  return drawLucky(rng, c, 1, r);
 }

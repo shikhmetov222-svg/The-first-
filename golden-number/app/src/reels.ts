@@ -3,6 +3,7 @@
 // последний барабан тормозит дольше и карточка трясётся. Повторное нажатие — «Пропустить».
 import type { Country } from '../../supabase/functions/_shared/game/config.ts';
 import { haptic } from './tg.ts';
+import { sfx } from './sound.ts';
 
 const SKIP_DELAY = 180, SKIP_SNAP = 260;
 const $ = (id: string) => document.getElementById(id)!;
@@ -189,7 +190,7 @@ export class Card {
     o.st.style.transition = `transform ${dur}ms cubic-bezier(.12,.8,.22,1.04) ${delay}ms`;
     o.st.style.transform = o.final;
     o.v = target;
-    this.later(() => { this.finishReel(o); haptic.tick(); }, delay + dur + 20);
+    this.later(() => { this.finishReel(o); haptic.tick(); sfx.tick(); }, delay + dur + 20);
     return delay + dur;
   }
 }

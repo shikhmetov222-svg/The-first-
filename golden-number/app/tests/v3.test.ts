@@ -34,8 +34,8 @@ describe('достижения', () => {
     expect(achClaimable(s).map((a) => a.id)).toEqual(['spins100']);
   });
 
-  it('сумма всех наград умеренная (меньше 500 000 ₽)', () => {
-    expect(ACHIEVEMENTS.reduce((s, a) => s + a.rewardRub, 0)).toBeLessThan(500_000);
+  it('сумма всех наград умеренная (меньше 800 000 ₽)', () => {
+    expect(ACHIEVEMENTS.reduce((s, a) => s + a.rewardRub, 0)).toBeLessThan(800_000);
   });
 });
 

@@ -11,12 +11,17 @@ import {
   STAKES, STAKE_LEVEL, XP_BASE, XP_POW, countryById, slotPriceRub,
   ACHIEVEMENTS, MARKET_FEE, MARKET_MAX_BUYS_PER_SELLER, MARKET_MAX_LOTS, MARKET_MAX_PRICE, MARKET_MIN_PRICE,
   REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS,
+  HAPPY_LUCK, KASSA_CAP_HOURS, KASSA_RATE_PER_HOUR, NOTIFY_BATCH, NOTIFY_MIN_GAP_S, QUEST_ALL_RUB, QUEST_ALL_SPINS,
+  TRADE_MAX_PENDING, TRADE_MAX_PER_DAY, TRADE_MAX_RATIO, WEEK_PRIZES_RUB, WEEK_PRIZES_SPINS,
 } from '../_shared/game/config.ts';
 import {
   achDone, drawLucky, formatLabel, guaranteeRank, parseKeepRule, spinCostKop, spinLuck, valueByBetKop, xpForSpin, type Rng, type Stats,
+  drawExactTier, msk, nextTier, questDone, questKey, questsFor, weekStart, type DayStats,
 } from '../_shared/game/logic.ts';
 
 const BOT_TOKEN = Deno.env.get('GN_TELEGRAM_BOT_TOKEN') ?? '';
+/** Владельцы игры (статистика) — только из секрета функции GN_ADMIN_IDS, через запятую. */
+const ADMINS = new Set((Deno.env.get('GN_ADMIN_IDS') ?? '').split(',').map((x) => Number(x.trim())).filter(Boolean));
 const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -85,6 +90,70 @@ function login(user: TelegramUser) {
     p_telegram_id: user.id, p_first_name: user.first_name ?? '', p_username: user.username ?? null,
     p_ref_telegram_id: m ? Number(m[1]) : null, p_ref_bonus: REF_NEW_SPINS,
   });
+}
+
+/** Вход: состояние + приз за прошлую неделю (если занял место) + признак владельца. */
+async function enter(user: TelegramUser) {
+  await login(user);
+  const prev = new Date(weekStart(new Date()).getTime() - 7 * 86400e3);
+  const prize = await rpc<Body | null>('gn_week_prize', {
+    p_telegram_id: user.id, p_prev_start: prev.toISOString(),
+    p_prizes: WEEK_PRIZES_RUB.map((r) => r * 100), p_spins: WEEK_PRIZES_SPINS,
+  });
+  const st = await login(user); // баланс после приза
+  return { ...st, week_prize: prize, is_admin: ADMINS.has(user.id) };
+}
+
+async function claimQuest(user: TelegramUser, body: Body) {
+  const st = await login(user);
+  const day = msk(new Date()).date;
+  const d = await rpc<DayStats>('gn_day_stats', { p_telegram_id: user.id, p_day: day });
+  const qs = questsFor(day, user.id, st.level as number);
+  if (body.id === 'all') {
+    if (!qs.every((q) => d.claimed.includes(questKey(day, q.id)))) throw new ApiError(400, 'Сначала выполни все три задания');
+    return rpc('gn_claim', { p_telegram_id: user.id, p_key: questKey(day, 'all'), p_reward: QUEST_ALL_RUB * 100, p_spins: QUEST_ALL_SPINS });
+  }
+  const q = qs.find((x) => x.id === body.id);
+  if (!q) throw new ApiError(400, 'Такого задания сегодня нет');
+  if (!questDone(q, d)) throw new ApiError(400, 'Задание ещё не выполнено');
+  return rpc('gn_claim', { p_telegram_id: user.id, p_key: questKey(day, q.id), p_reward: q.rewardRub * 100, p_spins: q.rewardSpins ?? 0 });
+}
+
+/** Улучшение: три номера одной редкости → один номер следующей. Номер генерирует сервер. */
+async function merge(user: TelegramUser, body: Body) {
+  const ids = body.ids;
+  if (!Array.isArray(ids) || ids.length !== 3 || !ids.every((x) => typeof x === 'string' && UUID.test(x))) {
+    throw new ApiError(400, 'Выбери три номера');
+  }
+  const ctx = await rpc<{ tier: string; country: string; bet: number }>('gn_merge_ctx', { p_telegram_id: user.id, p_ids: ids });
+  const target = nextTier(ctx.tier);
+  const country = countryById(ctx.country);
+  if (!target || !country) throw new ApiError(400, 'Эти номера нельзя улучшить');
+  const d = drawExactTier(cryptoRng, country, target);
+  return rpc('gn_merge', {
+    p_telegram_id: user.id, p_ids: ids, p_tier: ctx.tier,
+    p_country: country.id, p_operator: d.op.name, p_prefix: d.prefix, p_sub: d.sub, p_label: formatLabel(country, d.prefix, d.sub),
+    p_mul: d.ev.mul, p_new_tier: d.ev.tier.id, p_tags: d.ev.tags, p_value: valueByBetKop(ctx.bet, d.ev.mul, d.ev.micro), p_bet: ctx.bet,
+  });
+}
+
+/** Рассылка ботом: забрать готовые сообщения и отправить. Без проверки initData — вызывает расписание;
+ *  повторный вызов ничего не даёт (сервер выдаёт сообщения не чаще раза в минуту и помечает отправленные). */
+async function notifyTick() {
+  const list = await rpc<{ telegram_id: number; text: string }[]>('gn_notify_take', {
+    p_min_gap_s: NOTIFY_MIN_GAP_S, p_limit: NOTIFY_BATCH, p_kassa_rate: KASSA_RATE_PER_HOUR, p_kassa_cap_h: KASSA_CAP_HOURS,
+    p_happy_hours: HAPPY_HOURS_MSK, p_happy_luck: HAPPY_LUCK,
+  });
+  let sent = 0;
+  for (const m of list) {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: m.telegram_id, text: m.text, disable_notification: false }),
+    }).catch(() => null);
+    if (r?.ok) sent++;
+    await new Promise((res) => setTimeout(res, 40)); // Telegram: не больше ~30 сообщений в секунду
+  }
+  return { taken: list.length, sent };
 }
 
 const isRetry = (e: unknown) => e instanceof ApiError && e.message === 'GN_RETRY';
@@ -190,7 +259,38 @@ async function handle(user: TelegramUser, body: Body): Promise<unknown> {
   const tg = { p_telegram_id: user.id };
   switch (body.action) {
     case 'login':
-      return login(user);
+      return enter(user);
+    case 'history':
+      return rpc('gn_history', tg);
+    case 'day':
+      return rpc('gn_day_stats', { ...tg, p_day: msk(new Date()).date });
+    case 'quest_claim':
+      return claimQuest(user, body);
+    case 'feed':
+      return rpc('gn_feed', tg);
+    case 'week': {
+      const start = weekStart(new Date());
+      if (body.prev === true) start.setTime(start.getTime() - 7 * 86400e3);
+      return rpc('gn_week_board', { ...tg, p_start: start.toISOString() });
+    }
+    case 'merge':
+      return merge(user, body);
+    case 'friend_collection':
+      return rpc('gn_friend_collection', { ...tg, p_friend: uuid(body, 'id') });
+    case 'trades':
+      return rpc('gn_trades_list', tg);
+    case 'trade_offer':
+      return rpc('gn_trade_offer', {
+        ...tg, p_my_sim: uuid(body, 'my'), p_friend: uuid(body, 'friend'), p_their_sim: uuid(body, 'their'),
+        p_max_ratio: TRADE_MAX_RATIO, p_max_pending: TRADE_MAX_PENDING, p_max_per_day: TRADE_MAX_PER_DAY,
+      });
+    case 'trade_answer':
+      return rpc('gn_trade_answer', { ...tg, p_trade: uuid(body, 'id'), p_accept: body.accept === true });
+    case 'notify_prefs':
+      return rpc('gn_notify_prefs', { ...tg, p_notify: body.notify === true, p_happy: body.happy === true });
+    case 'admin_stats':
+      if (!ADMINS.has(user.id)) throw new ApiError(403, 'Только для владельца игры');
+      return rpc('gn_admin_stats', {});
     case 'spin':
       return spin(user, body);
     case 'sell':
@@ -260,6 +360,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Только POST' }, 405);
   try {
     if (!BOT_TOKEN) throw new Error('GN_TELEGRAM_BOT_TOKEN не задан в секретах функции');
+    if (new URL(req.url).searchParams.get('tick') === 'notify') return json(await notifyTick());
     const user = await verifyInitData(req.headers.get('x-telegram-init-data') ?? '', BOT_TOKEN);
     if (!user) throw new ApiError(401, 'Открой игру через Telegram');
     const body = (await req.json().catch(() => ({}))) as Body;
