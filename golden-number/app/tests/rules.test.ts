@@ -150,11 +150,11 @@ describe('экономика', () => {
     expect(spinCostKop(countryById('ae')!, 10)).toBe(BASE_COST_RUB * 5 * 10 * 100);
   });
 
-  it('цена = ставка × (0,75 + 0,17 × (множитель − 1))', () => {
-    expect(numberValueKop(countryById('ru')!, 1, 1)).toBe(75_000);
-    expect(numberValueKop(countryById('tr')!, 12, 2)).toBe(Math.round(500_000 * (0.75 + 0.17 * 11)));
-    expect(numberValueKop(countryById('by')!, 1.5, 1)).toBe(125_250);
-    expect(numberValueKop(countryById('ru')!, 500, 1) / 100).toBeCloseTo(85_580, 0);
+  it('цена = ставка × (0,95 + 0,15 × (множитель − 1))', () => {
+    expect(numberValueKop(countryById('ru')!, 1, 1)).toBe(95_000);
+    expect(numberValueKop(countryById('tr')!, 12, 2)).toBe(Math.round(500_000 * (0.95 + 0.15 * 11)));
+    expect(numberValueKop(countryById('by')!, 1.5, 1)).toBe(153_750);
+    expect(numberValueKop(countryById('ru')!, 500, 1) / 100).toBeCloseTo(75_800, 0);
   });
 
   it('касса: 2% в час, не больше 12 часов', () => {
@@ -190,7 +190,7 @@ describe('экономика', () => {
     expect(formatLabel(countryById('ae')!, '50', '1234567')).toBe('+971 (50) 123 4567');
   });
 
-  it('отдача: обычная ≈95%, с каждой 100-й ×10 ≈97%, одинакова по ставкам', () => {
+  it('отдача: обычная ≈112%, с каждой 100-й ×10 ≈114%', () => {
     const rng = seeded(6);
     let cost = 0, value = 0, luckyValue = 0, luckyCost = 0;
     for (const c of COUNTRIES) {
@@ -207,11 +207,11 @@ describe('экономика', () => {
       }
     }
     const base = value / cost, lucky = luckyValue / luckyCost;
-    expect(base).toBeGreaterThan(0.92);
-    expect(base).toBeLessThan(0.98);
+    expect(base).toBeGreaterThan(1.07);
+    expect(base).toBeLessThan(1.17);
     const avg = (base * 99 + lucky) / 100;
-    expect(avg).toBeGreaterThan(0.94);
-    expect(avg).toBeLessThan(1.0);
+    expect(avg).toBeGreaterThan(1.09);
+    expect(avg).toBeLessThan(1.2);
   });
 });
 
