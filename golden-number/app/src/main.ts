@@ -1,11 +1,11 @@
 import './styles.css';
 import {
-  BAILOUT_RUB, COUNTRIES, FREE_SPIN_MAX, KASSA_CAP_HOURS, LUCKY_EVERY, LUCKY_LUCK, HAPPY_LUCK, HAPPY_SPINS, SLOTS_MAX, SLOTS_START,
+  BAILOUT_RUB, COUNTRIES, FREE_SPIN_MAX, KASSA_CAP_HOURS, LUCKY_EVERY, LUCKY_LUCK, HAPPY_LUCK, SLOTS_MAX, SLOTS_START,
   STAKES, STAKE_LEVEL, countryById, slotPriceRub, type Country,
-  KEEP_RULE_DEFAULT, type KeepRule, ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
+  KEEP_RULE_DEFAULT, type KeepRule, VALUE_BASE, ACHIEVEMENTS, MARKET_FEE, REF_AFTER_SPINS, REF_NEW_SPINS, REF_REWARD_RUB, REF_REWARD_SPINS, TIERS, inviteLink,
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
-  valueFactor, ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
+  microFactor, valueFactor, ruleMatches, achClaimable, achProgress, dailyNow, freeNow, happyNow, incomePerHourKop, kassaTotalKop, lotPriceBounds, priceBreakdown,
   sellBackKop, spinCostKop, xpToNext, type Stats,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { serverApi } from './api.ts';
@@ -73,6 +73,8 @@ const useFree = () => freeInfo().charges > 0 || bonusSpins() > 0;
 const cost = () => (useFree() ? 0 : spinCostKop(country, stake));
 /** Время по Москве «13:00» — счастливые часы общие для всех игроков. */
 const mskHm = (d: Date) => { const m = new Date(d.getTime() + 3 * 3600e3); return `${String(m.getUTCHours()).padStart(2, '0')}:${String(m.getUTCMinutes()).padStart(2, '0')}`; };
+/** Конец текущего часа по Москве: «14:00». */
+const happyEnd = () => mskHm(new Date(Math.floor(now().getTime() / 3.6e6 + 1) * 3.6e6));
 /** Сколько осталось: «3:57» (часы:минуты). */
 const left = (d: Date) => { const m = Math.max(0, Math.ceil((d.getTime() - now().getTime()) / 60e3)); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
 
@@ -116,10 +118,10 @@ interface Banner { id: string; icon: string; title: string; sub: string; cta?: s
 function banners(): Banner[] {
   const out: Banner[] = [];
   const h = happyInfo(), d = dailyInfo(), acc = kassaNow();
-  if (h.active && h.left > 0) out.push({ id: 'happy', kind: 'happy', icon: 'i-sun', title: `Счастливый час ×${HAPPY_LUCK}`, sub: `осталось ${h.left} из ${HAPPY_SPINS}`, hot: true });
+  if (h.active) out.push({ id: 'happy', kind: 'happy', icon: 'i-sun', title: `Удача ×${HAPPY_LUCK} идёт`, sub: `до ${happyEnd()} МСК`, hot: true });
   if (d.available) out.push({ id: 'daily', kind: 'daily', icon: 'i-gift', title: 'Бонус дня', sub: rub(d.amountKop), cta: 'Забрать' });
   if (acc >= 100) out.push({ id: 'kassa', kind: 'kassa', icon: 'i-cash', title: `Касса · ${fmt(incomePerHourKop(S.collection_value) / 100)} ₽/ч`, sub: '+' + rub(acc), cta: 'Забрать' });
-  if (!h.active || h.left === 0) out.push({ id: 'happy', kind: 'happy-next', icon: 'i-sun', title: 'Счастливый час', sub: h.next ? `в ${mskHm(h.next)} МСК` : '—' });
+  if (!h.active) out.push({ id: 'happy', kind: 'happy-next', icon: 'i-sun', title: 'Счастливый час', sub: h.next ? `в ${mskHm(h.next)} МСК` : '—' });
   return out.slice(0, 2);
 }
 
@@ -205,13 +207,15 @@ function renderTierbar(p: Sim | null) {
 
 /** «Почему такая цена»: каждая причина — своей строкой, строки появляются по одной. */
 function whyHtml(p: Sim): string {
-  const k = valueFactor(p.mul), bet = Math.round(p.value / k);
   const fx = (x: number) => x.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
   const parts = priceBreakdown(p.prefix, p.sub).filter((x) => x.mul !== 1);
+  const mic = microFactor(p.sub);
+  const bet = Math.round(p.value / (valueFactor(p.mul) * mic.mul));
   const lines: { label: string; mul: string; up: boolean }[] = parts.map((x) => ({ label: x.label, mul: '×' + fx(x.mul), up: x.mul > 1 }));
-  lines.push(parts.length
-    ? { label: `Цена: ставка ${rub(bet)}`, mul: '×' + fx(k), up: k >= 1 }
-    : { label: 'Без узора', mul: '×' + fx(k), up: false });
+  if (!parts.length) lines.push({ label: 'Без узора', mul: '×' + fx(VALUE_BASE), up: false });
+  if (mic.mul !== 1) lines.push({ label: mic.label, mul: '×' + fx(mic.mul), up: mic.mul > 1 });
+  const k = p.value / bet;
+  lines.push({ label: `Итого от ставки ${rub(bet)}`, mul: '×' + fx(Math.round(k * 100) / 100), up: k >= 1 });
   if (p.luck > 1) lines.push({ label: 'Удача — узоры чаще', mul: '×' + p.luck, up: true });
   if (p.is_free) lines.push({ label: 'Бесплатная прокрутка', mul: '', up: false });
   return `<ul class="why">${lines.map((l, i) => `<li style="--i:${i}"><span>${esc(l.label)}</span>${l.mul ? `<b class="${l.up ? 'up' : 'dim'}">${l.mul}</b>` : ''}</li>`).join('')}</ul>`;
@@ -324,7 +328,7 @@ function menuHtml(): string {
     <div class="mlist">
       ${row('kassa', 'i-cash', `Касса · ${fmt(rate / 100)} ₽/ч`, rate > 0 ? `${rub(acc)} · копится до ${KASSA_CAP_HOURS} ч` : 'оставляй номера — они приносят доход', cta('Забрать', acc >= 100), acc >= 100)}
       ${row('daily', 'i-gift', 'Ежедневный бонус', d.available ? `день ${d.streak + 1} подряд · ${rub(d.amountKop)}` : 'уже забран — приходи завтра', d.available ? cta('Забрать', true) : '', d.available)}
-      ${row('happy', 'i-sun', h.active ? `Счастливый час ×${HAPPY_LUCK} идёт` : 'Счастливый час', h.active ? `осталось ${h.left} из ${HAPPY_SPINS} прокруток с удачей ×${HAPPY_LUCK}` : `в ${h.next ? mskHm(h.next) : '—'} МСК · ${HAPPY_SPINS} прокруток с удачей ×${HAPPY_LUCK}`, '', h.active && h.left > 0)}
+      ${row('happy', 'i-sun', h.active ? `Счастливый час ×${HAPPY_LUCK} идёт` : 'Счастливый час', h.active ? `удача ×${HAPPY_LUCK} на все прокрутки до ${happyEnd()} МСК` : `в ${h.next ? mskHm(h.next) : '—'} МСК · целый час удачи ×${HAPPY_LUCK}`, '', h.active)}
       ${row('luck', 'i-star', `Удача ×${LUCKY_LUCK}`, until === 1 ? 'следующая прокрутка!' : `через ${until} ${plural(until, 'прокрутку', 'прокрутки', 'прокруток')}`, '')}
       ${row('free', 'i-play', 'Бесплатные прокрутки', `${fr.charges} из ${FREE_SPIN_MAX}${bonusSpins() ? ` · бонусных ${bonusSpins()}` : ''}${fr.nextAt ? ` · следующая через ${left(fr.nextAt)}` : ''}`, '')}
       ${row('rule', 'i-sim', 'Что оставлять себе', ruleText(keepRule()), go)}
@@ -828,7 +832,7 @@ function bind() {
     else if (k === 'daily') act(b, claimDaily);
     else if (k === 'happy') {
       const h = happyInfo();
-      toast(h.active ? `Счастливый час: ещё ${h.left} прокруток с удачей ×${HAPPY_LUCK}` : `Счастливые часы — 13:00 и 20:00 МСК: ${HAPPY_SPINS} прокруток с удачей ×${HAPPY_LUCK}`);
+      toast(h.active ? `Счастливый час: удача ×${HAPPY_LUCK} на все прокрутки до ${happyEnd()} МСК` : `Счастливые часы — 13:00 и 20:00 МСК: целый час удачи ×${HAPPY_LUCK}`);
     }
   };
   $('sel-country').onclick = () => countrySheet();

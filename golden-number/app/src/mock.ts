@@ -54,7 +54,7 @@ function makeSim(countryId: string, stake: number, bet: number, luck: number, is
   const ev = forced ? evaluate(d.prefix, sub) : d.ev;
   return {
     id: crypto.randomUUID(), country: c.id, operator: d.op.name, prefix: d.prefix, sub, label: formatLabel(c, d.prefix, sub),
-    mul: ev.mul, tier: ev.tier.id, tags: ev.tags, stake, value: valueByBetKop(bet, ev.mul), luck, is_free: isFree,
+    mul: ev.mul, tier: ev.tier.id, tags: ev.tags, stake, value: valueByBetKop(bet, ev.mul, ev.micro), luck, is_free: isFree,
     created_at: new Date().toISOString(),
   };
 }

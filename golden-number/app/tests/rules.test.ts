@@ -6,7 +6,7 @@ import {
 } from '../../supabase/functions/_shared/game/config.ts';
 import {
   dailyNow, drawLucky, drawNumber, evaluate, formatLabel, freeNow, genSub, guaranteeRank, happyNow, kassaTotalKop, maxRun,
-  msk, numberValueKop, sellBackKop, spinCostKop, spinLuck, tierRank, valueByBetKop, xpForSpin, xpToNext,
+  microFactor, msk, numberValueKop, sellBackKop, spinCostKop, spinLuck, tierRank, valueByBetKop, xpForSpin, xpToNext,
 } from '../../supabase/functions/_shared/game/logic.ts';
 import { seeded } from './seeded.ts';
 
@@ -27,6 +27,13 @@ describe('редкость: правила evaluate()', () => {
     ['1211211', 6, 'Только две цифры', 'rare'],
     ['5803456', 2, 'Хвост-лесенка', 'nice'],
     ['5803111', 1.5, 'Красивый хвост', 'nice'],
+    ['7787878', 8, 'Повтор пар', 'rare'],
+    ['1237878', 2.5, 'Хвост 78-78', 'nice'],
+    ['1237788', 2.2, 'Хвост 77-88', 'nice'],
+    ['1237887', 2, 'Зеркальный хвост 78-87', 'nice'],
+    ['4564561', 5, 'Повтор 456', 'nice'],
+    ['1234000', 4, 'Хвост 000', 'nice'],
+    ['5803900', 1.6, 'Хвост 00', 'nice'],
     ['5803917', 1, undefined, 'common'],
   ])('%s → ×%d', (s, mul, tag, tier) => {
     const r = ev(s);
@@ -66,9 +73,9 @@ describe('редкость: правила evaluate()', () => {
 
   it('T9 умножается на узор, бонус кода — ещё ×2', () => {
     const mama = WORDS.find((w) => w.w === 'МАМА')!.c; // 5252
-    const r = evaluate('777', '111' + mama);
-    expect(r.mul).toBe(1 * 2 * 2);
-    expect(r.tags).toEqual(['T9: МАМА', 'Код 777']);
+    const r = evaluate('777', '111' + mama); // хвост 52-52 ×2,5
+    expect(r.mul).toBe(2.5 * 2 * 2);
+    expect(r.tags).toEqual(['Хвост 52-52', 'T9: МАМА', 'Код 777']);
   });
 
   it('бонус за код из одинаковых цифр', () => {
@@ -150,11 +157,20 @@ describe('экономика', () => {
     expect(spinCostKop(countryById('ae')!, 10)).toBe(BASE_COST_RUB * 5 * 10 * 100);
   });
 
-  it('цена = ставка × (0,95 + 0,15 × (множитель − 1))', () => {
+  it('цена = ставка × (0,95 + 0,13 × (множитель − 1)) × особенности цифр', () => {
     expect(numberValueKop(countryById('ru')!, 1, 1)).toBe(95_000);
-    expect(numberValueKop(countryById('tr')!, 12, 2)).toBe(Math.round(500_000 * (0.95 + 0.15 * 11)));
-    expect(numberValueKop(countryById('by')!, 1.5, 1)).toBe(153_750);
-    expect(numberValueKop(countryById('ru')!, 500, 1) / 100).toBeCloseTo(75_800, 0);
+    expect(numberValueKop(countryById('tr')!, 12, 2)).toBe(Math.round(500_000 * (0.95 + 0.13 * 11)));
+    expect(numberValueKop(countryById('by')!, 1.5, 1)).toBe(152_250);
+    expect(numberValueKop(countryById('ru')!, 500, 1) / 100).toBeCloseTo(65_820, 0);
+    expect(numberValueKop(countryById('ru')!, 1, 1, 1.07)).toBe(101_650); // не круглая
+  });
+
+  it('особенности цифр: у обычных номеров разные цены', () => {
+    expect(microFactor('5803917').mul).toBe(0.88); // все 7 цифр разные
+    expect(microFactor('5803917').label).toBe('7 разных цифр');
+    expect(microFactor('7717723')).toEqual({ mul: 1.2, label: '4 разные цифры · 2 пары рядом · семёрок: 4' });
+    const prices = new Set(['5803917', '5803397', '1203345', '7712093', '5550123'].map((x) => microFactor(x).mul));
+    expect(prices.size).toBeGreaterThan(3);
   });
 
   it('касса: 2% в час, не больше 12 часов', () => {
@@ -190,7 +206,7 @@ describe('экономика', () => {
     expect(formatLabel(countryById('ae')!, '50', '1234567')).toBe('+971 (50) 123 4567');
   });
 
-  it('отдача: обычная ≈112%, с каждой 100-й ×10 ≈114%', () => {
+  it('отдача ≈115–117%', () => {
     const rng = seeded(6);
     let cost = 0, value = 0, luckyValue = 0, luckyCost = 0;
     for (const c of COUNTRIES) {
@@ -198,20 +214,21 @@ describe('экономика', () => {
         const st = STAKES[i % STAKES.length];
         const d = drawNumber(rng, c);
         cost += spinCostKop(c, st);
-        value += numberValueKop(c, evaluate(d.prefix, d.sub).mul, st);
+        const e = evaluate(d.prefix, d.sub);
+        value += numberValueKop(c, e.mul, st, e.micro);
       }
       for (let i = 0; i < 5_000; i++) {
         const d = drawLucky(rng, c, LUCKY_LUCK);
         luckyCost += spinCostKop(c, 1);
-        luckyValue += numberValueKop(c, d.ev.mul, 1);
+        luckyValue += numberValueKop(c, d.ev.mul, 1, d.ev.micro);
       }
     }
     const base = value / cost, lucky = luckyValue / luckyCost;
-    expect(base).toBeGreaterThan(1.07);
-    expect(base).toBeLessThan(1.17);
+    expect(base).toBeGreaterThan(1.1);
+    expect(base).toBeLessThan(1.2);
     const avg = (base * 99 + lucky) / 100;
-    expect(avg).toBeGreaterThan(1.09);
-    expect(avg).toBeLessThan(1.2);
+    expect(avg).toBeGreaterThan(1.12);
+    expect(avg).toBeLessThan(1.22);
   });
 });
 
@@ -231,7 +248,7 @@ describe('удача и гарантии', () => {
       if (tierRank(drawLucky(rng, ru, 1).ev.tier.id) >= 1) plain++;
       if (tierRank(drawLucky(rng, ru, 10).ev.tier.id) >= 1) lucky++;
     }
-    expect(lucky / plain).toBeGreaterThan(5);
+    expect(lucky / plain).toBeGreaterThan(4);
   });
 
   it('гарантии: 2-я — Красивый+, 6-я — Редкий+', () => {
@@ -242,14 +259,13 @@ describe('удача и гарантии', () => {
     for (let i = 0; i < 300; i++) expect(tierRank(drawLucky(rng, ru, 1, 2).ev.tier.id)).toBeGreaterThanOrEqual(2);
   });
 
-  it('счастливые часы по Москве: 13 и 20, по 10 прокруток', () => {
+  it('счастливые часы по Москве: 13 и 20, удача весь час', () => {
     const at = (iso: string) => new Date(iso);
     expect(msk(at('2026-10-30T10:15:00Z')).hour).toBe(13);
     const h = happyNow(null, 0, at('2026-10-30T10:15:00Z'));
     expect(h.active).toBe(true);
-    expect(h.left).toBe(10);
-    expect(happyNow('2026-10-30T13', 7, at('2026-10-30T10:40:00Z')).left).toBe(3);
-    expect(happyNow('2026-10-30T13', 7, at('2026-10-30T17:10:00Z')).left).toBe(10); // 20:10 — новый час
+    expect(h.left).toBeGreaterThan(10_000);
+    expect(happyNow('2026-10-30T13', 500, at('2026-10-30T10:59:00Z')).left).toBeGreaterThan(0); // и после 500 прокруток
     const off = happyNow(null, 0, at('2026-10-30T12:00:00Z')); // 15:00 МСК
     expect(off.active).toBe(false);
     expect(off.next?.toISOString()).toBe('2026-10-30T17:00:00.000Z'); // 20:00 МСК

@@ -107,6 +107,8 @@ export interface Evaluation {
   tags: string[];
   tier: Tier;
   word: T9Word | undefined;
+  /** Множитель цены за особенности цифр (microFactor), на тир не влияет. */
+  micro: number;
 }
 
 export function evaluate(prefix: string, s: string, R: Rarity = RARITY): Evaluation {
@@ -123,9 +125,22 @@ export function evaluate(prefix: string, s: string, R: Rarity = RARITY): Evaluat
   if (s === [...s].reverse().join('')) hits.push(['Зеркальный', R.mirror]);
   if (/^.(\d)(\d)\1\2\1\2$/.test(s) && s[1] !== s[2]) hits.push(['Повтор пар', R.pairs]);
   if (new Set(s).size === 2) hits.push(['Только две цифры', R.twoDigits]);
+  // повтор трёх цифр: 456-456-x или x-456-456 (не из одинаковых)
+  for (const i of [0, 1]) {
+    const a = s.slice(i, i + 3);
+    if (a === s.slice(i + 3, i + 6) && new Set(a).size > 1) { hits.push(['Повтор ' + a, R.block3]); break; }
+  }
+  // хвост — последние 4 цифры (то, что видно как «78-78»)
+  const [w, x, y, z] = s.slice(3);
+  const tail = `${w}${x}-${y}${z}`;
+  if (s.endsWith('000') && r < 4) hits.push(['Хвост 000', R.tail000]);
+  else if (s.endsWith('00') && r < 4) hits.push(['Хвост 00', R.tail00]);
+  if (w === y && x === z && w !== x) hits.push(['Хвост ' + tail, R.tailABAB]);
+  if (w === x && y === z && w !== y) hits.push(['Хвост ' + tail, R.tailAABB]);
+  if (w === z && x === y && w !== x) hits.push(['Зеркальный хвост ' + tail, R.tailABBA]);
   const t = d.slice(3);
   if (t.every((v, i) => i === 0 || v - t[i - 1] === 1)) hits.push(['Хвост-лесенка', R.tailLadder]);
-  if (s[4] === s[5] && s[5] === s[6] && r < 4) hits.push(['Красивый хвост', R.tail3]);
+  if (s[4] === s[5] && s[5] === s[6] && r < 4 && s[6] !== '0') hits.push(['Красивый хвост', R.tail3]);
   hits.sort((a, b) => b[1] - a[1]);
   let mul = hits.length ? hits[0][1] : 1;
   const tags = hits.slice(0, 2).map((h) => h[0]);
@@ -138,7 +153,24 @@ export function evaluate(prefix: string, s: string, R: Rarity = RARITY): Evaluat
     mul *= R.beautifulCode;
     tags.push('Код ' + prefix);
   }
-  return { mul, tags, tier: tierFor(mul), word };
+  return { mul, tags, tier: tierFor(mul), word, micro: microFactor(s).mul };
+}
+
+/** «Мелкие» особенности цифр: у каждого номера своя цена, даже без узора. На редкость (тир) не влияют.
+ *  Сколько разных цифр, сколько одинаковых рядом и сколько семёрок. Среднее по случайным номерам ≈ 1. */
+export function microFactor(s: string): { mul: number; label: string } {
+  const distinct = new Set(s).size;
+  const DIST: Record<number, number> = { 7: 0.88, 6: 0.93, 5: 0.99, 4: 1.05, 3: 1.11 };
+  let m = DIST[distinct] ?? 1.15;
+  let pairs = 0;
+  for (let i = 1; i < s.length; i++) if (s[i] === s[i - 1]) pairs++;
+  m *= 1 + 0.03 * Math.min(pairs, 4);
+  const sevens = [...s].filter((c) => c === '7').length;
+  if (sevens >= 2) m *= 1 + 0.02 * Math.min(sevens, 5);
+  const parts = [`${distinct} ${distinct >= 5 ? 'разных цифр' : 'разные цифры'}`];
+  if (pairs) parts.push(`${pairs} ${pairs === 1 ? 'пара' : 'пары'} рядом`);
+  if (sevens >= 2) parts.push(`семёрок: ${sevens}`);
+  return { mul: Math.round(m * 100) / 100, label: parts.join(' · ') };
 }
 
 // ---------- экономика (в копейках, целые числа) ----------
@@ -146,7 +178,7 @@ export function evaluate(prefix: string, s: string, R: Rarity = RARITY): Evaluat
 export const spinCostKop = (c: Country, stake: number) => Math.round(BASE_COST_RUB * c.mul * stake * 100);
 /** Доля ставки, которую стоит номер с таким множителем редкости. */
 export const valueFactor = (mul: number) => VALUE_BASE + VALUE_SLOPE * (mul - 1);
-export const numberValueKop = (c: Country, mul: number, stake: number) => valueByBetKop(spinCostKop(c, stake), mul);
+export const numberValueKop = (c: Country, mul: number, stake: number, micro = 1) => valueByBetKop(spinCostKop(c, stake), mul, micro);
 export const incomePerHourKop = (collectionValueKop: number) => collectionValueKop * KASSA_RATE_PER_HOUR;
 
 /** Сколько лежит в кассе. Та же формула в SQL (gn_kassa_total). */
@@ -162,7 +194,8 @@ export const xpForSpin = (mul: number, stake = 1) =>
 export const xpToNext = (level: number) => Math.round(XP_BASE * Math.pow(level, XP_POW));
 
 /** Цена номера от фактической ставки в копейках. Для обычной прокрутки равна numberValueKop. */
-export const valueByBetKop = (betKop: number, mul: number) => Math.round(betKop * valueFactor(mul));
+/** Цена номера: ставка × доля по редкости × особенности цифр (microFactor). */
+export const valueByBetKop = (betKop: number, mul: number, micro = 1) => Math.round(betKop * valueFactor(mul) * micro);
 /** Сколько игрок получит, продав номер из коллекции. Та же формула в SQL (floor). */
 export const sellBackKop = (valueKop: number) => Math.floor(valueKop * SELL_BACK);
 

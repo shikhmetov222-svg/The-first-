@@ -144,7 +144,7 @@ async function spin(user: TelegramUser, body: Body) {
         p_tier: d.ev.tier.id,
         p_tags: d.ev.tags,
         p_stake: st,
-        p_value: valueByBetKop(bet, d.ev.mul),
+        p_value: valueByBetKop(bet, d.ev.mul, d.ev.micro),
         p_xp_base: XP_BASE,
         p_xp_pow: XP_POW,
         p_avg_weight: AVG_BET_WEIGHT,
