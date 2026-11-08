@@ -8,8 +8,8 @@
 //   supabaseUrl — «Project URL», выглядит как https://abcdefgh.supabase.co
 //   supabaseKey — «Publishable key», начинается с sb_publishable_…
 //
-// Пока здесь заглушки, командная игра выключена, а одиночная работает как раньше.
+// Если вместо значений стоят заглушки YOUR_…, командная игра выключена, а одиночная работает как раньше.
 window.COLONY_CONFIG = {
-  supabaseUrl: 'YOUR_SUPABASE_URL',
-  supabaseKey: 'YOUR_PUBLISHABLE_KEY',
+  supabaseUrl: 'https://nwitfifdtkfhmkpjdxrf.supabase.co',
+  supabaseKey: 'sb_publishable_OdN00OmZ_PlI8PzhfFuSVg_ZLSlmz8w',
 };
