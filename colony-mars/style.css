@@ -72,3 +72,57 @@ button:disabled { opacity: 0.45; cursor: default; }
 .result { font-size: 20px; font-weight: 700; margin-top: 16px; }
 .result.win { color: var(--good); }
 .result.lose { color: var(--bad); }
+
+/* ---------- Командная игра: меню, вход по коду, лобби (lobby.js) ---------- */
+
+/* Кнопка-ссылка: «← В меню», «← Назад» */
+button.link { background: transparent; color: var(--hint); min-height: 44px; font-weight: 500; }
+
+/* Поля ввода: имя и код */
+.field {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 0 14px;
+  border: 1px solid var(--card);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 16px; /* меньше 16px — iPhone сам приближает страницу при вводе */
+}
+.code-input { font-size: 28px; letter-spacing: 8px; text-align: center; font-weight: 700; }
+
+/* Крупный код комнаты в лобби */
+.code-big {
+  margin: 8px 0 4px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-align: center;
+}
+
+/* Список игроков */
+.players { list-style: none; padding: 0; margin: 0; }
+.players li {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Сообщение об ошибке: пустое не занимает места */
+.error { color: var(--bad); font-size: 14px; margin: 12px 0 0; }
+.error:empty { display: none; }

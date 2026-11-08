@@ -11,6 +11,11 @@
 <body>
   <!-- Сюда app.js рисует все экраны игры -->
   <main id="app"></main>
+  <!-- Клиент Supabase (для командной игры). Версия указана точно, чтобы сайт не сломался от обновлений. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
+  <!-- lobby.js — меню, создание комнаты, вход по коду и лобби. Подключается после app.js. -->
+  <script src="lobby.js"></script>
 </body>
 </html>

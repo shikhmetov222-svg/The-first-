@@ -179,6 +179,7 @@ function playScreen() {
       <button data-action="repair" ${canRepair ? '' : 'disabled'}>🔧 Починить энергосистему</button>
       <p class="hint">${repairHint}</p>
       <button data-action="next" class="secondary">Следующий раунд ▶</button>
+      <button data-action="menu" class="link">← В меню</button>
     </div>
     ${logHtml()}`;
 }
@@ -199,6 +200,7 @@ function endScreen() {
     ${resourcesHtml()}
     <div class="buttons">
       <button data-action="restart">Сыграть снова</button>
+      <button data-action="menu" class="link">← В меню</button>
     </div>
     ${logHtml()}`;
 }
@@ -236,5 +238,8 @@ document.getElementById('app').addEventListener('click', (e) => {
 
 // ---------- Запуск ----------
 
-newGame();
-render();
+// Одиночную игру запускает меню (lobby.js) — вызывает startSolo().
+function startSolo() {
+  newGame();
+  render();
+}
