@@ -7,7 +7,7 @@ name: Pages
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'golden-number/app/**', 'golden-number/supabase/functions/_shared/game/**', '.github/workflows/pages.yml']
+    paths: ['app/**', 'golden-number/app/**', 'golden-number/supabase/functions/_shared/game/**', 'colony-mars/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -46,6 +46,12 @@ jobs:
           npm ci
           npm run build
           cp -r dist ../../app/dist/zolotoy
+      # «Колония на Марсе» (colony-mars) выкладывается рядом: https://shikhmetov222-svg.github.io/The-first-/colony-mars/
+      # Копируем только файлы игры для браузера. balance.js и SQL на сайт не попадают.
+      - name: Copy Colony Mars
+        run: |
+          mkdir -p app/dist/colony-mars
+          cp colony-mars/index.html colony-mars/style.css colony-mars/app.js colony-mars/lobby.js colony-mars/config.js app/dist/colony-mars/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
