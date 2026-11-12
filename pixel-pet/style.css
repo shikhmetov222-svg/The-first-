@@ -1,0 +1,8 @@
+:root{--bg:#1d1a26;--text:#f4ecd8;--hint:#a79fb8}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px}
+h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px}
+.stage{line-height:0;border:3px solid #2a2033;border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+.hint{margin:0;font-size:13px;color:var(--hint)}
