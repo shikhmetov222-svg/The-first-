@@ -17,8 +17,8 @@
 
   // Целочисленный масштаб, чтобы пиксели были чёткими
   function fit() {
-    const k = Math.max(1, Math.floor(Math.min((innerWidth - 30) / 160, (innerHeight - 120) / 120)));
-    canvas.style.width = 160 * k + 'px'; canvas.style.height = 120 * k + 'px';
+    const k = Math.max(1, Math.floor(Math.min((innerWidth - 30) / Room.W, (innerHeight - 120) / Room.H)));
+    canvas.style.width = Room.W * k + 'px'; canvas.style.height = Room.H * k + 'px';
   }
   addEventListener('resize', fit); fit();
 

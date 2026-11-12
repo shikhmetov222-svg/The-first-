@@ -1,6 +1,6 @@
 // Комната 160×120: стена с окном, полка, картина, пол, ковёр, миска.
 (function () {
-  const W = 160, H = 120, FLOOR = 78;
+  const W = 192, H = 144, FLOOR = 94;
   const S = () => window.Sprites;
 
   function draw(ctx, t) {
@@ -10,18 +10,20 @@
 
     // стена в полоску + плинтус
     r(0, 0, W, FLOOR, 'wall');
-    for (let x = 4; x < W; x += 12) r(x, 0, 3, 73, 'wallShade');
-    r(0, 73, W, 5, 'wood'); r(0, 73, W, 1, 'ink');
+    for (let x = 4; x < W; x += 12) r(x, 0, 3, FLOOR - 5, 'wallShade');
+    r(0, FLOOR - 5, W, 5, 'wood'); r(0, FLOOR - 5, W, 1, 'ink');
 
     // пол: доски со стыками вразбежку
     r(0, FLOOR, W, H - FLOOR, 'floor');
-    [86, 95, 105, 116].forEach((y, row) => {
+    const ROWS = [102, 111, 121, 132, 143];
+    ROWS.forEach((y, row) => {
       r(0, y, W, 1, 'floorShade');
-      const prev = row === 0 ? FLOOR : [86, 95, 105, 116][row - 1];
+      const prev = row === 0 ? FLOOR : ROWS[row - 1];
       for (let x = (row % 2) * 20 + 14; x < W; x += 40) r(x, prev + 1, 1, y - prev - 1, 'floorShade');
     });
 
     // окно
+    ctx.save(); ctx.translate(16, 8);
     r(96, 13, 36, 40, 'ink'); r(97, 14, 34, 38, 'cream'); r(100, 17, 28, 32, 'sky');
     ctx.save(); ctx.beginPath(); ctx.rect(100, 17, 28, 32); ctx.clip();
     const cx = Math.floor(((t / 450) % 48)) + 78;
@@ -43,14 +45,16 @@
     r(8, 38, 46, 3, 'wood'); r(8, 41, 46, 1, 'ink'); r(8, 38, 46, 1, 'ink');
     r(12, 42, 2, 5, 'wood'); r(48, 42, 2, 5, 'wood');
 
+    ctx.restore();
+
     // ковёр
     const f = S().fillEllipse;
-    f(ctx, 80, 102, 47, 13, 'ink'); f(ctx, 80, 102, 45, 11, 'rugDark');
-    f(ctx, 80, 102, 40, 8, 'rug'); f(ctx, 80, 102, 30, 5, 'rugDark'); f(ctx, 80, 102, 28, 4, 'rug');
+    f(ctx, 96, 122, 54, 14, 'ink'); f(ctx, 96, 122, 52, 12, 'rugDark');
+    f(ctx, 96, 122, 47, 9, 'rug'); f(ctx, 96, 122, 36, 6, 'rugDark'); f(ctx, 96, 122, 34, 5, 'rug');
 
     // миска
-    S().shadow(ctx, 138, 109, 11, 2.5);
-    ctx.drawImage(S().bowl(), 129, 98);
+    S().shadow(ctx, 166, 128, 11, 2.5);
+    ctx.drawImage(S().bowl(), 157, 117);
   }
 
   window.Room = { W, H, draw };
