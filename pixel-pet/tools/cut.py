@@ -24,9 +24,14 @@ FRAMES = {
             'angry':  (HNG, (355, 30, 500, 214))},
  'gray':   {'sit':    (SIT, (686, 742, 982, 1042)),
             'sleep':  (CRY, (284, 340, 408, 506)),
-            'sad':    (CRY, (154, 348, 284, 506))},
+            'sad':    (CRY, (154, 348, 284, 506)),
+            'sad2':   (CRY, (15, 310, 170, 508), (90, 430))},
+ 'tuxedo': {'sit':    (SIT, (690, 403, 984, 730)),
+            'sleep':  (CRY, (282, 86, 410, 252)),
+            'sad':    (CRY, (154, 95, 284, 252)),
+            'sad2':   (CRY, (15, 60, 170, 252), (90, 150))},
 }
-MIN_AREA = {('gray', 'sad'): 900, ('gray', 'sit'): 600}      # убрать обрывок хвоста соседнего кота
+MIN_AREA = {('gray', 'sad'): 900, ('tuxedo', 'sad'): 900, ('tuxedo', 'sleep'): 400, ('gray', 'sit'): 600}      # убрать обрывок хвоста соседнего кота
 _cache = {}
 def source(name):
     if name not in _cache:
@@ -92,6 +97,21 @@ def keep_big(m, min_area):
                     for p in pts: out[p] = True
     return out
 
+def only_with(m, sx, sy):
+    """оставить только связную часть, в которой лежит точка (sx, sy)"""
+    from collections import deque
+    H, W = m.shape; out = np.zeros_like(m)
+    if not m[sy, sx]:                                    # ближайший пиксель кота
+        ys, xs = np.where(m); i = np.argmin((ys - sy) ** 2 + (xs - sx) ** 2); sy, sx = ys[i], xs[i]
+    q = deque([(sy, sx)]); out[sy, sx] = True
+    while q:
+        y, x = q.popleft()
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                yy, xx = y + dy, x + dx
+                if 0 <= yy < H and 0 <= xx < W and m[yy, xx] and not out[yy, xx]: out[yy, xx] = True; q.append((yy, xx))
+    return out
+
 def downsample(rgb, mask, k):
     """уменьшение в k раз: цвет — среднее по пикселям кота, прозрачность — по покрытию ≥ 50 %"""
     H, W = mask.shape; nw, nh = max(1, round(W / k)), max(1, round(H / k))
@@ -118,12 +138,14 @@ def tight(a):
 def main():
     sprites = {}
     for col, poses in FRAMES.items():
-        for pose, (src, (x0, y0, x1, y1)) in poses.items():
+        for pose, spec in poses.items():
+            src, (x0, y0, x1, y1) = spec[0], spec[1]; seed = spec[2] if len(spec) > 2 else None
             img, bg = source(src)
             fg = ~bg
             m = cut_shadow(img, fg, x0, y0, x1, y1)
             if src in (SLP, HNG): m = cut_shadow_dark(img, m, x0, y0, x1, y1)
             m = keep_big(m, MIN_AREA.get((col, pose), 60))
+            if seed: m = only_with(m, seed[0] - x0, seed[1] - y0)
             ys, xs = np.where(m)
             cy0, cy1, cx0, cx1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
             rgb = img[y0:y1, x0:x1][cy0:cy1, cx0:cx1].astype(np.float32)
@@ -132,7 +154,7 @@ def main():
     FW = max(s.shape[1] for s in sprites.values()) + 4
     FH = max(s.shape[0] for s in sprites.values()) + 4
     FW += FW % 2; FH += FH % 2
-    meta = {'frame_w': FW, 'frame_h': FH, 'poses': ['sit', 'sleep', 'hungry', 'sad', 'angry'], 'colorways': {}}
+    meta = {'frame_w': FW, 'frame_h': FH, 'poses': ['sit', 'sleep', 'hungry', 'sad', 'sad2', 'angry'], 'colorways': {}}
     os.makedirs(OUT, exist_ok=True)
     for col, poses in FRAMES.items():
         d = OUT + col + '/'; os.makedirs(d, exist_ok=True)

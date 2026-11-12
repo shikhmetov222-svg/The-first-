@@ -6,8 +6,8 @@ import cut   # noqa  (перерезает спрайты и заодно даё
 ROOT = '/home/user/The-first-/pixel-pet/'
 M = json.load(open(ROOT + 'assets/sprites/cats/manifest.json'))
 FW, FH = M['frame_w'], M['frame_h']
-NAMES = {'orange': 'Рыжий', 'calico': 'Трёхцветный', 'gray': 'Серый полосатый'}
-POSES = {'sit': 'sit — сидит', 'sleep': 'sleep — спит, Zzz', 'hungry': 'hungry — миска и «!»', 'sad': 'sad — слёзы', 'angry': 'angry — знак злости'}
+NAMES = {'orange': 'Рыжий', 'calico': 'Трёхцветный', 'gray': 'Серый полосатый', 'tuxedo': 'Чёрно-белый'}
+POSES = {'sit': 'sit — сидит', 'sleep': 'sleep — спит, Zzz', 'hungry': 'hungry — миска и «!»', 'sad': 'sad — слёзы', 'sad2': 'sad, вариант 2 — слёзы', 'angry': 'angry — знак злости'}
 def ref_crop(src, box, h=130):
     x0, y0, x1, y1 = box; f = h / (y1 - y0); W, H = Image.open(ROOT + 'assets/reference/' + src).size
     return ('<div class="ref" style="width:%dpx;height:%dpx"><img src="assets/reference/%s" style="width:%dpx;left:%dpx;top:%dpx" alt=""></div>'
@@ -18,7 +18,7 @@ for col, poses in cut.FRAMES.items():
     for p in M['poses']:
         f = M['colorways'][col][p]
         if f:
-            src, box = poses[p]
+            src, box = poses[p][0], poses[p][1]
             cells.append('<td><div class="pair">%s<div class="spr"><img src="assets/sprites/cats/%s" width="%d" height="%d" alt="%s %s"></div></div><div class="cap">%s · %d×%d px</div></td>'
                          % (ref_crop(src, box), f['file'], FW, FH, col, p, 'кадр ' + p, FW, FH))
         else:

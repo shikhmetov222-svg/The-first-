@@ -1,11 +1,12 @@
 {
  "frame_w": 56,
- "frame_h": 60,
+ "frame_h": 66,
  "poses": [
   "sit",
   "sleep",
   "hungry",
   "sad",
+  "sad2",
   "angry"
  ],
  "colorways": {
@@ -29,9 +30,10 @@
     "h": 50
    },
    "sad": null,
+   "sad2": null,
    "angry": {
     "file": "orange/angry.png",
-    "x": 224,
+    "x": 280,
     "w": 39,
     "h": 51
    }
@@ -56,9 +58,10 @@
     "h": 50
    },
    "sad": null,
+   "sad2": null,
    "angry": {
     "file": "calico/angry.png",
-    "x": 224,
+    "x": 280,
     "w": 41,
     "h": 52
    }
@@ -82,6 +85,40 @@
     "x": 168,
     "w": 41,
     "h": 50
+   },
+   "sad2": {
+    "file": "gray/sad2.png",
+    "x": 224,
+    "w": 48,
+    "h": 62
+   },
+   "angry": null
+  },
+  "tuxedo": {
+   "sit": {
+    "file": "tuxedo/sit.png",
+    "x": 0,
+    "w": 48,
+    "h": 53
+   },
+   "sleep": {
+    "file": "tuxedo/sleep.png",
+    "x": 56,
+    "w": 40,
+    "h": 35
+   },
+   "hungry": null,
+   "sad": {
+    "file": "tuxedo/sad.png",
+    "x": 168,
+    "w": 40,
+    "h": 49
+   },
+   "sad2": {
+    "file": "tuxedo/sad2.png",
+    "x": 224,
+    "w": 48,
+    "h": 60
    },
    "angry": null
   }
