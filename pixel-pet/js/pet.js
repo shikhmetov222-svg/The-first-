@@ -2,7 +2,7 @@
 (function () {
   const Pet = {
     type: 'cat', name: 'Мурзик',
-    x: 59, y: 63, // левый верхний угол спрайта 44×46; лапы на y+41
+    x: 52, y: 54, // левый верхний угол спрайта 52×52; лапы на y+41
     // Анимационные параметры по времени (мс)
     anim(t) {
       return {
@@ -13,7 +13,7 @@
     },
     draw(ctx, t) {
       const a = this.anim(t);
-      window.Sprites.shadow(ctx, this.x + 22, this.y + 41, 14, 3.5);
+      window.Sprites.shadow(ctx, this.x + 26, this.y + 52, 22, 5);
       ctx.drawImage(window.Sprites.cat(a), this.x, this.y);
     }
   };
