@@ -1,0 +1,89 @@
+{
+ "frame_w": 56,
+ "frame_h": 60,
+ "poses": [
+  "sit",
+  "sleep",
+  "hungry",
+  "sad",
+  "angry"
+ ],
+ "colorways": {
+  "orange": {
+   "sit": {
+    "file": "orange/sit.png",
+    "x": 0,
+    "w": 49,
+    "h": 53
+   },
+   "sleep": {
+    "file": "orange/sleep.png",
+    "x": 56,
+    "w": 48,
+    "h": 53
+   },
+   "hungry": {
+    "file": "orange/hungry.png",
+    "x": 112,
+    "w": 51,
+    "h": 50
+   },
+   "sad": null,
+   "angry": {
+    "file": "orange/angry.png",
+    "x": 224,
+    "w": 39,
+    "h": 51
+   }
+  },
+  "calico": {
+   "sit": {
+    "file": "calico/sit.png",
+    "x": 0,
+    "w": 50,
+    "h": 56
+   },
+   "sleep": {
+    "file": "calico/sleep.png",
+    "x": 56,
+    "w": 50,
+    "h": 48
+   },
+   "hungry": {
+    "file": "calico/hungry.png",
+    "x": 112,
+    "w": 50,
+    "h": 50
+   },
+   "sad": null,
+   "angry": {
+    "file": "calico/angry.png",
+    "x": 224,
+    "w": 41,
+    "h": 52
+   }
+  },
+  "gray": {
+   "sit": {
+    "file": "gray/sit.png",
+    "x": 0,
+    "w": 48,
+    "h": 49
+   },
+   "sleep": {
+    "file": "gray/sleep.png",
+    "x": 56,
+    "w": 38,
+    "h": 51
+   },
+   "hungry": null,
+   "sad": {
+    "file": "gray/sad.png",
+    "x": 168,
+    "w": 41,
+    "h": 50
+   },
+   "angry": null
+  }
+ }
+}
