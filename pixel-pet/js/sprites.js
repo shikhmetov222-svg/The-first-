@@ -105,21 +105,13 @@
     return cv;
   }
   // o: { head: на сколько пикселей опущена голова, tail: -2..2,
-  //      eyes: 'open' | 'closed' | 'cry' | 'hungry' | 'sick' | 'angry', tear: 0|1 }
+  //      eyes: 'open' | 'closed' }
   function cat(o) {
     const key = o.head + '|' + o.eyes + '|' + o.tail + '|' + (o.tear || 0);
     if (catCache[key]) return catCache[key];
     const g = CAT.map(r => r.split(''));
     const lids = () => { g[7][4] = g[7][5] = g[7][10] = g[7][11] = 'o'; };        // веки: остаётся нижняя чёрточка
-    if (o.eyes === 'closed' || o.eyes === 'sick') lids();
-    if (o.eyes === 'cry') {                                                       // плачет: глаза закрыты, ручьи слёз
-      lids();
-      const n = 3 + (o.tear || 0);
-      for (let i = 0; i < n; i++) { g[9 + i][4] = 'b'; g[9 + i][11] = 'b'; }
-    }
-    if (o.eyes === 'hungry') { g[7][5] = 'K'; g[7][10] = 'K'; }                   // тусклые глаза без блика
-    if (o.eyes === 'angry') { g[7][4] = 'o'; g[7][11] = 'o'; g[7][5] = 'K'; g[7][10] = 'K'; } // сердитый прищур
-    if (o.eyes === 'sick') { g[11][14] = 'b'; }                                   // капелька пота у щеки
+    if (o.eyes === 'closed') lids();
     const sway = Math.round(o.tail / 2);                                          // хвост: кончик ±1
     if (sway) for (let r = 10; r <= 12; r++) {
       const row = g[r].slice(19);
@@ -137,36 +129,18 @@
     return (catCache[key] = scaled(B.toCanvas(), CAT_SCALE));
   }
 
-  // ---- Спящий кот клубком (рисуется процедурно слоями: тело, хвост, голова; у каждого свой контур) ----
-  Buf.prototype.paste = function (L) { for (let i = 0; i < L.d.length; i++) if (L.d[i]) this.d[i] = L.d[i]; };
-  const sleepCache = {};
-  function catSleep(breath) {
-    const key = breath ? 1 : 0;
-    if (sleepCache[key]) return sleepCache[key];
-    const W = 38, H = 22;
-    // тело-«буханка» (дыхание: верх поднимается на 1 пиксель)
-    const body = new Buf(W, H);
-    if (breath) body.ellipse(22, 10.5, 13, 6.5, 'orange'); else body.ellipse(22, 11, 13, 6, 'orange');
-    for (let x = 16; x <= 31; x += 3) for (let y = 4; y <= 7; y++) if (body.d[y * W + x]) body.set(x, y, 'orangeDark');
-    body.outline('ink');
-    // хвост лежит спереди и обвивает тело
-    const tail = new Buf(W, H);
-    tail.ellipse(26, 15.5, 11, 2.8, 'orange'); tail.ellipse(35, 14, 2, 2.5, 'orange');
-    for (let x = 20; x <= 32; x += 3) for (let y = 13; y <= 18; y++) if (tail.d[y * W + x]) tail.set(x, y, 'orangeDark');
-    tail.outline('ink');
-    // передние лапы, голова с ушами
-    const head = new Buf(W, H);
-    head.rect(3, 15, 6, 3, 'orange'); head.rect(10, 15, 6, 3, 'orange');
-    head.ellipse(9, 11, 7, 5.5, 'orange');
-    [[1, 3, 3], [2, 3, 4], [3, 3, 5], [4, 3, 6], [5, 3, 7]].forEach(r => head.rect(r[1], r[0], r[2] - r[1] + 1, 1, 'orange'));
-    [[1, 14, 14], [2, 13, 14], [3, 12, 14], [4, 11, 14], [5, 10, 14]].forEach(r => head.rect(r[1] - 1, r[0], r[2] - r[1] + 1, 1, 'orange'));
-    head.rect(4, 3, 1, 1, 'pink'); head.rect(4, 4, 2, 1, 'pink'); head.rect(12, 3, 1, 1, 'pink'); head.rect(11, 4, 2, 1, 'pink');
-    head.rect(9, 6, 1, 2, 'orangeDark'); head.rect(6, 7, 1, 1, 'orangeDark'); head.rect(12, 7, 1, 1, 'orangeDark');
-    head.rect(5, 11, 2, 1, 'ink'); head.rect(11, 11, 2, 1, 'ink');             // закрытые глаза
-    head.rect(8, 12, 2, 1, 'pink'); head.set(8, 13, 'ink'); head.set(9, 13, 'ink');
-    head.outline('ink');
-    body.paste(tail); body.paste(head);
-    return (sleepCache[key] = scaled(body.toCanvas(), CAT_SCALE));
+  // ---- Позы с картинок-референсов (спит клубком, плачет, голодный, больной, злой) ----
+  // Снимаются из assets.js (генерируется из картинок), рисуются ×2 как и сидящий кот.
+  const poseCache = {};
+  function pose(name) {
+    if (poseCache[name]) return poseCache[name];
+    const C = window.Assets.cats, rows = C[name], h = rows.length, w = rows[0].length;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d');
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const ch = rows[y][x]; if (ch === '.') continue;
+      g.fillStyle = C.pal[ch]; g.fillRect(x, y, 1, 1);
+    }
+    return (poseCache[name] = scaled(cv, CAT_SCALE));
   }
 
   // ---- Значки состояний: «!», завиток, значок злости, капля, Zzz, сердечко, пузырь ----
@@ -178,7 +152,7 @@
     if (outline) B.outline(outline);
     return (fxCache[name] = scaled(B.toCanvas(), 2));
   }
-  const excl = () => icon('excl', ['##', '##', '##', '##', '..', '##'], 'red', 'ink');
+  const excl = () => icon('excl', ['##', '##', '##', '##', '..', '##'], 'orangeDark');
   const swirl = () => icon('swirl', ['.####.', '#....#', '#.##.#', '#.#..#', '#.####', '.#....'], 'wood');
   const anger = () => icon('anger', ['##...##', '#.....#', '.......', '.......', '#.....#', '##...##'], 'red');
   let heartC, bubbleC;
@@ -225,5 +199,5 @@
   const plantImg = i => fromRows('p' + i, window.Assets.plants.list[i], window.Assets.plants.pal);
   const itemImg = n => fromRows('i' + n, window.Assets.items[n], window.Assets.items.pal);
 
-  window.Sprites = { PAL, Buf, fillEllipse, shadow, cat, catSleep, excl, swirl, anger, heart, bubble, zed, bowl, plantImg, itemImg };
+  window.Sprites = { PAL, Buf, fillEllipse, shadow, cat, pose, excl, swirl, anger, heart, bubble, zed, bowl, plantImg, itemImg };
 })();

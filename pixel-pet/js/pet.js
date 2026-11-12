@@ -113,19 +113,21 @@
 
     // ---------- анимации ----------
     anim(t) {
-      const st = this.state(), breath = Math.floor(t / 1200) % 2, tear = Math.floor(t / 500) % 2;
-      if (st === 'hungry') return { st, head: 1 + breath, eyes: 'hungry', tail: 0 };
-      if (st === 'cry') return { st, head: 1 + breath, eyes: 'cry', tail: 0, tear };
-      if (st === 'sick') return { st, head: 2 + breath, eyes: 'sick', tail: 0 };
-      if (st === 'angry') return { st, head: breath, eyes: 'angry', tail: Math.round(Math.sin(t / 160) * 2) };
-      if (st === 'sleep') return { st, breath };
+      const st = this.state(), breath = Math.floor(t / 1200) % 2;
+      if (st !== 'ok') return { st, breath };              // позы с картинок: сидит, плачет, спит…
       return { st, head: breath, eyes: (t % 3600) > 3400 ? 'closed' : 'open', tail: Math.round(Math.sin(t / 450) * 2) };
+    },
+    // положение позы: по центру, лапы на полу
+    poseBox(name) {
+      const img = window.Sprites.pose(name);
+      return { img, x: Math.round(94 - img.width / 2), y: 124 - img.height };
     },
     draw(ctx, t) {
       const a = this.anim(t), f = this.fx, S = window.Sprites;
-      if (a.st === 'sleep') {                                    // спит клубком
-        S.shadow(ctx, this.x + 36, 125, 32, 4.5);
-        ctx.drawImage(S.catSleep(a.breath), this.x - 8, 124 - 36);
+      if (a.st !== 'ok') {
+        const name = a.st === 'cry' ? 'cry' : a.st, bx = this.poseBox(name);
+        S.shadow(ctx, 94, 125, bx.img.width / 2, 4.5);
+        ctx.drawImage(bx.img, bx.x, bx.y + (a.breath ? 1 : 0));
         return;
       }
       // прыжок при игре: два подскока
@@ -143,15 +145,14 @@
         if (p.type === 'crumb') { ctx.fillStyle = S.PAL.orangeDark; ctx.fillRect(x, y, 2, 2); }
         else ctx.drawImage(p.type === 'heart' ? S.heart() : S.bubble(), x, y);
       });
-      // значки состояния рядом с котом
-      const st = this.state(), bob = Math.floor(t / 400) % 2, X = this.x, Y = this.y;
-      if (st === 'hungry') { ctx.drawImage(S.excl(), X + 42, Y - 10 - bob); ctx.drawImage(S.excl(), X + 52, Y - 4 + bob); }
-      if (st === 'sick') {
-        ctx.drawImage(S.swirl(), X + 14, Y - 8 + bob);
-        const dp = Math.floor((t / 350) % 4);                       // капелька пота стекает
-        ctx.fillStyle = S.PAL.sky; ctx.fillRect(X + 34, Y + 14 + dp * 2, 2, 3);
+      // значки состояния рядом с котом (позы берутся с картинок, значки рисуются поверх)
+      const st = this.state(), bob = Math.floor(t / 400) % 2;
+      if (st === 'hungry' || st === 'sick' || st === 'angry') {
+        const bx = this.poseBox(st), X = bx.x, Y = bx.y;
+        if (st === 'hungry') { ctx.drawImage(S.excl(), X + 40, Y + 4 - bob); ctx.drawImage(S.excl(), X + 49, Y + 10 + bob); }
+        if (st === 'sick') ctx.drawImage(S.swirl(), X + 2, Y - 14 + bob);
+        if (st === 'angry' && Math.floor(t / 450) % 2 === 0) ctx.drawImage(S.anger(), X + 28, Y - 12);
       }
-      if (st === 'angry' && Math.floor(t / 450) % 2 === 0) ctx.drawImage(S.anger(), X + 32, Y - 6);
     },
     // затемнение и Zzz для сна
     drawSleep(ctx, t, W, H) {
@@ -161,7 +162,7 @@
       ctx.fillStyle = 'rgba(14,10,46,' + (0.5 * f.fade).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
       if (!this.data.sleeping) return;
-      const S = window.Sprites, ph = (t / 1400) % 1, bx = this.x + 22, by = this.y + 10;
+      const S = window.Sprites, ph = (t / 1400) % 1, bx = 84, by = 72;
       [[0, 1], [0.33, 2], [0.66, 2]].forEach(([off, k], i) => {
         const p = (ph + off) % 1;
         S.zed(ctx, Math.round(bx + i * 6 + p * 6), Math.round(by - p * 22 - i * 2), k);
