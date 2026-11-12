@@ -1,0 +1,96 @@
+{
+ "width": 1672,
+ "height": 941,
+ "items": {
+  "shelf-left": {
+   "name": "Полка с цветком и рамкой",
+   "price": 60,
+   "x": 121,
+   "y": 46,
+   "w": 387,
+   "h": 249,
+   "z": 2,
+   "file": "items/shelf-left.png"
+  },
+  "shelf-right": {
+   "name": "Полка с книгами и цветком",
+   "price": 60,
+   "x": 1163,
+   "y": 40,
+   "w": 275,
+   "h": 226,
+   "z": 2,
+   "file": "items/shelf-right.png"
+  },
+  "frame-cat": {
+   "name": "Картина «Кот»",
+   "price": 35,
+   "x": 1462,
+   "y": 97,
+   "w": 148,
+   "h": 154,
+   "z": 2,
+   "file": "items/frame-cat.png"
+  },
+  "cat-tree": {
+   "name": "Когтеточка с домиком",
+   "price": 120,
+   "x": 24,
+   "y": 315,
+   "w": 309,
+   "h": 410,
+   "z": 3,
+   "file": "items/cat-tree.png"
+  },
+  "bowl": {
+   "name": "Миска с лапкой",
+   "price": 25,
+   "x": 376,
+   "y": 584,
+   "w": 168,
+   "h": 96,
+   "z": 3,
+   "file": "items/bowl.png"
+  },
+  "cat-bed": {
+   "name": "Лежанка-кошка",
+   "price": 80,
+   "x": 1136,
+   "y": 521,
+   "w": 301,
+   "h": 180,
+   "z": 3,
+   "file": "items/cat-bed.png"
+  },
+  "dresser": {
+   "name": "Комод с растением",
+   "price": 90,
+   "x": 1446,
+   "y": 278,
+   "w": 226,
+   "h": 407,
+   "z": 3,
+   "file": "items/dresser.png"
+  },
+  "mouse": {
+   "name": "Игрушка-мышка",
+   "price": 15,
+   "x": 1418,
+   "y": 715,
+   "w": 122,
+   "h": 52,
+   "z": 4,
+   "file": "items/mouse.png"
+  },
+  "rug": {
+   "name": "Коврик с лапкой",
+   "price": 50,
+   "x": 358,
+   "y": 735,
+   "w": 939,
+   "h": 159,
+   "z": 1,
+   "file": "items/rug.png"
+  }
+ }
+}

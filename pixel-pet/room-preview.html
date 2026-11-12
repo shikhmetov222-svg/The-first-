@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Комната: пустая и предметы</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#1d1a26;color:#f4ecd8;font-family:system-ui,sans-serif;padding:14px}
+h1{font-size:20px;margin:0 0 6px}p{margin:4px 0;color:#a79fb8;font-size:14px;max-width:860px}
+.layout{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;align-items:flex-start}
+.stage{position:relative;flex:1 1 640px;max-width:1100px;aspect-ratio:1672/941;background:#000;border-radius:8px;overflow:hidden}
+.stage img{position:absolute;display:block;image-rendering:pixelated}
+.stage .bg{left:0;top:0;width:100%}.stage .it{height:auto}.stage .it[hidden]{display:none}
+.side{flex:0 0 330px;display:flex;flex-direction:column;gap:6px}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+button{min-height:44px;padding:0 14px;border:0;border-radius:10px;background:#2a2536;color:#f4ecd8;font:inherit;font-size:13px;cursor:pointer}button.on{background:#e8b93c;color:#241c05;font-weight:700}
+.row{display:flex;align-items:center;gap:10px;background:#2a2536;border-radius:10px;padding:6px 10px;min-height:56px;cursor:pointer}
+.row input{width:20px;height:20px}.th{width:64px;height:44px;display:flex;align-items:center;justify-content:center;background:#e6cfa6;border-radius:6px;flex:none}
+.th img{max-width:100%;max-height:100%;image-rendering:pixelated}.nm{flex:1;font-size:14px}.pr{font-size:13px;color:#e8b93c;font-weight:700}
+</style></head><body>
+<h1>Комната: пустая и предметы</h1>
+<p>Базовая комната пустая: стены с лапками, окно, плинтус, пол. Все предметы вырезаны из <code>assets/reference/room.png</code> и покупаются за монеты (всего на 535 🪙). Отметь предмет, и он встанет на своё место из референса. «Поставить всё» собирает комнату как на референсе. В игру пока не подключено.</p>
+<div class="layout">
+ <div class="stage" id="stage"><img class="bg" id="bgE" src="assets/room/room-empty.png" alt="Пустая комната"><img class="bg" id="bgR" src="assets/reference/room.png" alt="Референс" hidden><img class="it" id="L-rug" src="assets/room/items/rug.png" alt="Коврик с лапкой" style="left:21.4115%;top:78.1084%;width:56.1603%" hidden><img class="it" id="L-shelf-left" src="assets/room/items/shelf-left.png" alt="Полка с цветком и рамкой" style="left:7.2368%;top:4.8884%;width:23.1459%" hidden><img class="it" id="L-shelf-right" src="assets/room/items/shelf-right.png" alt="Полка с книгами и цветком" style="left:69.5574%;top:4.2508%;width:16.4474%" hidden><img class="it" id="L-frame-cat" src="assets/room/items/frame-cat.png" alt="Картина «Кот»" style="left:87.4402%;top:10.3082%;width:8.8517%" hidden><img class="it" id="L-cat-tree" src="assets/room/items/cat-tree.png" alt="Когтеточка с домиком" style="left:1.4354%;top:33.4750%;width:18.4809%" hidden><img class="it" id="L-bowl" src="assets/room/items/bowl.png" alt="Миска с лапкой" style="left:22.4880%;top:62.0616%;width:10.0478%" hidden><img class="it" id="L-cat-bed" src="assets/room/items/cat-bed.png" alt="Лежанка-кошка" style="left:67.9426%;top:55.3666%;width:18.0024%" hidden><img class="it" id="L-dresser" src="assets/room/items/dresser.png" alt="Комод с растением" style="left:86.4833%;top:29.5430%;width:13.5167%" hidden><img class="it" id="L-mouse" src="assets/room/items/mouse.png" alt="Игрушка-мышка" style="left:84.8086%;top:75.9830%;width:7.2967%" hidden></div>
+ <div class="side"><div class="bar"><button id="all">Поставить всё</button><button id="none" class="on">Убрать всё</button><button id="ref">Показать референс</button></div><label class="row"><input type="checkbox" data-id="shelf-left"><span class="th"><img src="assets/room/items/shelf-left.png" alt=""></span><span class="nm">Полка с цветком и рамкой</span><span class="pr">60 🪙</span></label><label class="row"><input type="checkbox" data-id="shelf-right"><span class="th"><img src="assets/room/items/shelf-right.png" alt=""></span><span class="nm">Полка с книгами и цветком</span><span class="pr">60 🪙</span></label><label class="row"><input type="checkbox" data-id="frame-cat"><span class="th"><img src="assets/room/items/frame-cat.png" alt=""></span><span class="nm">Картина «Кот»</span><span class="pr">35 🪙</span></label><label class="row"><input type="checkbox" data-id="cat-tree"><span class="th"><img src="assets/room/items/cat-tree.png" alt=""></span><span class="nm">Когтеточка с домиком</span><span class="pr">120 🪙</span></label><label class="row"><input type="checkbox" data-id="bowl"><span class="th"><img src="assets/room/items/bowl.png" alt=""></span><span class="nm">Миска с лапкой</span><span class="pr">25 🪙</span></label><label class="row"><input type="checkbox" data-id="cat-bed"><span class="th"><img src="assets/room/items/cat-bed.png" alt=""></span><span class="nm">Лежанка-кошка</span><span class="pr">80 🪙</span></label><label class="row"><input type="checkbox" data-id="dresser"><span class="th"><img src="assets/room/items/dresser.png" alt=""></span><span class="nm">Комод с растением</span><span class="pr">90 🪙</span></label><label class="row"><input type="checkbox" data-id="mouse"><span class="th"><img src="assets/room/items/mouse.png" alt=""></span><span class="nm">Игрушка-мышка</span><span class="pr">15 🪙</span></label><label class="row"><input type="checkbox" data-id="rug"><span class="th"><img src="assets/room/items/rug.png" alt=""></span><span class="nm">Коврик с лапкой</span><span class="pr">50 🪙</span></label></div>
+</div>
+<script>
+var boxes=[].slice.call(document.querySelectorAll('[data-id]'));
+function sync(){boxes.forEach(function(b){document.getElementById('L-'+b.dataset.id).hidden=!b.checked})}
+boxes.forEach(function(b){b.onchange=sync});
+document.getElementById('all').onclick=function(){boxes.forEach(function(b){b.checked=true});sync()};
+document.getElementById('none').onclick=function(){boxes.forEach(function(b){b.checked=false});sync()};
+var showRef=false;document.getElementById('ref').onclick=function(){showRef=!showRef;this.classList.toggle('on',showRef);document.getElementById('bgR').hidden=!showRef;document.querySelectorAll('.it').forEach(function(i){i.style.visibility=showRef?'hidden':'visible'})};
+</script></body></html>
