@@ -12,7 +12,14 @@
   NAMES.forEach((n, i) => (IDX[n] = i + 1)); // 0 = пусто
 
   // Буфер пикселей с индексами палитры + автоматический тёмный контур.
+  const K = 1.2; // масштаб мебели относительно прежней сетки
   function Buf(w, h) { this.w = w; this.h = h; this.d = new Uint8Array(w * h); }
+  // те же вызовы, что rect/ellipse, но координаты и размеры умножаются на K
+  Buf.prototype.rectS = function (x, y, w, h, c) {
+    const x0 = Math.round(x * K), y0 = Math.round(y * K);
+    this.rect(x0, y0, Math.round((x + w) * K) - x0, Math.round((y + h) * K) - y0, c);
+  };
+  Buf.prototype.ellipseS = function (cx, cy, rx, ry, c) { this.ellipse(cx * K, cy * K, rx * K, ry * K, c); };
   Buf.prototype.set = function (x, y, c) {
     if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.d[y * this.w + x] = IDX[c];
   };
@@ -121,16 +128,16 @@
   let plantC, bowlC;
   function plant() {
     if (plantC) return plantC;
-    const B = new Buf(16, 20);
-    B.ellipse(4.5, 9, 3, 5, 'green'); B.ellipse(11.5, 8, 3, 6, 'green'); B.ellipse(8, 5, 3, 5, 'green'); B.rect(5, 7, 6, 6, 'green');
-    B.rect(3, 13, 10, 7, 'orangeDark'); B.rect(2, 12, 12, 2, 'orange'); B.rect(4, 15, 1, 3, 'orange');
+    const B = new Buf(Math.round(16 * K), Math.round(20 * K));
+    B.ellipseS(4.5, 9, 3, 5, 'green'); B.ellipseS(11.5, 8, 3, 6, 'green'); B.ellipseS(8, 5, 3, 5, 'green'); B.rectS(5, 7, 6, 6, 'green');
+    B.rectS(3, 13, 10, 7, 'orangeDark'); B.rectS(2, 12, 12, 2, 'orange'); B.rectS(4, 15, 1, 3, 'orange');
     B.outline('ink'); return (plantC = B.toCanvas());
   }
   function bowl() {
     if (bowlC) return bowlC;
-    const B = new Buf(18, 12);
-    B.rect(1, 6, 14, 2, 'pink'); B.rect(2, 8, 12, 2, 'pink'); B.rect(3, 10, 10, 1, 'rug');
-    B.ellipse(8, 5, 7, 2.5, 'cream'); B.ellipse(8, 5, 5, 1.6, 'orangeDark');
+    const B = new Buf(Math.round(18 * K), Math.round(12 * K));
+    B.rectS(1, 6, 14, 2, 'pink'); B.rectS(2, 8, 12, 2, 'pink'); B.rectS(3, 10, 10, 1, 'rug');
+    B.ellipseS(8, 5, 7, 2.5, 'cream'); B.ellipseS(8, 5, 5, 1.6, 'orangeDark');
     B.outline('ink'); return (bowlC = B.toCanvas());
   }
 
