@@ -2,7 +2,7 @@
   const $ = id => document.getElementById(id);
   const canvas = $('scene'), ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  const KEY = 'pixelpet.v1';
+  const KEY = 'pixelpet.v1', D = window.GameData, S = window.Sprites;
 
   // ---------- Telegram ----------
   let tg = null;
@@ -25,10 +25,10 @@
 
   // ---------- масштаб: целый, если места хватает ----------
   function fit() {
-    const availW = innerWidth - 8, availH = innerHeight - 330;
-    let k = Math.min(availW / Room.W, availH / Room.H);
-    k = k >= 2 ? Math.floor(k) : Math.max(1, k);
-    canvas.style.width = Math.round(Room.W * k) + 'px'; canvas.style.height = Math.round(Room.H * k) + 'px';
+    const availW = Math.min(innerWidth - 8, 1000), availH = innerHeight - 380;
+    let k = Math.min(availW / D.w, availH / D.h);
+    k = k >= 1 ? Math.floor(k) : Math.max(0.7, k);
+    canvas.style.width = Math.round(D.w * k) + 'px'; canvas.style.height = Math.round(D.h * k) + 'px';
   }
   addEventListener('resize', fit); fit();
 
@@ -44,7 +44,7 @@
     const d = Pet.data;
     for (const k in bars) {
       const v = Math.round(d.stats[k]);
-      bars[k].style.width = v + '%'; vals[k].textContent = v;
+      bars[k].style.width = v + '%';
       bars[k].parentNode.classList.toggle('low', v < 25);
       vals[k].textContent = v + (v < 25 ? ' ▼' : '');
     }
@@ -58,58 +58,59 @@
     refresh(); save();
   }));
 
-  // ---------- интерьер: лист магазина ----------
-  const TABS = [['plant', 'Растения'], ['furn', 'Мебель'], ['wall', 'Стены'], ['floor', 'Пол'], ['rug', 'Ковёр']];
-  let tab = 'plant';
-  function preview(it) {
-    const cv = document.createElement('canvas');
-    if (it.cat === 'plant' || it.cat === 'furn') {
-      const img = it.cat === 'plant' ? Sprites.plantImg(it.idx) : Sprites.itemImg(it.asset);
-      const k = it.cat === 'plant' ? 3 : 1.5;
-      cv.width = img.width; cv.height = img.height; cv.getContext('2d').drawImage(img, 0, 0);
-      cv.style.width = Math.round(img.width * k) + 'px'; cv.style.height = Math.round(img.height * k) + 'px';
-      cv.style.padding = '4px'; cv.style.boxSizing = 'content-box';
-    } else {
-      cv.width = 16; cv.height = 12; const g = cv.getContext('2d');
-      if (it.cat === 'rug' && !it.c1) { g.fillStyle = '#e6cfa6'; g.fillRect(0, 0, 16, 12); }
-      else if (it.cat === 'rug') { g.fillStyle = '#b8794b'; g.fillRect(0, 0, 16, 12); g.fillStyle = it.c2; g.fillRect(1, 3, 14, 6); g.fillStyle = it.c1; g.fillRect(3, 4, 10, 4); }
-      else { g.fillStyle = it.c1; g.fillRect(0, 0, 16, 12); g.fillStyle = it.c2;
-        for (let x = 1; x < 16; x += 4) g.fillRect(x, 0, 1, 12); if (it.pat === 'tiles' || it.pat === 'planks') g.fillRect(0, 6, 16, 1); }
-      cv.style.width = '64px'; cv.style.height = '48px';
-    }
+  // ---------- магазин и окрас (нижний лист) ----------
+  let mode = 'items';
+  function thumb(img, sx, sy, sw, sh, boxW, boxH) {           // предпросмотр: картинка целиком в рамку
+    const cv = document.createElement('canvas'); cv.width = sw; cv.height = sh;
+    cv.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    const k = Math.min(boxW / sw, boxH / sh); const ki = k >= 1 ? Math.floor(k) : k;
+    cv.style.width = Math.round(sw * ki) + 'px'; cv.style.height = Math.round(sh * ki) + 'px'; cv.style.padding = '4px'; cv.style.boxSizing = 'content-box';
     return cv;
   }
   function btn(text, cls, fn, disabled) {
     const b = document.createElement('button'); b.textContent = text; if (cls) b.className = cls;
     b.disabled = !!disabled; b.addEventListener('click', fn); return b;
   }
-  function renderShop() {
+  function renderSheet() {
     const d = Pet.data, list = $('shop-list'); list.textContent = '';
-    $('tabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-    Shop.items.filter(it => it.cat === tab).forEach(it => {
+    $('tabs').hidden = true;
+    if (mode === 'coat') {
+      $('sheet-title').textContent = 'Окрас кота';
+      const grid = document.createElement('div'); grid.className = 'coats';
+      Object.keys(D.coats).forEach(c => {
+        const b = document.createElement('button'); b.className = 'coat' + (d.coat === c ? ' on' : '');
+        const sh = S.coat(c);
+        if (sh) b.appendChild(thumb(sh, 0, 0, D.frame_w, D.frame_h, 128, 112));
+        const l = document.createElement('span'); l.textContent = D.coats[c] + (d.coat === c ? ' ✓' : ''); b.appendChild(l);
+        b.addEventListener('click', () => { const r = Shop.setCoat(d, c); toast(r.msg, !r.ok); haptic('light'); renderSheet(); save(); });
+        grid.appendChild(b);
+      });
+      list.appendChild(grid); return;
+    }
+    $('sheet-title').textContent = 'Магазин комнаты';
+    Shop.items.forEach(it => {
       const row = document.createElement('div'); row.className = 'item';
-      row.appendChild(preview(it));
+      const im = S.item(it.id), cd = D.items[it.id];
+      if (im) row.appendChild(thumb(im, 0, 0, cd.w, cd.h, 84, 60));
+      const owned = Shop.owns(d, it.id), put = Shop.placed(d, it.id);
       const info = document.createElement('div'); info.className = 'info';
-      const owned = Shop.owns(d, it.id), where = Shop.placedIn(d, it.id);
       info.innerHTML = '<b></b><span></span>'; info.firstChild.textContent = it.name;
-      info.lastChild.textContent = owned ? (where.length ? 'Стоит в комнате ✓' : 'Куплено') : (it.price + ' 🪙');
+      info.lastChild.textContent = owned ? (put ? 'Стоит в комнате ✓' : 'Куплено · в кладовке') : (it.price + ' 🪙');
       row.appendChild(info);
       const btns = document.createElement('div'); btns.className = 'btns';
-      const act = (res) => { toast(res.msg, !res.ok); haptic(res.ok ? 'light' : 'error'); refresh(); renderShop(); save(); };
+      const act = res => { toast(res.msg, !res.ok); haptic(res.ok ? 'light' : 'error'); refresh(); renderSheet(); save(); };
       if (!owned) btns.appendChild(btn('Купить ' + it.price + ' 🪙', 'buy', () => act(Shop.buy(d, it.id)), d.coins < it.price));
-      else if (it.cat === 'plant') {
-        btns.appendChild(btn('Полка', where.indexOf('shelf') >= 0 ? 'on' : '', () => act(Shop.use(d, it.id, 'shelf'))));
-        btns.appendChild(btn('Окно', where.indexOf('sill') >= 0 ? 'on' : '', () => act(Shop.use(d, it.id, 'sill'))));
-      } else if (it.cat === 'furn') btns.appendChild(btn(where.length ? 'Убрать' : 'Поставить', where.length ? 'on' : '', () => act(Shop.use(d, it.id))));
-      else btns.appendChild(btn(where.length ? 'Выбрано' : 'Выбрать', where.length ? 'on' : '', () => act(Shop.use(d, it.id)), where.length > 0));
+      else btns.appendChild(btn(put ? 'Убрать' : 'Поставить', put ? 'on' : '', () => act(Shop.toggle(d, it.id))));
       row.appendChild(btns); list.appendChild(row);
     });
   }
-  TABS.forEach(([id, name]) => {
-    const b = document.createElement('button'); b.textContent = name; b.dataset.tab = id;
-    b.addEventListener('click', () => { tab = id; renderShop(); }); $('tabs').appendChild(b);
-  });
-  $('open-shop').addEventListener('click', () => { $('sheet').hidden = false; renderShop(); });
+  function openSheet(m) {
+    mode = m; $('sheet').hidden = false;
+    const need = m === 'coat' ? Object.keys(D.coats).map(c => S.loadCoat(c)) : [];
+    renderSheet(); Promise.all(need).then(() => { if (!$('sheet').hidden) renderSheet(); });
+  }
+  $('open-shop').addEventListener('click', () => openSheet('items'));
+  $('open-coat').addEventListener('click', () => openSheet('coat'));
   document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => { $('sheet').hidden = true; }));
 
   // ---------- цикл ----------
@@ -118,15 +119,20 @@
     const dt = Math.min(t - last, 5000); last = t; acc += dt;
     if (acc >= 1000) { Pet.advance(acc, false); acc = 0; refresh(); }
     Pet.events.splice(0).forEach(e => { toast(e.msg, e.kind === 'bad'); haptic('success'); });
-    Room.draw(ctx, t, Pet.data.room);
+    Room.draw(ctx, Pet.data);
     Pet.draw(ctx, t);
-    Pet.drawFx(ctx, t);
-    Pet.drawSleep(ctx, t, Room.W, Room.H);
     if (t - lastSave > 5000) { lastSave = t; save(); }
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   addEventListener('pagehide', save);
-  Pet.events.splice(0).forEach(e => toast(e.msg));   // например «пока тебя не было…»
-  refresh(); requestAnimationFrame(frame);
+
+  // ---------- старт: ждём картинки ----------
+  const d0 = Pet.data;
+  Promise.all([S.loadRoom(), S.loadCoat(d0.coat)].concat(Object.keys(D.items).map(id => S.loadItem(id)))).then(() => {
+    Pet.events.splice(0).forEach(e => toast(e.msg));      // например «пока тебя не было…»
+    refresh(); requestAnimationFrame(frame);
+  }).catch(e => { $('status').textContent = 'Не удалось загрузить картинки: ' + e.message; });
+  // смена окраса подгружает его картинки
+  const setCoat = Shop.setCoat; Shop.setCoat = function (d, c) { const r = setCoat(d, c); if (r.ok) S.loadCoat(c); return r; };
 })();
