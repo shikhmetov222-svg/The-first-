@@ -24,3 +24,26 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 .toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);background:#000c;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .toast.bad{background:#7a2a2a}
+
+.room-btn{width:calc(100% - 12px);min-height:48px;background:var(--card);color:var(--text);border:1px dashed #5a5272;border-radius:12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.sheet-wrap[hidden]{display:none}
+.sheet-wrap{position:fixed;inset:0;z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.sheet-bg{position:absolute;inset:0;background:#0009}
+.sheet{position:relative;width:100%;max-width:520px;max-height:78vh;background:#221e2e;border-radius:18px 18px 0 0;padding:12px 12px 18px;display:flex;flex-direction:column;gap:10px}
+.sheet-head{display:flex;align-items:center;gap:10px}
+.sheet-head b:first-child{font-size:16px;flex:1}
+.x{width:44px;height:44px;border:0;border-radius:12px;background:var(--card);color:var(--text);font-size:16px;cursor:pointer}
+.sheet-head,.tabs{flex:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.tabs button{flex:none;min-height:44px;padding:0 14px;border:0;border-radius:999px;background:var(--card);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{background:var(--gold);color:#241c05;font-weight:700}
+.list{overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:8px 10px}
+.item canvas{image-rendering:pixelated;background:#e6d6b0;border-radius:8px;flex:none}
+.item .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.item .info span{font-size:12px;color:var(--hint)}
+.item .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.item button{min-height:44px;min-width:64px;padding:0 10px;border:0;border-radius:10px;background:#3a3450;color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+.item button.buy{background:var(--gold);color:#241c05;font-weight:700}
+.item button.on{background:var(--ok);color:#0d2a1c;font-weight:700}
+.item button:disabled{opacity:.5}

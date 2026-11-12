@@ -24,9 +24,20 @@
       <button data-act="wash"><span>🫧</span><b>Мыть</b></button>
       <button data-act="sleep" id="btn-sleep"><span>🌙</span><b>Спать</b></button>
     </div>
+    <button class="room-btn" id="open-shop">🛋 Интерьер комнаты</button>
+    <div class="sheet-wrap" id="sheet" hidden>
+      <div class="sheet-bg" data-close></div>
+      <div class="sheet">
+        <div class="sheet-head"><b>Интерьер</b><span class="coins">🪙 <b id="shop-coins">0</b></span><button class="x" data-close aria-label="Закрыть">✕</button></div>
+        <div class="tabs" id="tabs"></div>
+        <div class="list" id="shop-list"></div>
+      </div>
+    </div>
     <div class="toast" id="toast"></div>
   </main>
+  <script src="js/assets.js"></script>
   <script src="js/sprites.js"></script>
+  <script src="js/shop.js"></script>
   <script src="js/room.js"></script>
   <script src="js/pet.js"></script>
   <script src="js/main.js"></script>

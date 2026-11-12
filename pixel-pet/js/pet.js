@@ -9,8 +9,8 @@
   const clamp = v => Math.max(0, Math.min(100, v));
 
   function defaults(now) {
-    return { v: 1, type: 'cat', name: 'Мурзик', coins: 0, sleeping: false, sleepFrom: 0,
-             stats: { food: 80, mood: 80, clean: 80, energy: 80 }, savedAt: now };
+    return Object.assign({ v: 1, type: 'cat', name: 'Мурзик', coins: 20, sleeping: false, sleepFrom: 0,
+             stats: { food: 80, mood: 80, clean: 80, energy: 80 }, savedAt: now }, window.Shop.defaults());
   }
 
   const Pet = {
@@ -31,8 +31,11 @@
           d.sleeping = !!o.sleeping; d.sleepFrom = isFinite(o.sleepFrom) ? +o.sleepFrom : d.stats.energy;
           if (typeof o.name === 'string') d.name = o.name.slice(0, 20);
           if (isFinite(o.savedAt)) d.savedAt = Math.min(+o.savedAt, now);
+          if (Array.isArray(o.owned)) d.owned = o.owned;
+          if (o.room && typeof o.room === 'object') d.room = o.room;
         }
       } catch (e) {}
+      window.Shop.sanitize(d);
       this.data = d;
       const away = Math.min(now - d.savedAt, MAX_AWAY);
       if (away > 60e3) this.advance(away, true);  // время, пока приложение было закрыто
@@ -60,15 +63,21 @@
     },
 
     // ---------- состояние ----------
-    sad() { const s = this.data.stats; return !this.data.sleeping && (s.food < 25 || s.mood < 25); },
-    status() {
+    // sleep | sick | hungry | cry | angry | ok  (по важности)
+    state() {
       const d = this.data, s = d.stats;
-      if (d.sleeping) return d.name + ' спит 💤';
-      if (s.food < 25) return d.name + ' голодный 😿';
-      if (s.mood < 25) return d.name + ' скучает 😿';
-      if (s.energy < 20) return d.name + ' устал';
-      if (s.clean < 25) return d.name + ' грязный';
-      return d.name + ': всё хорошо';
+      if (d.sleeping) return 'sleep';
+      if (s.clean < 15) return 'sick';
+      if (s.food < 25) return 'hungry';
+      if (s.mood < 25) return 'cry';
+      if (s.energy < 15) return 'angry';
+      return 'ok';
+    },
+    status() {
+      const n = this.data.name;
+      return { sleep: n + ' спит 💤', sick: n + ' заболел — помой его 🤒', hungry: n + ' голодный — покорми 🍖',
+               cry: n + ' плачет — поиграй с ним 😿', angry: n + ' злится от усталости — уложи спать 😾',
+               ok: n + ': всё хорошо' }[this.state()];
     },
 
     // ---------- действия ----------
@@ -104,15 +113,21 @@
 
     // ---------- анимации ----------
     anim(t) {
-      const d = this.data;
-      const breath = Math.floor(t / 1200) % 2;
-      const blink = (t % 3600) > 3400;
-      if (d.sleeping) return { head: 2 + breath, eyes: 'closed', tail: 0 };
-      if (this.sad()) return { head: 1 + breath, eyes: 'sad', tail: 0 };
-      return { head: breath, eyes: blink ? 'closed' : 'open', tail: Math.round(Math.sin(t / 450) * 2) };
+      const st = this.state(), breath = Math.floor(t / 1200) % 2, tear = Math.floor(t / 500) % 2;
+      if (st === 'hungry') return { st, head: 1 + breath, eyes: 'hungry', tail: 0 };
+      if (st === 'cry') return { st, head: 1 + breath, eyes: 'cry', tail: 0, tear };
+      if (st === 'sick') return { st, head: 2 + breath, eyes: 'sick', tail: 0 };
+      if (st === 'angry') return { st, head: breath, eyes: 'angry', tail: Math.round(Math.sin(t / 160) * 2) };
+      if (st === 'sleep') return { st, breath };
+      return { st, head: breath, eyes: (t % 3600) > 3400 ? 'closed' : 'open', tail: Math.round(Math.sin(t / 450) * 2) };
     },
     draw(ctx, t) {
       const a = this.anim(t), f = this.fx, S = window.Sprites;
+      if (a.st === 'sleep') {                                    // спит клубком
+        S.shadow(ctx, this.x + 36, 125, 32, 4.5);
+        ctx.drawImage(S.catSleep(a.breath), this.x - 8, 124 - 36);
+        return;
+      }
       // прыжок при игре: два подскока
       const jp = (t - f.jumpAt) / 900;
       const hop = jp >= 0 && jp < 1 ? Math.round(Math.abs(Math.sin(jp * Math.PI * 2)) * 10) : 0;
@@ -128,6 +143,15 @@
         if (p.type === 'crumb') { ctx.fillStyle = S.PAL.orangeDark; ctx.fillRect(x, y, 2, 2); }
         else ctx.drawImage(p.type === 'heart' ? S.heart() : S.bubble(), x, y);
       });
+      // значки состояния рядом с котом
+      const st = this.state(), bob = Math.floor(t / 400) % 2, X = this.x, Y = this.y;
+      if (st === 'hungry') { ctx.drawImage(S.excl(), X + 42, Y - 10 - bob); ctx.drawImage(S.excl(), X + 52, Y - 4 + bob); }
+      if (st === 'sick') {
+        ctx.drawImage(S.swirl(), X + 14, Y - 8 + bob);
+        const dp = Math.floor((t / 350) % 4);                       // капелька пота стекает
+        ctx.fillStyle = S.PAL.sky; ctx.fillRect(X + 34, Y + 14 + dp * 2, 2, 3);
+      }
+      if (st === 'angry' && Math.floor(t / 450) % 2 === 0) ctx.drawImage(S.anger(), X + 32, Y - 6);
     },
     // затемнение и Zzz для сна
     drawSleep(ctx, t, W, H) {
@@ -137,7 +161,7 @@
       ctx.fillStyle = 'rgba(14,10,46,' + (0.5 * f.fade).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
       if (!this.data.sleeping) return;
-      const S = window.Sprites, ph = (t / 1400) % 1, bx = this.x + 36, by = this.y + 4;
+      const S = window.Sprites, ph = (t / 1400) % 1, bx = this.x + 22, by = this.y + 10;
       [[0, 1], [0.33, 2], [0.66, 2]].forEach(([off, k], i) => {
         const p = (ph + off) % 1;
         S.zed(ctx, Math.round(bx + i * 6 + p * 6), Math.round(by - p * 22 - i * 2), k);
