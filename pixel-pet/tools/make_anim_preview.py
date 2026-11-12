@@ -98,7 +98,10 @@ function report() {
     td[4].textContent = x.fallback ? 'кадр ' + x.fallback + '.png' : 'ничего (не показывается)';
     td[5].textContent = x.missing.length === coats.length ? 'все ' + coats.length : x.missing.length + ' из ' + coats.length; tb.appendChild(tr);
   });
-  document.getElementById('sum').innerHTML = 'Не хватает <b class="warn">' + D.extra_names.length + ' кадров на каждый окрас</b>, всего <b class="warn">' + n + ' файлов</b> (' + D.extra_names.length + ' × ' + coats.length + ' окрасов). Для одного рыжего кота достаточно ' + D.extra_names.length + ' файлов.';
+  var per = coats.map(function (c) { var m = D.extra_names.filter(function (id) { return !S.has(c, id); }).length; return m ? D.coats[c] + ': ' + m : null; }).filter(Boolean);
+  var done = coats.filter(function (c) { return D.extra_names.every(function (id) { return S.has(c, id); }); }).map(function (c) { return D.coats[c]; });
+  document.getElementById('sum').innerHTML = (done.length ? 'Полный набор из ' + D.extra_names.length + ' кадров есть у: <b>' + done.join(', ') + '</b>. ' : '') +
+    (n ? 'Не хватает <b class="warn">' + n + ' файлов</b> (по ' + D.extra_names.length + ' на каждый остальной окрас: ' + per.join(', ') + ').' : 'Все кадры на месте.');
 }
 var sel = document.getElementById('coat');
 Object.keys(D.coats).forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = D.coats[c]; sel.appendChild(o); });
