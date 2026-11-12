@@ -59,48 +59,48 @@
     fillEllipse(ctx, cx, cy, rx * 0.65, ry * 0.6, 'wood', false);
   }
 
-  // ---- Кот (сидит, анфас) ----
+  // ---- Кот (сидит, анфас, пропорции «чиби»: большая голова, маленькое тело) ----
   const catCache = {};
   function cat(o) {
     const key = (o.breath ? 1 : 0) + '|' + (o.blink ? 1 : 0) + '|' + o.tail;
     if (catCache[key]) return catCache[key];
     const B = new Buf(44, 44), hb = o.breath ? 1 : 0;
-    // хвост (3×3 звенья, кончик качается)
-    const pts = [[29, 36], [30, 36], [31, 35], [32, 34], [33, 33], [33, 32], [33, 31], [33, 30], [33, 29]];
+    // тонкий хвост (2×2), загибается вверх, кончик светлый и качается
+    const pts = [[26, 37], [28, 37], [30, 36], [31, 34], [32, 32], [32, 30], [31, 28], [30, 27]];
     pts.forEach((p, i) => {
-      const dx = Math.round(o.tail * (i >= 3 ? (i - 2) / 6 : 0));
-      B.rect(p[0] + dx, p[1], 3, 3, i === 5 || i === 6 ? 'orangeDark' : 'orange');
+      const dx = Math.round(o.tail * (i >= 3 ? (i - 2) / 5 : 0));
+      B.rect(p[0] + dx, p[1], 2, 2, i >= 6 ? 'orangeLight' : 'orange');
     });
-    // тело, бёдра, живот, лапы
-    B.ellipse(20, 31, 9, 8, 'orange');
-    B.ellipse(12.5, 35, 4, 4.5, 'orange'); B.ellipse(27.5, 35, 4, 4.5, 'orange');
-    B.ellipse(20, 33, 5, 5, 'orangeLight');
-    B.rect(14, 33, 4, 7, 'orange'); B.rect(22, 33, 4, 7, 'orange');
-    B.rect(14, 38, 4, 2, 'orangeLight'); B.rect(22, 38, 4, 2, 'orangeLight');
-    [27, 29, 31].forEach(y => { B.rect(12, y, 2, 1, 'orangeDark'); B.rect(26, y, 2, 1, 'orangeDark'); });
-    // уши (зеркальные)
-    const ear = [[11, 11], [11, 12], [11, 13], [11, 14], [11, 15], [11, 16], [11, 16]];
-    ear.forEach((r, i) => {
+    // маленькое тело
+    B.ellipse(20, 32, 6.5, 7, 'orange');
+    B.ellipse(14, 36, 3, 3.5, 'orange'); B.ellipse(26, 36, 3, 3.5, 'orange');
+    B.ellipse(20, 34, 3.5, 4, 'orangeLight');
+    B.rect(16, 34, 3, 6, 'orange'); B.rect(21, 34, 3, 6, 'orange');
+    B.rect(16, 38, 3, 2, 'orangeLight'); B.rect(21, 38, 3, 2, 'orangeLight');
+    B.rect(14, 30, 2, 1, 'orangeDark'); B.rect(24, 30, 2, 1, 'orangeDark');
+    // острые ушки
+    [[10, 11], [10, 12], [10, 13], [10, 14], [10, 15], [10, 16], [10, 17]].forEach((r, i) => {
       const y = 3 + i + hb;
       B.rect(r[0], y, r[1] - r[0] + 1, 1, 'orange');
       B.rect(39 - r[1], y, r[1] - r[0] + 1, 1, 'orange');
     });
-    [[5, 12, 12], [6, 12, 13], [7, 12, 13], [8, 12, 14]].forEach(e => {
+    [[5, 11, 11], [6, 11, 12], [7, 11, 13], [8, 11, 13]].forEach(e => {
       B.rect(e[1], e[0] + hb, e[2] - e[1] + 1, 1, 'pink');
       B.rect(39 - e[2], e[0] + hb, e[2] - e[1] + 1, 1, 'pink');
     });
-    // голова
-    B.ellipse(20, 16 + hb, 10, 8, 'orange');
-    B.rect(19, 8 + hb, 2, 3, 'orangeDark'); B.rect(16, 9 + hb, 2, 2, 'orangeDark'); B.rect(22, 9 + hb, 2, 2, 'orangeDark');
-    B.ellipse(20, 19 + hb, 5, 3, 'orangeLight');
-    // глаза
-    [15, 23].forEach(x => {
-      if (o.blink) B.rect(x, 16 + hb, 2, 1, 'ink');
-      else { B.rect(x, 15 + hb, 2, 3, 'ink'); B.set(x, 15 + hb, 'cream'); }
+    // широкая голова
+    B.ellipse(20, 17 + hb, 11, 7.5, 'orange');
+    B.rect(19, 10 + hb, 2, 2, 'orangeDark'); B.rect(16, 11 + hb, 2, 1, 'orangeDark'); B.rect(22, 11 + hb, 2, 1, 'orangeDark');
+    B.ellipse(20, 21.5 + hb, 3.5, 2.5, 'orangeLight');
+    // большие глаза с бликами
+    [13, 25].forEach(x => {
+      if (o.blink) B.rect(x, 18 + hb, 3, 1, 'ink');
+      else { B.rect(x, 16 + hb, 3, 4, 'ink'); B.set(x, 16 + hb, 'cream'); B.set(x + 2, 19 + hb, 'cream'); }
     });
-    B.rect(19, 18 + hb, 2, 1, 'pink');                       // нос
-    B.set(19, 19 + hb, 'ink'); B.set(20, 19 + hb, 'ink');    // рот
-    B.set(18, 20 + hb, 'ink'); B.set(21, 20 + hb, 'ink');
+    B.rect(11, 20 + hb, 2, 1, 'pink'); B.rect(27, 20 + hb, 2, 1, 'pink'); // румянец
+    B.rect(19, 20 + hb, 2, 1, 'pink');                                      // носик
+    B.set(18, 21 + hb, 'ink'); B.set(21, 21 + hb, 'ink');                   // ротик «w»
+    B.set(19, 22 + hb, 'ink'); B.set(20, 22 + hb, 'ink');
     B.outline('ink');
     return (catCache[key] = B.toCanvas());
   }

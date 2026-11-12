@@ -13,7 +13,7 @@
     },
     draw(ctx, t) {
       const a = this.anim(t);
-      window.Sprites.shadow(ctx, this.x + 22, this.y + 40, 15, 4);
+      window.Sprites.shadow(ctx, this.x + 20, this.y + 40, 12, 3.5);
       ctx.drawImage(window.Sprites.cat(a), this.x, this.y);
     }
   };
