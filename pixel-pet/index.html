@@ -9,9 +9,22 @@
 </head>
 <body>
   <main class="app">
-    <h1>Пиксель-питомец</h1>
+    <header class="top"><h1>Пиксель-питомец</h1><div class="coins" title="Монеты">🪙 <b id="coins">0</b></div></header>
     <div class="stage"><canvas id="scene" width="192" height="144"></canvas></div>
-    <p class="hint">Шаг 1: комната и кот</p>
+    <p class="status" id="status"></p>
+    <div class="stats">
+      <div class="stat"><span class="lab">🍖 Сытость</span><div class="bar"><i id="b-food"></i></div><span class="val" id="v-food"></span></div>
+      <div class="stat"><span class="lab">😊 Настроение</span><div class="bar"><i id="b-mood"></i></div><span class="val" id="v-mood"></span></div>
+      <div class="stat"><span class="lab">🫧 Чистота</span><div class="bar"><i id="b-clean"></i></div><span class="val" id="v-clean"></span></div>
+      <div class="stat"><span class="lab">⚡ Энергия</span><div class="bar"><i id="b-energy"></i></div><span class="val" id="v-energy"></span></div>
+    </div>
+    <div class="actions">
+      <button data-act="feed"><span>🍖</span><b>Кормить</b></button>
+      <button data-act="play"><span>🎾</span><b>Играть</b></button>
+      <button data-act="wash"><span>🫧</span><b>Мыть</b></button>
+      <button data-act="sleep" id="btn-sleep"><span>🌙</span><b>Спать</b></button>
+    </div>
+    <div class="toast" id="toast"></div>
   </main>
   <script src="js/sprites.js"></script>
   <script src="js/room.js"></script>

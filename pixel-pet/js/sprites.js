@@ -95,33 +95,56 @@
     '...dKooddoomKddmmmmKmmK.',
     '...KoomKooomKoommmdKdd..'
   ];
-  const CAT_COL = { K: 'ink', d: 'wood', m: 'orangeDark', o: 'orange', p: 'pink', w: 'cream' };
+  const CAT_COL = { K: 'ink', d: 'wood', m: 'orangeDark', o: 'orange', p: 'pink', w: 'cream', b: 'sky' };
   const CAT_SCALE = 2; // кот крупнее комнаты в целое число раз
   const CAT_W = 24, CAT_H = CAT.length;
   const catCache = {};
+  // o: { head: 0..3 (на сколько пикселей голова опущена), eyes: 'open'|'closed'|'sad', tail: -2..2 }
   function cat(o) {
-    const key = (o.breath ? 1 : 0) + '|' + (o.blink ? 1 : 0) + '|' + o.tail;
+    const key = o.head + '|' + o.eyes + '|' + o.tail;
     if (catCache[key]) return catCache[key];
     const g = CAT.map(r => r.split(''));
-    if (o.blink) { g[7][5] = g[7][4] = g[7][10] = g[7][11] = 'o'; }           // глаза закрыты: остаётся нижняя чёрточка
-    const sway = Math.round(o.tail / 2);                                      // хвост: кончик сдвигается на ±1
+    if (o.eyes !== 'open') { g[7][4] = g[7][5] = g[7][10] = g[7][11] = 'o'; }  // веки: остаётся нижняя чёрточка
+    if (o.eyes === 'sad') { g[9][4] = 'b'; g[9][11] = 'b'; }                    // слёзки
+    const sway = Math.round(o.tail / 2);                                        // хвост: кончик ±1
     if (sway) for (let r = 10; r <= 12; r++) {
       const row = g[r].slice(19);
       for (let c = 19; c < CAT_W; c++) g[r][c] = '.';
       row.forEach((v, i) => { const x = 19 + i + sway; if (v !== '.' && x < CAT_W) g[r][x] = v; });
     }
-    if (o.breath) for (let c = 0; c < 18; c++) {                              // дыхание: голова на 1 пиксель вниз
-      for (let r = 10; r >= 1; r--) g[r][c] = g[r - 1][c];
-      g[0][c] = '.';
+    const d = o.head;
+    if (d) for (let c = 0; c < 18; c++) {                                       // голова вниз на d пикселей
+      for (let r = 9; r >= 0; r--) g[r + d][c] = g[r][c];
+      for (let r = 0; r < d; r++) g[r][c] = '.';
     }
     const B = new Buf(CAT_W + 2, CAT_H + 1);
     for (let y = 0; y < CAT_H; y++) for (let x = 0; x < CAT_W; x++)
       if (g[y][x] !== '.') B.set(x + 1, y, CAT_COL[g[y][x]]);
-    const src = B.toCanvas(), K = CAT_SCALE, cv = document.createElement('canvas');
-    cv.width = src.width * K; cv.height = src.height * K;
+    const src = B.toCanvas(), cv = document.createElement('canvas');
+    cv.width = src.width * CAT_SCALE; cv.height = src.height * CAT_SCALE;
     const g2 = cv.getContext('2d'); g2.imageSmoothingEnabled = false;
     g2.drawImage(src, 0, 0, cv.width, cv.height);
     return (catCache[key] = cv);
+  }
+
+  // ---- Эффекты: сердечко, пузырь, буква Z ----
+  let heartC, bubbleC;
+  function heart() {
+    if (heartC) return heartC;
+    const B = new Buf(9, 8);
+    ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'].forEach((row, y) =>
+      row.split('').forEach((ch, x) => { if (ch === '#') B.set(x + 1, y + 1, 'pink'); }));
+    B.outline('ink'); return (heartC = B.toCanvas());
+  }
+  function bubble() {
+    if (bubbleC) return bubbleC;
+    const B = new Buf(8, 8); B.ellipse(4, 4, 2.5, 2.5, 'skyLight'); B.outline('sky');
+    return (bubbleC = B.toCanvas());
+  }
+  function zed(ctx, x, y, k, color) {
+    ctx.fillStyle = PAL[color || 'cream'];
+    ['####', '..#.', '.#..', '#...', '####'].forEach((row, j) =>
+      row.split('').forEach((ch, i) => { if (ch === '#') ctx.fillRect(x + i * k, y + j * k, k, k); }));
   }
 
   // ---- Предметы комнаты ----
@@ -141,5 +164,5 @@
     B.outline('ink'); return (bowlC = B.toCanvas());
   }
 
-  window.Sprites = { PAL, Buf, fillEllipse, shadow, cat, plant, bowl };
+  window.Sprites = { PAL, Buf, fillEllipse, shadow, cat, plant, bowl, heart, bubble, zed };
 })();
