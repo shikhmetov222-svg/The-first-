@@ -1,0 +1,113 @@
+"""Страница animations-preview.html: каждая анимация кота крутится по очереди (тем же движком, что и игра)."""
+ROOT = '/home/user/The-first-/pixel-pet/'
+html = r'''<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Анимации кота</title>
+<style>
+:root{--bg:#1d1a26;--card:#2a2536;--text:#f4ecd8;--hint:#a79fb8;--gold:#e8b93c;--ok:#5fd39a;--warn:#f2a65a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:14px}
+h1{font-size:20px;margin:0 0 6px}h2{font-size:16px;margin:22px 0 8px}p,li{color:var(--hint);font-size:14px;max-width:860px}p{margin:4px 0}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}select,button{min-height:44px;border:0;border-radius:10px;background:var(--card);color:var(--text);font:inherit;font-size:14px;padding:0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:12px}
+.card{background:var(--card);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}.card.wide{grid-column:span 2}
+.card h3{margin:0;font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}.card h3 small{color:var(--hint);font-weight:400;font-size:12px}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block;border-radius:8px;background:#000;max-width:100%}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{font-size:11px;padding:3px 7px;border-radius:999px;background:#1d1a26;border:1px solid #3a3450}
+.chip.ok{border-color:var(--ok);color:var(--ok)}.chip.no{border-color:var(--warn);color:var(--warn)}
+.code{font-size:12px;color:var(--hint)}
+table{border-collapse:collapse;font-size:13px;width:100%;max-width:1000px}th,td{border-bottom:1px solid #3a3450;padding:6px 8px;text-align:left;vertical-align:top}th{color:var(--hint);font-weight:600}
+code{background:#15121d;padding:1px 5px;border-radius:5px}.warn{color:var(--warn)}
+</style></head><body>
+<h1>Анимации кота</h1>
+<p>Кадры берутся из PNG-набора (<code>assets/sprites/cats/</code>), движение, значки и Zzz рисует код. Это тот же движок (<code>js/anim.js</code>), что работает в игре. Таймер только от <code>requestAnimationFrame</code>, масштаб целый, <code>image-rendering: pixelated</code>. В наборе по одному кадру на состояние, поэтому там, где нужны 2–4 кадра, сейчас стоит запасной кадр (оранжевая метка). Список недостающих кадров внизу.</p>
+<div class="bar"><label>Окрас: <select id="coat"></select></label><span id="loading">Загрузка…</span></div>
+<div class="grid" id="grid"></div>
+<h2>Каких кадров не хватает</h2>
+<p>Все кадры: PNG <b>64×56</b> пикселей, прозрачный фон, та же поза и точка опоры (лапы на нижней линии, кот по центру), как в <code>sit.png</code>. Файл кладётся в <code>assets/sprites/cats/&lt;окрас&gt;/&lt;имя&gt;.png</code>, затем <code>python3 tools/build_game_assets.py</code>, и анимация подхватит его сама.</p>
+<p id="sum"></p>
+<div style="overflow-x:auto"><table id="miss"><thead><tr><th>Файл</th><th>Размер</th><th>Анимация</th><th>Что нужно нарисовать</th><th>Сейчас вместо него</th><th>Окрасов без файла</th></tr></thead><tbody></tbody></table></div>
+<script src="assets/game/data.js"></script><script src="js/sprites.js"></script><script src="js/anim.js"></script>
+<script>
+var D = GameData, S = Sprites, A = Anim, K = 3;
+var DESC = {
+  idle_2: ['idle', 'сидит, чуть выдохнул (грудь/голова ниже на пиксель), хвост как в sit'], blink_1: ['blink', 'сидит, глаза прикрыты наполовину'],
+  blink_2: ['blink', 'сидит, глаза закрыты'], tail_1: ['tail', 'сидит, кончик хвоста в другом положении'], tail_2: ['tail', 'сидит, хвост в третьем положении'],
+  eat_1: ['eat', 'голову наклонил к миске'], eat_2: ['eat', 'ест, мордочка в миске'], eat_3: ['eat', 'жуёт, голова чуть выше'], eat_4: ['eat', 'поднял голову, облизывается'],
+  sleep_2: ['sleep', 'спит, вдох (тело чуть выше)'], play_1: ['play', 'прыжок: оттолкнулся, лапы вытянуты вверх'], play_2: ['play', 'прыжок: в верхней точке'],
+  play_3: ['play', 'прыжок: снижается, готовится к приземлению'], sad_2: ['sad', 'грустит, голова опущена ниже, глаза закрыты'], angry_2: ['angry', 'злится, кадр тряски (поза чуть сдвинута)']
+};
+function card(title, sub, w, h, opts) {
+  var d = document.createElement('div'); d.className = 'card' + (opts && opts.wide ? ' wide' : '');
+  var k = (opts && opts.k) || K;
+  d.innerHTML = '<h3><span></span><small></small></h3><canvas></canvas><div class="chips"></div><div class="code"></div>';
+  d.querySelector('span').textContent = title; d.querySelector('small').textContent = sub;
+  var cv = d.querySelector('canvas'); cv.width = w; cv.height = h; cv.style.width = w * k + 'px'; cv.style.height = h * k + 'px';
+  document.getElementById('grid').appendChild(d);
+  return { el: d, ctx: cv.getContext('2d'), w: w, h: h, chips: d.querySelector('.chips'), code: d.querySelector('.code') };
+}
+var cards = [], coat = 'orange';
+function chipsFor(c, anim) {
+  c.chips.textContent = '';
+  A.ANIMS[anim].frames.forEach(function (f) {
+    var real = S.has(coat, f[0]), s = document.createElement('span'); s.className = 'chip ' + (real ? 'ok' : 'no');
+    s.textContent = real ? f[0] + '.png ✓' : f[0] + '.png нет → ' + (f[1] ? 'запасной ' + f[1] : 'не показывается'); c.chips.appendChild(s);
+  });
+}
+function build() {
+  document.getElementById('grid').textContent = ''; cards = [];
+  function bg(c, t) { c.ctx.drawImage(S.room(), 128, 104, c.w, c.h, 0, 0, c.w, c.h); }
+  function simple(name, sub, anim, code, tick) {
+    var c = card(name, sub, 128, 96); chipsFor(c, anim); c.code.textContent = code;
+    var a = new A.Actor(coat, 64, 88); a.set(anim, 0); c.a = a;
+    c.frame = function (t) { bg(c, t); if (tick) tick(a, t, c); a.draw(c.ctx, t); }; cards.push(c);
+  }
+  simple('idle · покой', '2 кадра · смена 500 мс', 'idle', 'Кодом: покачивание вверх-вниз на 1 пиксель в такт смене кадра.');
+  simple('blink · моргание', '2 кадра · по 120 мс, раз в 3–5 с', 'idle', 'Моргание включается само раз в 3–5 с (здесь для наглядности чаще). Кадры blink_1 и blink_2 лежат поверх позы покоя.', function (a, t) { if (!a._b || t - a._b > 1600) { a._b = t; a.blinkNow(t); } });
+  chipsFor(cards[1], 'blink');
+  simple('tail · хвост', '3 кадра · смена 250 мс', 'tail', 'Кадры sit → tail_1 → tail_2 по кругу. Пока нет tail_1/tail_2, хвост не движется.');
+  simple('eat · еда', '4 кадра · цикл 1,2 с', 'eat', 'Один цикл около 1,2 с, затем кодом поднимаются сердечки.', function (a, t) { if (!a._e || t - a._e > 2800) { a._e = t; a.restart(t); } });
+  simple('sleep · сон', '2 кадра · смена 700 мс', 'sleep', 'Кодом: «Zzz» отделяются от кота, поднимаются над головой и тают; дыхание на 1 пиксель.');
+  simple('play · игра', '3 кадра · прыжок', 'play', 'Кодом: высота прыжка (парабола, 1 с, до 16 px), кадры меняются по высоте; тень сжимается; сердечки.');
+  simple('sad · грусть', '2 кадра · смена 600 мс', 'sad', 'Кодом: слёзы капают из глаз, падают и тают.');
+  simple('angry · злость', '2 кадра тряски · по 80 мс', 'angry', 'Кодом: знак злости появляется и пропадает, кот трясётся (если нет второго кадра, тряска сдвигом на 1 пиксель).');
+  simple('hungry · голод', '1 кадр + значки', 'hungry', 'Кодом: значки «!» поднимаются над головой и тают. Если куплена миска, голодный кот сам идёт к ней (см. ниже).');
+  // ходьба к миске и отражение
+  var w = card('walk · идёт к миске, отражение по горизонтали', 'кодом', 256, 96, { wide: true, k: 2 });
+  w.code.textContent = 'Голодный кот медленно (16 px/с) идёт к миске, потом возвращается. Влево кот смотрит как в наборе, вправо картинка отражается.';
+  var wa = new A.Actor(coat, 150, 92); wa.set('idle', 0); w.a = wa; S.loadItem('bowl');
+  w.frame = function (t) {
+    var ctx = w.ctx; ctx.drawImage(S.room(), 64, 100, 256, 96, 0, 0, 256, 96);
+    var b = D.items.bowl, bi = S.item('bowl'); if (bi) ctx.drawImage(bi, b.x - 64, b.y - 100);
+    var phase = Math.floor(t / 7000) % 2; wa.target = phase ? 215 : b.x + b.w + 24 - 64;
+    wa.set(Math.abs(wa.x - wa.target) < 1 && !phase ? 'hungry' : 'idle', t); wa.draw(ctx, t);
+    w.chips.textContent = ''; var c1 = document.createElement('span'); c1.className = 'chip ok'; c1.textContent = wa.facing > 0 ? 'смотрит влево (как в наборе)' : 'отражён: смотрит вправо'; w.chips.appendChild(c1);
+  };
+  cards.push(w);
+  var h = card('happy · сердечки', 'значки кодом', 128, 96); h.code.textContent = 'Кодом: сердечки поднимаются и тают (после еды и во время игры).';
+  var ha = new A.Actor(coat, 64, 88); ha.set('happy', 0); h.a = ha; chipsFor(h, 'happy');
+  h.frame = function (t) { h.ctx.drawImage(S.room(), 128, 104, h.w, h.h, 0, 0, h.w, h.h); if (!ha._h || t - ha._h > 1600) { ha._h = t; ha.hearts(t); } ha.draw(h.ctx, t); }; cards.push(h);
+}
+function loop(t) { cards.forEach(function (c) { c.frame(t); }); requestAnimationFrame(loop); }
+function report() {
+  var coats = Object.keys(D.coats), r = A.framesReport(coats), tb = document.querySelector('#miss tbody'), n = 0; tb.textContent = '';
+  D.extra_names.forEach(function (id) {
+    var x = r[id]; if (!x) return; n += x.missing.length;
+    var tr = document.createElement('tr'), d = DESC[id] || [x.anim, ''];
+    tr.innerHTML = '<td><code></code></td><td>64×56</td><td></td><td></td><td></td><td></td>';
+    var td = tr.children; td[0].firstChild.textContent = id + '.png'; td[2].textContent = x.anim; td[3].textContent = d[1];
+    td[4].textContent = x.fallback ? 'кадр ' + x.fallback + '.png' : 'ничего (не показывается)';
+    td[5].textContent = x.missing.length === coats.length ? 'все ' + coats.length : x.missing.length + ' из ' + coats.length; tb.appendChild(tr);
+  });
+  document.getElementById('sum').innerHTML = 'Не хватает <b class="warn">' + D.extra_names.length + ' кадров на каждый окрас</b>, всего <b class="warn">' + n + ' файлов</b> (' + D.extra_names.length + ' × ' + coats.length + ' окрасов). Для одного рыжего кота достаточно ' + D.extra_names.length + ' файлов.';
+}
+var sel = document.getElementById('coat');
+Object.keys(D.coats).forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = D.coats[c]; sel.appendChild(o); });
+function start() {
+  document.getElementById('loading').textContent = 'Загрузка…';
+  Promise.all([S.loadRoom(), S.loadItem('bowl'), S.loadCoat(coat)]).then(function () { document.getElementById('loading').textContent = ''; build(); });
+}
+sel.onchange = function () { coat = sel.value; start(); };
+report(); start(); requestAnimationFrame(loop);
+</script></body></html>
+'''
+open(ROOT + 'animations-preview.html', 'w').write(html); print('ok')

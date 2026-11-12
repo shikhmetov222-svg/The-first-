@@ -15,7 +15,8 @@
 
   const Pet = {
     data: null, events: [],
-    fx: { pose: null, until: 0, fade: 0 },        // временная поза после действия, затемнение сна
+    fx: { anim: null, until: 0, fade: 0 },        // временная анимация после действия, затемнение сна
+    actor: null, lastT: 0,
 
     // ---------- данные ----------
     load(raw, now) {
@@ -75,17 +76,9 @@
                cry: n + ' плачет — поиграй с ним 😿', angry: n + ' злится от усталости — уложи спать 😾',
                ok: n + ': всё хорошо' }[this.state()];
     },
-    // кадр кота: sit | happy | sad | sleep | hungry | sick | angry | play | groom
-    pose(now) {
-      const st = this.state();
-      if (st === 'sleep') return 'sleep';
-      if (this.fx.pose && now < this.fx.until) return this.fx.pose;
-      return { sick: 'sick', hungry: 'hungry', cry: 'sad', angry: 'angry', ok: 'sit' }[st];
-    },
-
     // ---------- действия ----------
     act(name, now) {
-      const d = this.data, s = d.stats, T = performance.now();
+      const d = this.data, s = d.stats, T = this.lastT || performance.now();
       const fail = msg => ({ ok: false, msg });
       if (name === 'sleep') {
         if (d.sleeping) { this.wake('Проснулся'); return { ok: true, msg: this.events.pop().msg }; }
@@ -98,34 +91,51 @@
       if (name === 'feed') {
         if (s.food >= 95) return fail(d.name + ' сыт');
         coins = 2; s.food = clamp(s.food + 30); s.clean = clamp(s.clean - 3); msg = 'Ням-ням! 🍖';
-        this.fx.pose = 'happy'; this.fx.until = T + 3000;
+        this.fx.anim = 'eat'; this.fx.until = T + 1200;
       } else if (name === 'play') {
         if (s.energy < 10) return fail('Он слишком устал. Пусть поспит');
         coins = 3; s.mood = clamp(s.mood + 25); s.energy = clamp(s.energy - 12);
         s.food = clamp(s.food - 6); s.clean = clamp(s.clean - 4); msg = 'Весёлая игра! 🧶';
-        this.fx.pose = 'play'; this.fx.until = T + 3500;
+        this.fx.anim = 'play'; this.fx.until = T + 3600;
       } else if (name === 'wash') {
         if (s.clean >= 95) return fail(d.name + ' уже чистый');
         coins = 2; s.clean = clamp(s.clean + 40); s.mood = clamp(s.mood - 2); msg = 'Чистый и пушистый! 🫧';
-        this.fx.pose = 'groom'; this.fx.until = T + 3000;
+        this.fx.anim = 'groom'; this.fx.until = T + 3000;
       } else return fail('Неизвестное действие');
       d.coins += coins;
       return { ok: true, msg: msg + ' · +' + coins + ' 🪙' };
     },
 
     // ---------- рисование ----------
+    // какая анимация нужна сейчас (по состоянию питомца); при смене состояния переходим сразу
+    wanted(t) {
+      const st = this.state(), coat = this.data.coat;
+      if (st === 'sleep') return 'sleep';
+      if (this.fx.anim && t < this.fx.until) return this.fx.anim;
+      if (st === 'sick') return 'sick';
+      if (st === 'hungry') return 'hungry';
+      if (st === 'cry') return 'sad';
+      if (st === 'angry') return 'angry';
+      return window.Sprites.has(coat, 'tail_1') ? 'tail' : 'idle';
+    },
     draw(ctx, t) {
-      const S = window.Sprites, d = this.data, T = performance.now();
-      const pose = this.pose(T), sleeping = pose === 'sleep';
-      const f = this.fx, target = sleeping ? 1 : 0;
+      const d = this.data, G = window.GameData; this.lastT = t;
+      if (!this.actor) this.actor = new window.Anim.Actor(d.coat, CX, FEET);
+      const a = this.actor; a.coat = d.coat;
+      const want = this.wanted(t);
+      a.set(want, t);
+      // перемещение: голодный кот медленно идёт к миске (если она куплена), потом возвращается на место
+      const bowl = d.placed.indexOf('bowl') >= 0 ? G.items.bowl : null;
+      if (want === 'hungry' && bowl) a.target = Math.min(300, bowl.x + bowl.w + 24);
+      else if (want === 'tail' || want === 'idle') a.target = CX;
+      else a.target = null;
+      const f = this.fx, target = want === 'sleep' ? 1 : 0;
       f.fade += (target - f.fade) * 0.06;
       if (f.fade > 0.01) {                                  // ночь: затемняем комнату
         ctx.fillStyle = 'rgba(14,10,46,' + (0.32 * f.fade).toFixed(3) + ')';
-        ctx.fillRect(0, 0, window.GameData.w, window.GameData.h);
+        ctx.fillRect(0, 0, G.w, G.h);
       }
-      const bob = Math.floor(t / 1200) % 2;                 // дыхание: покачивание на 1 пиксель
-      S.shadow(ctx, CX, FEET + 2, sleeping ? 24 : 20, 4);
-      S.drawCat(ctx, d.coat, pose, CX - window.GameData.frame_w / 2, FEET + 2 - window.GameData.frame_h + bob);
+      a.draw(ctx, t);
     }
   };
   window.Pet = Pet;
