@@ -126,3 +126,23 @@ button.link { background: transparent; color: var(--hint); min-height: 44px; fon
 /* Сообщение об ошибке: пустое не занимает места */
 .error { color: var(--bad); font-size: 14px; margin: 12px 0 0; }
 .error:empty { display: none; }
+
+/* ---------- Игра: карточки, голосование, журнал (game.js) ---------- */
+
+.card, .action {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 12px;
+}
+.card-title { font-weight: 700; margin-bottom: 2px; }
+.card-bad { border: 1px solid var(--bad); }
+.action.mine { border: 1px solid var(--button); }
+.card .buttons, .action .buttons { margin-top: 8px; }
+.event-name { font-size: 18px; font-weight: 700; margin: 4px 0; }
+.event-next { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--bg); font-size: 14px; }
+.timer { font-size: 18px; font-variant-numeric: tabular-nums; }
+.warn { color: var(--warn, #f2a65a); font-size: 14px; margin: 6px 0 0; }
+.players-game li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.log li strong { font-weight: 700; }
+.log li em { font-style: normal; color: var(--good); }

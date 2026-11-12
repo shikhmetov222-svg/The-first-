@@ -1,6 +1,7 @@
-// lobby.js — командная игра, шаг 1: меню, создание комнаты, вход по коду и лобби.
-// Подключается ПОСЛЕ app.js: берёт оттуда tg, getPlayerName(), escapeHtml() и startSolo().
-// Раунды, голосование и чат здесь пока не нужны — они появятся на следующих шагах.
+// lobby.js — командная игра: меню, создание комнаты, вход по коду, лобби, а когда игра началась —
+// чтение данных игры и нажатия кнопок (голосовать, использовать способность).
+// Подключается ПОСЛЕ app.js и game.js: берёт оттуда tg, getPlayerName(), escapeHtml(), startSolo() и ColonyGame.
+// Сам экран игры рисует game.js. Чат и выход из игры появятся на следующих шагах.
 //
 // Как это устроено, простыми словами:
 //   • Вся настоящая работа (создать комнату, войти, начать игру) — в базе, в функциях из supabase/schema.sql.
@@ -32,6 +33,8 @@
   let linkState = '';       // 'connecting' | 'ok' | 'error' — есть ли связь с Realtime
   let reloading = false;    // идёт ли чтение лобби прямо сейчас
   let reloadAgain = false;  // пришёл ещё один «звонок», пока читали: прочитать ещё раз
+  let timerHandle = null;   // секундный таймер обратного отсчёта
+  let lastNudge = 0;        // когда в последний раз просили базу закрыть раунд
 
   // ---------- Мелочи: Telegram, имя, ошибки ----------
 
@@ -221,6 +224,7 @@
     linkState = 'connecting';
     drawLobby();
     startRealtime(roomId);
+    timerHandle = setInterval(onSecond, 1000);
     await loadLobby();
   }
 
@@ -233,6 +237,16 @@
         loadLobby)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId },
+        loadLobby)
+      // Когда игра идёт, слушаем ещё голоса, способности и журнал раундов.
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'votes', filter: 'room_id=eq.' + roomId },
+        loadLobby)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ability_uses', filter: 'room_id=eq.' + roomId },
+        loadLobby)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'round_log', filter: 'room_id=eq.' + roomId },
         loadLobby)
       .subscribe((status) => {
         if (roomId !== lobbyRoomId) return;
@@ -247,6 +261,8 @@
   }
 
   function stopLobby() {
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = null;
     if (lobbyChannel && sbClient) sbClient.removeChannel(lobbyChannel);
     lobbyChannel = null;
     lobbyRoomId = null;
@@ -261,8 +277,8 @@
     const roomId = lobbyRoomId;
     try {
       const [rooms, players] = await Promise.all([
-        sbClient.from('rooms').select('id, code, host_id, status').eq('id', roomId).maybeSingle(),
-        sbClient.from('players').select('user_id, name, joined_at').eq('room_id', roomId).order('joined_at'),
+        sbClient.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+        sbClient.from('players').select('*').eq('room_id', roomId).order('joined_at'),
       ]);
       if (roomId !== lobbyRoomId) return; // пока читали, игрок ушёл с экрана
       if (rooms.error) throw rooms.error;
@@ -272,7 +288,9 @@
         showMenu('Эта колония недоступна: её удалили (комнаты живут сутки) или ты зашёл в неё с другого устройства.');
         return;
       }
-      lobbyData = { room: rooms.data, players: players.data };
+      const game = await loadGameData(roomId, rooms.data);
+      if (roomId !== lobbyRoomId) return;
+      lobbyData = { room: rooms.data, players: players.data, votes: game.votes, uses: game.uses, log: game.log };
       setError('');
       drawLobby();
     } catch (e) {
@@ -281,6 +299,19 @@
       reloading = false;
       if (reloadAgain) { reloadAgain = false; loadLobby(); }
     }
+  }
+
+  // Когда игра идёт (или закончилась): голоса и способности текущего раунда и весь журнал.
+  async function loadGameData(roomId, room) {
+    const empty = { votes: [], uses: [], log: [] };
+    if (room.status === 'lobby' || typeof room.round !== 'number') return empty;
+    const [votes, uses, log] = await Promise.all([
+      sbClient.from('votes').select('*').eq('room_id', roomId).eq('round', room.round),
+      sbClient.from('ability_uses').select('*').eq('room_id', roomId).eq('round', room.round).order('id'),
+      sbClient.from('round_log').select('*').eq('room_id', roomId).order('round', { ascending: false }),
+    ]);
+    for (const r of [votes, uses, log]) if (r.error) throw r.error;
+    return { votes: votes.data, uses: uses.data, log: log.data };
   }
 
   function linkHtml() {
@@ -326,6 +357,11 @@
       return;
     }
     const { room, players } = lobbyData;
+    if (room.status !== 'lobby' && window.ColonyGame) {
+      appEl.innerHTML = window.ColonyGame.html({ ...lobbyData, myId: myUserId }) + errorHtml() + linkHtml() +
+        '<div class="buttons"><button data-action="menu" class="link">← В меню</button></div>';
+      return;
+    }
     const code = room.code.slice(0, 3) + ' ' + room.code.slice(3);
     appEl.innerHTML = `
       <h1>Колония на Марсе</h1>
@@ -355,7 +391,44 @@
     }
   }
 
+  // Голос за основное действие. Всё проверяет база (время, участие, действие).
+  async function castVote(choice) {
+    const { error } = await sbClient.rpc('cast_vote', { p_room_id: lobbyRoomId, p_action: choice });
+    if (error) throw error;
+    await loadLobby();
+  }
+
+  // Способность роли: применяется сразу. Роль и лимиты проверяет база.
+  async function useAbility(ability) {
+    const { error } = await sbClient.rpc('use_ability', { p_room_id: lobbyRoomId, p_ability: ability });
+    if (error) throw error;
+    await loadLobby();
+  }
+
+  // Каждую секунду: обновляем отсчёт. Когда время вышло — просим базу закрыть раунд.
+  // Раньше времени база закрыть не даст. А если у всех выключены телефоны, раунд закроет pg_cron.
+  function onSecond() {
+    if (!lobbyData || lobbyData.room.status !== 'playing' || !window.ColonyGame) return;
+    const left = window.ColonyGame.msLeft(lobbyData.room);
+    const el = document.getElementById('timer');
+    if (el) el.textContent = window.ColonyGame.timerText(left);
+    if (left <= 0 && Date.now() - lastNudge > 3000) {
+      lastNudge = Date.now();
+      closeVote();
+    }
+  }
+
+  async function closeVote() {
+    const roomId = lobbyRoomId;
+    try {
+      const { error } = await sbClient.rpc('close_vote', { p_room_id: roomId });
+      if (!error && roomId === lobbyRoomId) await loadLobby();
+    } catch (e) { /* не страшно: попробуем снова через 3 секунды */ }
+  }
+
   const actions = {
+    vote: (button) => guarded(() => castVote(button.dataset.choice)),
+    ability: (button) => guarded(() => useAbility(button.dataset.ability)),
     menu: () => showMenu(),
     solo: () => { stopLobby(); startSolo(); },
     create: () => guarded(createGame),
@@ -370,7 +443,7 @@
     const button = e.target.closest('button[data-action]');
     if (!button || button.disabled) return;
     const action = actions[button.dataset.action];
-    if (action) action();
+    if (action) action(button);
   });
 
   // В поле кода пропускаем только цифры; Enter = «Войти».

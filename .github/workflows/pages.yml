@@ -51,7 +51,7 @@ jobs:
       - name: Copy Colony Mars
         run: |
           mkdir -p app/dist/colony-mars
-          cp colony-mars/index.html colony-mars/style.css colony-mars/app.js colony-mars/lobby.js colony-mars/config.js app/dist/colony-mars/
+          cp colony-mars/index.html colony-mars/style.css colony-mars/app.js colony-mars/game.js colony-mars/lobby.js colony-mars/config.js app/dist/colony-mars/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
