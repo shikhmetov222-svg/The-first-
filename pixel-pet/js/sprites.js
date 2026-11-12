@@ -59,49 +59,65 @@
     fillEllipse(ctx, cx, cy, rx * 0.65, ry * 0.6, 'wood', false);
   }
 
-  // ---- Кот (сидит, анфас, пропорции «чиби»: большая голова, маленькое тело) ----
+  // ---- Кот (сидит прямо, как на референсе: вытянутое тело, острые уши, усы, хвост столбиком) ----
   const catCache = {};
   function cat(o) {
     const key = (o.breath ? 1 : 0) + '|' + (o.blink ? 1 : 0) + '|' + o.tail;
     if (catCache[key]) return catCache[key];
-    const B = new Buf(44, 44), hb = o.breath ? 1 : 0;
-    // тонкий хвост (2×2), загибается вверх, кончик светлый и качается
-    const pts = [[26, 37], [28, 37], [30, 36], [31, 34], [32, 32], [32, 30], [31, 28], [30, 27]];
+    const B = new Buf(44, 46), hb = o.breath ? 1 : 0;
+    const mir = x => 39 - x; // зеркало относительно оси головы
+
+    // хвост (3×3 звенья), поднимается вверх; верхняя часть качается
+    const pts = [[31, 38], [33, 37], [34, 35], [34, 33], [34, 31], [34, 29], [34, 27], [34, 25], [34, 23]];
     pts.forEach((p, i) => {
-      const dx = Math.round(o.tail * (i >= 3 ? (i - 2) / 5 : 0));
-      B.rect(p[0] + dx, p[1], 2, 2, i >= 6 ? 'orangeLight' : 'orange');
+      const dx = Math.round(o.tail * (i >= 3 ? (i - 2) / 6 : 0));
+      B.rect(p[0] + dx, p[1], 3, 3, i >= 7 || i === 4 || i === 5 ? 'orangeDark' : 'orange');
     });
-    // маленькое тело
-    B.ellipse(20, 32, 6.5, 7, 'orange');
-    B.ellipse(14, 36, 3, 3.5, 'orange'); B.ellipse(26, 36, 3, 3.5, 'orange');
-    B.ellipse(20, 34, 3.5, 4, 'orangeLight');
-    B.rect(16, 34, 3, 6, 'orange'); B.rect(21, 34, 3, 6, 'orange');
-    B.rect(16, 38, 3, 2, 'orangeLight'); B.rect(21, 38, 3, 2, 'orangeLight');
-    B.rect(14, 30, 2, 1, 'orangeDark'); B.rect(24, 30, 2, 1, 'orangeDark');
-    // острые ушки
-    [[10, 11], [10, 12], [10, 13], [10, 14], [10, 15], [10, 16], [10, 17]].forEach((r, i) => {
-      const y = 3 + i + hb;
-      B.rect(r[0], y, r[1] - r[0] + 1, 1, 'orange');
-      B.rect(39 - r[1], y, r[1] - r[0] + 1, 1, 'orange');
+
+    // тело: торс, бёдра, грудка
+    B.ellipse(20, 31, 8, 9, 'orange');
+    B.rect(13, 19, 14, 8, 'orange');
+    B.ellipse(27, 35, 5, 6, 'orange'); B.ellipse(13, 37, 3, 4, 'orange');
+    B.ellipse(20, 26, 3.5, 5.5, 'orangeLight');
+    // передние лапы + тень между ними
+    B.rect(16, 30, 3, 11, 'orange'); B.rect(21, 30, 3, 11, 'orange');
+    B.rect(19, 33, 2, 8, 'orangeDark');
+    B.rect(16, 40, 3, 2, 'orangeLight'); B.rect(21, 40, 3, 2, 'orangeLight');
+    // полоски
+    [[13, 26], [14, 28], [13, 30], [28, 30], [29, 32], [28, 34], [30, 36], [29, 38]].forEach(p => B.rect(p[0], p[1], 2, 1, 'orangeDark'));
+    B.set(16, 34, 'orangeDark'); B.set(17, 36, 'orangeDark'); B.set(22, 35, 'orangeDark'); B.set(23, 37, 'orangeDark');
+
+    // уши
+    [[11, 12], [11, 13], [11, 14], [11, 15], [11, 16], [11, 16]].forEach((r, i) => {
+      const y = 3 + i + hb, w = r[1] - r[0] + 1;
+      B.rect(r[0], y, w, 1, 'orange'); B.rect(mir(r[1]), y, w, 1, 'orange');
     });
-    [[5, 11, 11], [6, 11, 12], [7, 11, 13], [8, 11, 13]].forEach(e => {
-      B.rect(e[1], e[0] + hb, e[2] - e[1] + 1, 1, 'pink');
-      B.rect(39 - e[2], e[0] + hb, e[2] - e[1] + 1, 1, 'pink');
+    [[5, 12, 12], [6, 12, 13], [7, 12, 14]].forEach(e => {
+      const w = e[2] - e[1] + 1;
+      B.rect(e[1], e[0] + hb, w, 1, 'pink'); B.rect(mir(e[2]), e[0] + hb, w, 1, 'pink');
     });
-    // широкая голова
-    B.ellipse(20, 17 + hb, 11, 7.5, 'orange');
-    B.rect(19, 10 + hb, 2, 2, 'orangeDark'); B.rect(16, 11 + hb, 2, 1, 'orangeDark'); B.rect(22, 11 + hb, 2, 1, 'orangeDark');
-    B.ellipse(20, 21.5 + hb, 3.5, 2.5, 'orangeLight');
-    // большие глаза с бликами
-    [13, 25].forEach(x => {
-      if (o.blink) B.rect(x, 18 + hb, 3, 1, 'ink');
-      else { B.rect(x, 16 + hb, 3, 4, 'ink'); B.set(x, 16 + hb, 'cream'); B.set(x + 2, 19 + hb, 'cream'); }
+    // голова (чуть квадратная)
+    B.rect(13, 8 + hb, 14, 1, 'orange');
+    B.rect(11, 9 + hb, 18, 9, 'orange');
+    B.rect(12, 18 + hb, 16, 1, 'orange'); B.rect(14, 19 + hb, 12, 1, 'orange');
+    // лоб и щёки в полоску
+    B.rect(19, 9 + hb, 2, 3, 'orangeDark'); B.rect(16, 10 + hb, 1, 2, 'orangeDark'); B.rect(23, 10 + hb, 1, 2, 'orangeDark');
+    [[11, 14], [11, 16], [27, 14], [27, 16]].forEach(p => B.rect(p[0], p[1] + hb, 2, 1, 'orangeDark'));
+    // светлая мордочка
+    [[15, 17, 22], [16, 16, 23], [17, 16, 23], [18, 17, 22]].forEach(m => B.rect(m[1], m[0] + hb, m[2] - m[1] + 1, 1, 'orangeLight'));
+    // глаза: 2×3 с бликом
+    [14, 24].forEach(x => {
+      if (o.blink) B.rect(x, 14 + hb, 2, 1, 'ink');
+      else { B.rect(x, 12 + hb, 2, 3, 'ink'); B.set(x + 1, 12 + hb, 'cream'); }
     });
-    B.rect(11, 20 + hb, 2, 1, 'pink'); B.rect(27, 20 + hb, 2, 1, 'pink'); // румянец
-    B.rect(19, 20 + hb, 2, 1, 'pink');                                      // носик
-    B.set(18, 21 + hb, 'ink'); B.set(21, 21 + hb, 'ink');                   // ротик «w»
-    B.set(19, 22 + hb, 'ink'); B.set(20, 22 + hb, 'ink');
+    B.rect(19, 16 + hb, 2, 1, 'pink');                         // нос
+    B.set(19, 17 + hb, 'ink'); B.set(20, 17 + hb, 'ink');      // рот
+
     B.outline('ink');
+    // усы — поверх контура
+    [[9, 15], [8, 15], [7, 14], [9, 17], [8, 17], [7, 18]].forEach(p => {
+      B.set(p[0], p[1] + hb, 'ink'); B.set(mir(p[0]), p[1] + hb, 'ink');
+    });
     return (catCache[key] = B.toCanvas());
   }
 
