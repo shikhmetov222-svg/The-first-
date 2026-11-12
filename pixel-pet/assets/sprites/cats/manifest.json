@@ -1,126 +1,605 @@
 {
- "frame_w": 56,
- "frame_h": 66,
+ "frame_w": 64,
+ "frame_h": 56,
+ "k": 2.5,
  "poses": [
   "sit",
+  "happy",
+  "sad",
   "sleep",
   "hungry",
-  "sad",
-  "sad2",
-  "angry"
+  "sick",
+  "angry",
+  "play",
+  "groom"
  ],
  "colorways": {
   "orange": {
-   "sit": {
-    "file": "orange/sit.png",
-    "x": 0,
-    "w": 49,
-    "h": 53
-   },
-   "sleep": {
-    "file": "orange/sleep.png",
-    "x": 56,
-    "w": 48,
-    "h": 53
-   },
-   "hungry": {
-    "file": "orange/hungry.png",
-    "x": 112,
-    "w": 51,
-    "h": 50
-   },
-   "sad": null,
-   "sad2": null,
-   "angry": {
-    "file": "orange/angry.png",
-    "x": 280,
-    "w": 39,
-    "h": 51
-   }
+   "sit": "orange/sit.png",
+   "happy": "orange/happy.png",
+   "sad": "orange/sad.png",
+   "sleep": "orange/sleep.png",
+   "hungry": "orange/hungry.png",
+   "sick": "orange/sick.png",
+   "angry": "orange/angry.png",
+   "play": "orange/play.png",
+   "groom": "orange/groom.png"
   },
   "calico": {
-   "sit": {
-    "file": "calico/sit.png",
-    "x": 0,
-    "w": 50,
-    "h": 56
-   },
-   "sleep": {
-    "file": "calico/sleep.png",
-    "x": 56,
-    "w": 50,
-    "h": 48
-   },
-   "hungry": {
-    "file": "calico/hungry.png",
-    "x": 112,
-    "w": 50,
-    "h": 50
-   },
-   "sad": null,
-   "sad2": null,
-   "angry": {
-    "file": "calico/angry.png",
-    "x": 280,
-    "w": 41,
-    "h": 52
-   }
+   "sit": "calico/sit.png",
+   "happy": "calico/happy.png",
+   "sad": "calico/sad.png",
+   "sleep": "calico/sleep.png",
+   "hungry": "calico/hungry.png",
+   "sick": "calico/sick.png",
+   "angry": "calico/angry.png",
+   "play": "calico/play.png",
+   "groom": "calico/groom.png"
   },
   "gray": {
-   "sit": {
-    "file": "gray/sit.png",
-    "x": 0,
-    "w": 48,
-    "h": 49
-   },
-   "sleep": {
-    "file": "gray/sleep.png",
-    "x": 56,
-    "w": 38,
-    "h": 51
-   },
-   "hungry": null,
-   "sad": {
-    "file": "gray/sad.png",
-    "x": 168,
-    "w": 41,
-    "h": 50
-   },
-   "sad2": {
-    "file": "gray/sad2.png",
-    "x": 224,
-    "w": 48,
-    "h": 62
-   },
-   "angry": null
+   "sit": "gray/sit.png",
+   "happy": "gray/happy.png",
+   "sad": "gray/sad.png",
+   "sleep": "gray/sleep.png",
+   "hungry": "gray/hungry.png",
+   "sick": "gray/sick.png",
+   "angry": "gray/angry.png",
+   "play": "gray/play.png",
+   "groom": "gray/groom.png"
   },
   "tuxedo": {
-   "sit": {
-    "file": "tuxedo/sit.png",
-    "x": 0,
-    "w": 48,
-    "h": 53
-   },
-   "sleep": {
-    "file": "tuxedo/sleep.png",
-    "x": 56,
-    "w": 40,
-    "h": 35
-   },
-   "hungry": null,
-   "sad": {
-    "file": "tuxedo/sad.png",
-    "x": 168,
-    "w": 40,
-    "h": 49
-   },
-   "sad2": {
-    "file": "tuxedo/sad2.png",
-    "x": 224,
-    "w": 48,
-    "h": 60
-   },
-   "angry": null
+   "sit": "tuxedo/sit.png",
+   "happy": "tuxedo/happy.png",
+   "sad": "tuxedo/sad.png",
+   "sleep": "tuxedo/sleep.png",
+   "hungry": "tuxedo/hungry.png",
+   "sick": "tuxedo/sick.png",
+   "angry": "tuxedo/angry.png",
+   "play": "tuxedo/play.png",
+   "groom": "tuxedo/groom.png"
+  },
+  "siamese": {
+   "sit": "siamese/sit.png",
+   "happy": "siamese/happy.png",
+   "sad": "siamese/sad.png",
+   "sleep": "siamese/sleep.png",
+   "hungry": "siamese/hungry.png",
+   "sick": "siamese/sick.png",
+   "angry": "siamese/angry.png",
+   "play": "siamese/play.png",
+   "groom": "siamese/groom.png"
+  },
+  "white": {
+   "sit": "white/sit.png",
+   "happy": "white/happy.png",
+   "sad": "white/sad.png",
+   "sleep": "white/sleep.png",
+   "hungry": "white/hungry.png",
+   "sick": "white/sick.png",
+   "angry": "white/angry.png",
+   "play": "white/play.png",
+   "groom": "white/groom.png"
+  },
+  "black": {
+   "sit": "black/sit.png",
+   "happy": "black/happy.png",
+   "sad": "black/sad.png",
+   "sleep": "black/sleep.png",
+   "hungry": "black/hungry.png",
+   "sick": "black/sick.png",
+   "angry": "black/angry.png",
+   "play": "black/play.png",
+   "groom": "black/groom.png"
+  },
+  "beige": {
+   "sit": "beige/sit.png",
+   "happy": "beige/happy.png",
+   "sad": "beige/sad.png",
+   "sleep": "beige/sleep.png",
+   "hungry": "beige/hungry.png",
+   "sick": "beige/sick.png",
+   "angry": "beige/angry.png",
+   "play": "beige/play.png",
+   "groom": "beige/groom.png"
+  },
+  "cream": {
+   "sit": "cream/sit.png",
+   "happy": "cream/happy.png",
+   "sad": "cream/sad.png",
+   "sleep": "cream/sleep.png",
+   "hungry": "cream/hungry.png",
+   "sick": "cream/sick.png",
+   "angry": "cream/angry.png",
+   "play": "cream/play.png",
+   "groom": "cream/groom.png"
   }
+ },
+ "cells": {
+  "orange/sit": [
+   136,
+   42,
+   296,
+   182
+  ],
+  "orange/happy": [
+   282,
+   42,
+   442,
+   182
+  ],
+  "orange/sad": [
+   432,
+   42,
+   592,
+   182
+  ],
+  "orange/sleep": [
+   584,
+   42,
+   744,
+   182
+  ],
+  "orange/hungry": [
+   738,
+   42,
+   898,
+   182
+  ],
+  "orange/sick": [
+   891,
+   42,
+   1051,
+   182
+  ],
+  "orange/angry": [
+   1044,
+   42,
+   1204,
+   182
+  ],
+  "orange/play": [
+   1204,
+   42,
+   1364,
+   182
+  ],
+  "orange/groom": [
+   1366,
+   42,
+   1526,
+   182
+  ],
+  "calico/sit": [
+   136,
+   164,
+   296,
+   304
+  ],
+  "calico/happy": [
+   282,
+   164,
+   442,
+   304
+  ],
+  "calico/sad": [
+   432,
+   164,
+   592,
+   304
+  ],
+  "calico/sleep": [
+   584,
+   164,
+   744,
+   304
+  ],
+  "calico/hungry": [
+   738,
+   164,
+   898,
+   304
+  ],
+  "calico/sick": [
+   891,
+   164,
+   1051,
+   304
+  ],
+  "calico/angry": [
+   1044,
+   164,
+   1204,
+   304
+  ],
+  "calico/play": [
+   1204,
+   164,
+   1364,
+   304
+  ],
+  "calico/groom": [
+   1366,
+   164,
+   1526,
+   304
+  ],
+  "gray/sit": [
+   136,
+   281,
+   296,
+   421
+  ],
+  "gray/happy": [
+   282,
+   281,
+   442,
+   421
+  ],
+  "gray/sad": [
+   432,
+   281,
+   592,
+   421
+  ],
+  "gray/sleep": [
+   584,
+   281,
+   744,
+   421
+  ],
+  "gray/hungry": [
+   738,
+   281,
+   898,
+   421
+  ],
+  "gray/sick": [
+   891,
+   281,
+   1051,
+   421
+  ],
+  "gray/angry": [
+   1044,
+   281,
+   1204,
+   421
+  ],
+  "gray/play": [
+   1204,
+   281,
+   1364,
+   421
+  ],
+  "gray/groom": [
+   1366,
+   281,
+   1526,
+   421
+  ],
+  "tuxedo/sit": [
+   136,
+   407,
+   296,
+   547
+  ],
+  "tuxedo/happy": [
+   282,
+   407,
+   442,
+   547
+  ],
+  "tuxedo/sad": [
+   432,
+   407,
+   592,
+   547
+  ],
+  "tuxedo/sleep": [
+   584,
+   407,
+   744,
+   547
+  ],
+  "tuxedo/hungry": [
+   738,
+   407,
+   898,
+   547
+  ],
+  "tuxedo/sick": [
+   891,
+   407,
+   1051,
+   547
+  ],
+  "tuxedo/angry": [
+   1044,
+   407,
+   1204,
+   547
+  ],
+  "tuxedo/play": [
+   1204,
+   407,
+   1364,
+   547
+  ],
+  "tuxedo/groom": [
+   1366,
+   407,
+   1526,
+   547
+  ],
+  "siamese/sit": [
+   136,
+   527,
+   296,
+   667
+  ],
+  "siamese/happy": [
+   282,
+   527,
+   442,
+   667
+  ],
+  "siamese/sad": [
+   432,
+   527,
+   592,
+   667
+  ],
+  "siamese/sleep": [
+   584,
+   527,
+   744,
+   667
+  ],
+  "siamese/hungry": [
+   738,
+   527,
+   898,
+   667
+  ],
+  "siamese/sick": [
+   891,
+   527,
+   1051,
+   667
+  ],
+  "siamese/angry": [
+   1044,
+   527,
+   1204,
+   667
+  ],
+  "siamese/play": [
+   1204,
+   527,
+   1364,
+   667
+  ],
+  "siamese/groom": [
+   1366,
+   527,
+   1526,
+   667
+  ],
+  "white/sit": [
+   136,
+   638,
+   296,
+   778
+  ],
+  "white/happy": [
+   282,
+   638,
+   442,
+   778
+  ],
+  "white/sad": [
+   432,
+   638,
+   592,
+   778
+  ],
+  "white/sleep": [
+   584,
+   638,
+   744,
+   778
+  ],
+  "white/hungry": [
+   738,
+   638,
+   898,
+   778
+  ],
+  "white/sick": [
+   891,
+   638,
+   1051,
+   778
+  ],
+  "white/angry": [
+   1044,
+   638,
+   1204,
+   778
+  ],
+  "white/play": [
+   1204,
+   638,
+   1364,
+   778
+  ],
+  "white/groom": [
+   1366,
+   638,
+   1526,
+   778
+  ],
+  "black/sit": [
+   136,
+   728,
+   296,
+   868
+  ],
+  "black/happy": [
+   282,
+   728,
+   442,
+   868
+  ],
+  "black/sad": [
+   432,
+   728,
+   592,
+   868
+  ],
+  "black/sleep": [
+   584,
+   728,
+   744,
+   868
+  ],
+  "black/hungry": [
+   738,
+   728,
+   898,
+   868
+  ],
+  "black/sick": [
+   891,
+   728,
+   1051,
+   868
+  ],
+  "black/angry": [
+   1044,
+   728,
+   1204,
+   868
+  ],
+  "black/play": [
+   1204,
+   728,
+   1364,
+   868
+  ],
+  "black/groom": [
+   1366,
+   728,
+   1526,
+   868
+  ],
+  "beige/sit": [
+   136,
+   809,
+   296,
+   949
+  ],
+  "beige/happy": [
+   282,
+   809,
+   442,
+   949
+  ],
+  "beige/sad": [
+   432,
+   809,
+   592,
+   949
+  ],
+  "beige/sleep": [
+   584,
+   809,
+   744,
+   949
+  ],
+  "beige/hungry": [
+   738,
+   809,
+   898,
+   949
+  ],
+  "beige/sick": [
+   891,
+   809,
+   1051,
+   949
+  ],
+  "beige/angry": [
+   1044,
+   809,
+   1204,
+   949
+  ],
+  "beige/play": [
+   1204,
+   809,
+   1364,
+   949
+  ],
+  "beige/groom": [
+   1366,
+   809,
+   1526,
+   949
+  ],
+  "cream/sit": [
+   136,
+   882,
+   296,
+   1022
+  ],
+  "cream/happy": [
+   282,
+   882,
+   442,
+   1022
+  ],
+  "cream/sad": [
+   432,
+   882,
+   592,
+   1022
+  ],
+  "cream/sleep": [
+   584,
+   882,
+   744,
+   1022
+  ],
+  "cream/hungry": [
+   738,
+   882,
+   898,
+   1022
+  ],
+  "cream/sick": [
+   891,
+   882,
+   1051,
+   1022
+  ],
+  "cream/angry": [
+   1044,
+   882,
+   1204,
+   1022
+  ],
+  "cream/play": [
+   1204,
+   882,
+   1364,
+   1022
+  ],
+  "cream/groom": [
+   1366,
+   882,
+   1526,
+   1022
+  ]
  }
 }
