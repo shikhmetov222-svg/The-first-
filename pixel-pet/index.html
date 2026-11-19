@@ -2,38 +2,55 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Пиксель-питомец</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@700;800;900&display=swap">
   <link rel="stylesheet" href="style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <main class="app">
-    <header class="top"><h1>Пиксель-питомец</h1><div class="coins" title="Монеты">🪙 <b id="coins">0</b></div></header>
-    <div class="stage"><canvas id="scene" width="384" height="216"></canvas></div>
-    <p class="status" id="status"></p>
+    <header class="top">
+      <h1>Пиксель-питомец</h1>
+      <div class="coins" id="coins-pill" title="Монеты"><span class="coin" aria-hidden="true"></span><b id="coins">0</b></div>
+    </header>
+    <div class="stage" id="stage"><canvas id="scene" width="384" height="216"></canvas><div class="fx" id="fx" aria-hidden="true"></div></div>
+    <p class="status" id="status" aria-live="polite"></p>
     <div class="stats">
-      <div class="stat"><span class="lab">🍖 Сытость</span><div class="bar"><i id="b-food"></i></div><span class="val" id="v-food"></span></div>
-      <div class="stat"><span class="lab">😊 Настроение</span><div class="bar"><i id="b-mood"></i></div><span class="val" id="v-mood"></span></div>
-      <div class="stat"><span class="lab">🫧 Чистота</span><div class="bar"><i id="b-clean"></i></div><span class="val" id="v-clean"></span></div>
-      <div class="stat"><span class="lab">⚡ Энергия</span><div class="bar"><i id="b-energy"></i></div><span class="val" id="v-energy"></span></div>
+      <div class="stat" id="s-food"><span class="ico" aria-hidden="true">🍖</span><span class="lab">Сытость</span><span class="val" id="v-food"></span><div class="bar" id="b-food"></div></div>
+      <div class="stat" id="s-mood"><span class="ico" aria-hidden="true">😊</span><span class="lab">Настроение</span><span class="val" id="v-mood"></span><div class="bar" id="b-mood"></div></div>
+      <div class="stat" id="s-clean"><span class="ico" aria-hidden="true">🫧</span><span class="lab">Чистота</span><span class="val" id="v-clean"></span><div class="bar" id="b-clean"></div></div>
+      <div class="stat" id="s-energy"><span class="ico" aria-hidden="true">⚡</span><span class="lab">Энергия</span><span class="val" id="v-energy"></span><div class="bar" id="b-energy"></div></div>
     </div>
     <div class="actions">
-      <button data-act="feed"><span>🍖</span><b>Кормить</b></button>
-      <button data-act="play"><span>🎾</span><b>Играть</b></button>
-      <button data-act="wash"><span>🫧</span><b>Мыть</b></button>
-      <button data-act="sleep" id="btn-sleep"><span>🌙</span><b>Спать</b></button>
+      <button data-act="feed"><span aria-hidden="true">🍖</span><b>Кормить</b></button>
+      <button data-act="play"><span aria-hidden="true">🧶</span><b>Играть</b></button>
+      <button data-act="wash"><span aria-hidden="true">🫧</span><b>Мыть</b></button>
+      <button data-act="sleep" id="btn-sleep"><span aria-hidden="true">🌙</span><b>Спать</b></button>
     </div>
-    <div class="two"><button class="room-btn" id="open-shop">🛋 Магазин комнаты</button><button class="room-btn" id="open-coat">🎨 Окрас кота</button></div>
+    <div class="two"><button class="room-btn" id="open-shop"><span aria-hidden="true">🛋</span> Магазин</button><button class="room-btn" id="open-coat"><span aria-hidden="true">🎨</span> Окрас</button></div>
+
+    <section class="test" id="test" hidden>
+      <h2>Тестовая панель</h2>
+      <div class="test-row">
+        <button data-t="food">Голод</button><button data-t="mood">Грусть</button><button data-t="clean">Болезнь</button>
+        <button data-t="energy">Злость</button><button data-t="sleep">Сон</button><button data-t="ok">Норма</button>
+      </div>
+      <div class="test-row">
+        <button data-t="coins">+100 🪙</button><button data-t="speed" id="t-speed">Время ×1</button><button data-t="reset" id="t-reset">Начать заново</button>
+      </div>
+    </section>
+
     <div class="sheet-wrap" id="sheet" hidden>
       <div class="sheet-bg" data-close></div>
-      <div class="sheet">
-        <div class="sheet-head"><b id="sheet-title">Магазин</b><span class="coins">🪙 <b id="shop-coins">0</b></span><button class="x" data-close aria-label="Закрыть">✕</button></div>
+      <div class="sheet" role="dialog" aria-labelledby="sheet-title">
+        <div class="sheet-head"><b id="sheet-title">Магазин</b><span class="coins small"><span class="coin" aria-hidden="true"></span><b id="shop-coins">0</b></span><button class="x" data-close aria-label="Закрыть">✕</button></div>
         <div class="tabs" id="tabs"></div>
         <div class="list" id="shop-list"></div>
       </div>
     </div>
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="status"></div>
   </main>
   <script src="assets/game/data.js"></script>
   <script src="js/sprites.js"></script>

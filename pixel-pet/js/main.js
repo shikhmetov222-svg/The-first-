@@ -10,10 +10,7 @@
     tg = window.Telegram && window.Telegram.WebApp;
     if (tg) {
       tg.ready(); tg.expand();
-      const p = tg.themeParams || {}, st = document.documentElement.style;
-      if (p.bg_color) st.setProperty('--bg', p.bg_color);
-      if (p.text_color) st.setProperty('--text', p.text_color);
-      if (p.hint_color) st.setProperty('--hint', p.hint_color);
+      try { tg.setHeaderColor('#21170f'); tg.setBackgroundColor('#21170f'); } catch (e) {}
     }
   } catch (e) { tg = null; }
   const haptic = kind => { try { tg && tg.HapticFeedback && (kind === 'light' ? tg.HapticFeedback.impactOccurred('light') : tg.HapticFeedback.notificationOccurred(kind)); } catch (e) {} };
@@ -33,28 +30,44 @@
   addEventListener('resize', fit); fit();
 
   // ---------- интерфейс ----------
-  const bars = { food: $('b-food'), mood: $('b-mood'), clean: $('b-clean'), energy: $('b-energy') };
-  const vals = { food: $('v-food'), mood: $('v-mood'), clean: $('v-clean'), energy: $('v-energy') };
+  const KEYS = ['food', 'mood', 'clean', 'energy'];
+  const segs = {};
+  KEYS.forEach(k => { const b = $('b-' + k); segs[k] = []; for (let i = 0; i < 10; i++) { const c = document.createElement('i'); b.appendChild(c); segs[k].push(c); } });
   let toastT = 0;
   function toast(msg, bad) {
     const el = $('toast'); el.textContent = msg; el.className = 'toast show' + (bad ? ' bad' : '');
     clearTimeout(toastT); toastT = setTimeout(() => { el.className = 'toast'; }, 2200);
   }
+  let lastCoins = null;
   function refresh() {
     const d = Pet.data;
-    for (const k in bars) {
-      const v = Math.round(d.stats[k]);
-      bars[k].style.width = v + '%';
-      bars[k].parentNode.classList.toggle('low', v < 25);
-      vals[k].textContent = v + (v < 25 ? ' ▼' : '');
-    }
+    KEYS.forEach(k => {
+      const v = Math.round(d.stats[k]), n = Math.ceil(v / 10);
+      segs[k].forEach((c, i) => c.classList.toggle('on', i < n));
+      const st = $('s-' + k); st.classList.toggle('low', v < 25); st.classList.toggle('mid', v >= 25 && v < 50);
+      $('v-' + k).textContent = v + (v < 25 ? ' ▼' : '');
+    });
     $('coins').textContent = d.coins; $('shop-coins').textContent = d.coins;
-    $('status').textContent = Pet.status();
+    if (lastCoins !== null && d.coins > lastCoins) { const pill = $('coins-pill'); pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump'); }
+    lastCoins = d.coins;
+    if (resetAsk && performance.now() - resetAsk > 3000) { $('t-reset').textContent = 'Начать заново'; resetAsk = 0; }
+    const st = Pet.state(); $('status').textContent = Pet.status(); $('status').classList.toggle('alert', st !== 'ok' && st !== 'sleep');
     $('btn-sleep').querySelector('b').textContent = d.sleeping ? 'Будить' : 'Спать';
+    $('btn-sleep').querySelector('span').textContent = d.sleeping ? '☀️' : '🌙';
+    document.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('busy', d.sleeping && b.dataset.act !== 'sleep'));
+  }
+  // всплывающий текст над котом («+2 🪙»)
+  function floatText(text) {
+    const a = Pet.actor; if (!a) return;
+    const el = document.createElement('span'); el.className = 'float'; el.textContent = text;
+    el.style.left = (a.x / D.w * 100) + '%'; el.style.top = ((a.floorY - 62) / D.h * 100) + '%';
+    el.addEventListener('animationend', () => el.remove()); $('fx').appendChild(el);
   }
   document.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', () => {
+    const before = Pet.data.coins;
     const r = Pet.act(btn.dataset.act, Date.now());
     toast(r.msg, !r.ok); haptic(r.ok ? 'light' : 'error');
+    if (Pet.data.coins > before) floatText('+' + (Pet.data.coins - before) + ' 🪙');
     refresh(); save();
   }));
 
@@ -113,11 +126,30 @@
   $('open-coat').addEventListener('click', () => openSheet('coat'));
   document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => { $('sheet').hidden = true; }));
 
+  // ---------- тестовая панель (адрес с #test или тестовая сборка) ----------
+  let speed = 1, resetAsk = 0;
+  if (location.hash === '#test' || window.PET_TEST) $('test').hidden = false;
+  document.querySelectorAll('[data-t]').forEach(b => b.addEventListener('click', () => {
+    const d = Pet.data, s = d.stats, t = b.dataset.t;
+    const norm = () => { Object.assign(s, { food: 80, mood: 80, clean: 80, energy: 80 }); d.sleeping = false; Pet.fx.anim = null; };
+    if (t === 'ok') norm();
+    else if (['food', 'mood', 'clean', 'energy'].indexOf(t) >= 0) { norm(); s[t] = t === 'food' || t === 'mood' ? 10 : 5; }
+    else if (t === 'sleep') { norm(); s.energy = 40; d.sleeping = true; d.sleepFrom = 40; }
+    else if (t === 'coins') { d.coins += 100; floatText('+100 🪙'); }
+    else if (t === 'speed') { speed = speed === 1 ? 60 : speed === 60 ? 600 : 1; b.textContent = 'Время ×' + speed; b.classList.toggle('on', speed > 1); }
+    else if (t === 'reset') {
+      if (performance.now() - resetAsk > 3000) { resetAsk = performance.now(); b.textContent = 'Точно? Нажми ещё раз'; return; }
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      Pet.load(null, Date.now()); Pet.actor = null; b.textContent = 'Начать заново'; resetAsk = 0; toast('Начали заново');
+    }
+    haptic('light'); refresh(); save();
+  }));
+
   // ---------- цикл ----------
   let last = performance.now(), acc = 0, lastSave = 0;
   function frame(t) {
     const dt = Math.min(t - last, 5000); last = t; acc += dt;
-    if (acc >= 1000) { Pet.advance(acc, false); acc = 0; refresh(); }
+    if (acc >= 1000) { Pet.advance(acc * speed, false); acc = 0; refresh(); }
     Pet.events.splice(0).forEach(e => { toast(e.msg, e.kind === 'bad'); haptic('success'); });
     Room.draw(ctx, Pet.data);
     Pet.draw(ctx, t);
